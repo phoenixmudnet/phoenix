@@ -5,7 +5,8 @@ on:
   pull_request:
 
 jobs:
-  build:
+  analyze:
+    needs: build
     runs-on: ubuntu-24.04
 
     steps:
