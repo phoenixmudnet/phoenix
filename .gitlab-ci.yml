@@ -1,6 +1,0 @@
-build:
-    before_script:
-        - apt-get update && apt-get install -y gcc-multilib make
-    image: "ubuntu:18.04"
-    script:
-    - make -C PhoenixMud/src
