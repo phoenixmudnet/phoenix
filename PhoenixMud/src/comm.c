@@ -2283,7 +2283,7 @@ void close_socket(struct descriptor_data *d)
 	 } 
       } 
    else 
-      mudlog("Losing descriptor without char.", CMP, LVL_IMMORT, TRUE); 
+      mudlogf(CMP, LVL_IMMORT, TRUE, "Losing descriptor [%s] without char. ", d->host); 
  
   /* JE 2/22/95 -- part of my unending quest to make switch stable */ 
    if (d->original && d->original->desc) 
