@@ -1,4 +1,4 @@
-name: Compile Code
+name: Build and Test
 
 on:
   push:
@@ -18,7 +18,10 @@ jobs:
       run: |
         sudo dpkg --add-architecture i386
         sudo apt-get update
-        sudo apt-get install -y gcc-multilib make libc6-dev:i386
+        sudo apt-get install -y gcc-multilib make libc6-dev:i386 bear clang-tidy
 
-    - name: Compile code
-      run: make -C PhoenixMud/src
+    - name: Compile and generate compile commands
+      run: bear -- make -C PhoenixMud/src
+
+    - name: Run clang-tidy
+      run: run-clang-tidy -p . -j4
