@@ -1,11 +1,8 @@
 {
 	"name": "Phoenix m32",
 	"image": "mcr.microsoft.com/devcontainers/base:jammy",
-	"mounts":[
-		"source=${localEnv:HOME}/work/phoenix,target=/work,type=bind"
-	],
 
-	"postCreateCommand": "sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y gdb gcc-multilib make libc6-dev:i386",
+	"postCreateCommand": "sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install -y gdb gcc-multilib make libc6-dev:i386 libc6-dbg:i386 valgrind",
 	"customizations": {
 		"vscode": {
 			"extensions": [
