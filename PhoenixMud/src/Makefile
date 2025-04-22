@@ -178,7 +178,7 @@ wld2html:
 
 ../compile/circle : $(OBJFILES)
 	mkdir -p ../../circle/compile ../../circle/bin
-	$(CC) -m32 -g -o ../../circle/compile/circle -lcrypt $(PROFILE) $(OBJFILES)
+	$(CC) -m32 -g -o ../../circle/compile/circle $(PROFILE) $(OBJFILES)
 	cp ../../circle/compile/circle ../../circle/bin
 clean:
 	rm -f *.o *~
