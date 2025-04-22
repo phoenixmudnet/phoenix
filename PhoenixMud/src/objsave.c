@@ -680,10 +680,16 @@ void auto_equip(struct char_data *ch, struct obj_data *obj, int locate)
             locate = 0;
       }
       if (GET_EQ(ch, j)) locate = 0;
-      if (IS_OBJ_STAT(obj, ITEM_ANTI_EVIL)    && IS_EVIL(ch)   ) locate = 0;
-      if (IS_OBJ_STAT(obj, ITEM_ANTI_GOOD)    && IS_GOOD(ch)   ) locate = 0;
-      if (IS_OBJ_STAT(obj, ITEM_ANTI_NEUTRAL) && IS_NEUTRAL(ch)) locate = 0;
-      if (!can_wear_lr(ch, obj, FALSE) && GET_LEVEL(ch) < LVL_IMMORT && REMORT_LEVEL(ch) < TRIPLE_REMORT) locate = 0;
+
+      // Triple remorts are not affected by alignment restrictions
+      if (GET_LEVEL(ch) < LVL_IMMORT && REMORT_LEVEL(ch) < TRIPLE_REMORT) {
+         if (IS_OBJ_STAT(obj, ITEM_ANTI_EVIL)    && IS_EVIL(ch)   ) locate = 0;
+         if (IS_OBJ_STAT(obj, ITEM_ANTI_GOOD)    && IS_GOOD(ch)   ) locate = 0;
+         if (IS_OBJ_STAT(obj, ITEM_ANTI_NEUTRAL) && IS_NEUTRAL(ch)) locate = 0;
+      }
+
+      // can_wear_lr already handles immortals and triple remorts
+      if (!can_wear_lr(ch, obj, FALSE)) locate = 0;
 
       // If a playerfile was corrupted, the character may have been created with
       // their original equipment (which is in a differnet file) AND given the
@@ -1282,8 +1288,6 @@ void Crash_idlesave(struct char_data * ch)
    char *buf;
    struct rent_info rent;
    int j;
-   int cost;
-   /*    int cost_eq;  */
    FILE *fp;
    int result = TRUE;
 
@@ -1313,36 +1317,6 @@ void Crash_idlesave(struct char_data * ch)
    Crash_extract_norents_from_equipped(ch);
 
    Crash_extract_norents(ch->carrying);
-
-   cost = 0;
-#if 0
-
-   Crash_calculate_rent(ch->carrying, &cost);
-
-   cost_eq = 0;
-   for (j = 0; j < NUM_WEARS; j++)
-      Crash_calculate_rent(GET_EQ(ch,j), &cost_eq);
-
-   cost *= 2;   /* forcerent cost is 2x normal rent */
-   cost_eq *= 2;
-
-   if (cost+cost_eq > GET_GOLD(ch) + GET_BANK_GOLD(ch))
-      {
-      for (j = 0; j < NUM_WEARS; j++) /* unequip player with low money */
-         if (GET_EQ(ch,j))
-            obj_to_char(unequip_char(ch, j), ch);
-      cost += cost_eq;
-      cost_eq = 0;
-
-      while ((cost > GET_GOLD(ch) + GET_BANK_GOLD(ch)) && ch->carrying)
-         {
-         Crash_extract_expensive(ch->carrying);
-         cost = 0;
-         Crash_calculate_rent(ch->carrying, &cost);
-         cost *= 2;
-         }
-      }
-#endif
 
    if (!ch->carrying)
       {
@@ -1909,7 +1883,6 @@ int parse_xap_obj(char *filename, struct obj_data **obj,char *line,
    int t[14];
    int zwei = 0;
    int j = 0;
-   int k = 0;
    struct extra_descr_data *new_descr;
    long lVector;
    obj_vnum nr=NOTHING;
@@ -2052,7 +2025,7 @@ int parse_xap_obj(char *filename, struct obj_data **obj,char *line,
          }
 
       get_line(fl,line);
-      for (k=j=zwei=0;!zwei && !feof(fl);)
+      for (j=zwei=0;!zwei && !feof(fl);)
          {
          switch (*line)
             {
