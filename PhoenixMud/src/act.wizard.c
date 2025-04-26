@@ -5719,16 +5719,20 @@ ACMD(do_show)
          store_to_char(&vbuf,victim);
          }
       buf[0]='\0';
+
+      sprintf(buf, "|#  ) VNUM (Lvl)[ Name          ]Count||#  ) VNUM (Lvl)[ Name          ]Count|\r\n");
+      sprintf(buf + strlen(buf), "------------------------------------------------------------------------------\r\n");
       for(i=0;i<127;i++)
          {
 
-         rmob_num=real_mobile(GET_KILLS_VNUM(victim,i));
-         sprintf(buf+strlen(buf),"|%-3ld) %-5ld [%-15.15s] %-3d |",
-                 i+1,
-                 GET_KILLS_VNUM(victim,i),
-                 (GET_KILLS_VNUM(victim,i)!=0)?((rmob_num==-1)?"ERROR":GET_NAME(mob_proto + rmob_num)):"None",
-                       GET_KILLS_AMMOUNT(victim,i)
-                      );
+         rmob_num = real_mobile(GET_KILLS_VNUM(victim, i));
+         sprintf(buf + strlen(buf), "|%-3ld) %-5ld(%-3d)[%-15.15s] %-3d |",
+                 i + 1,
+                 GET_KILLS_VNUM(victim, i),
+                 (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERR" : GET_LEVEL(mob_proto + rmob_num)) : 0,
+                 (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERROR" : GET_NAME(mob_proto + rmob_num)) : "None",
+                 GET_KILLS_AMMOUNT(victim, i)
+                 );
          if(i%2)
             strcat(buf,"\r\n");
          }
