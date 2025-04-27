@@ -1472,8 +1472,8 @@ ACMD(do_gen_tog)
          {"Autoexits disabled.\r\n",
           "Autoexits enabled.\r\n"
          } ,
-         {"Ident changed to NO;  remote username lookups will not be attempted.\r\n",
-          "Ident changed to YES;  remote usernames lookups will be attempted.\r\n"
+         {"Ident is disabled.\r\n",
+          "Ident is now disabled... but it was turned on. BUG?\r\n"
          } ,
          {"Infobar disabled.\r\n",
           "Infobar enabled.  There are supplemental commands:\r\n"
@@ -1598,7 +1598,14 @@ ACMD(do_gen_tog)
       result = PRF_TOG_CHK(ch, PRF_AUTOEXIT);
       break;
    case SCMD_IDENT:
-      result = (ident = !ident);
+      // No reason to use ident anymore. This will allow disabling it if it
+      // somehow managed to get the bit flipped. Messages above should indicate
+      // if it _was_ on, which would indicate a problem
+      result = 0;
+      if (ident) {
+         result = 1;
+      }
+      ident = 0;
       break;
    case SCMD_INFOBAR: /* -naj infobar2 12/16/96 - do_gen_tog */
       if (PRF_FLAGGED(ch,PRF_INFOBAR))
