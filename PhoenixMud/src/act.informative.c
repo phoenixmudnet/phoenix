@@ -2999,47 +2999,109 @@ ACMD(do_where)
 	release_buffer(arg);
 }
 
+/* 4/30/2025 Nomikos - Added ability for mortals to list zones based on criteria */
 ACMD(do_zinfo)
 {
-	char *buf = get_buffer(32750);
+	room_vnum nr;
+	int temp_zone;
+	int found = 0;
+	int target;
+	char *buf, *tempbuf, *arg1, *arg2;
 
 	/* check these three things so that techno-mudders can't abuse it */
 	if (AFF_FLAGGED(ch, AFF_BLIND)) {
-		send_to_char(ch,
-			     "You can't see a damned thing, you're blind!\r\n");
-		release_buffer(buf);
+		send_to_char(ch, "You can't see a damned thing, you're blind!\r\n");
 		return;
 	}
 	if (IS_DARK(IN_ROOM(ch)) && !CAN_SEE_IN_DARK(ch)) {
 		send_to_char(ch, "It is pitch black...\r\n");
-		release_buffer(buf);
 		return;
 	}
 	/*
 	   if (!IS_NPC(ch) && PRF_FLAGGED(ch, PRF_BRIEF))
 	   {
 	   send_to_char(ch,"You have brief on... what do you care who made the zone???\r\n");
-	   release_buffer(buf);
 	   return;
 	   }
 	 */
 
-	sprintf(buf + strlen(buf), "Zone: %s\r\n",
-		zone_table[world[IN_ROOM(ch)].zone].name);
-	sprintf(buf + strlen(buf), " Author:    %s\r\n",
-		zone_table[world[IN_ROOM(ch)].zone].author);
-	sprintf(buf + strlen(buf), " Editor:    %s\r\n",
-		zone_table[world[IN_ROOM(ch)].zone].editor);
-	sprintf(buf + strlen(buf), " Levels:    %s\r\n",
-		zone_table[world[IN_ROOM(ch)].zone].levels);
-	sprintf(buf + strlen(buf), " Source:    %s\r\n",
-		zone_source[(int)zone_table[world[IN_ROOM(ch)].zone].source]);
-	sprintf(buf + strlen(buf), " Continent: %s\r\n",
-		zone_continent[(int)zone_table[world[IN_ROOM(ch)].zone].
-			       continent][0]);
+	buf = get_buffer(32750);
+	arg1 = get_buffer(MAX_INPUT_LENGTH);
+	arg2 = get_buffer(MAX_INPUT_LENGTH);
+	tempbuf = get_buffer(MAX_STRING_LENGTH);
 
-	send_to_char(ch, "%s", buf);
+	two_arguments(argument, arg1, arg2);
+	
+	if (!*arg1) {
+		sprintf(buf + strlen(buf), "Zone: %s\r\n",
+			zone_table[world[IN_ROOM(ch)].zone].name);
+		sprintf(buf + strlen(buf), " Author:    %s\r\n",
+			zone_table[world[IN_ROOM(ch)].zone].author);
+		sprintf(buf + strlen(buf), " Editor:    %s\r\n",
+			zone_table[world[IN_ROOM(ch)].zone].editor);
+		sprintf(buf + strlen(buf), " Levels:    %s\r\n",
+			zone_table[world[IN_ROOM(ch)].zone].levels);
+		sprintf(buf + strlen(buf), " Source:    %s\r\n",
+			zone_source[(int)zone_table[world[IN_ROOM(ch)].zone].source]);
+		sprintf(buf + strlen(buf), " Continent: %s\r\n",
+			zone_continent[(int)zone_table[world[IN_ROOM(ch)].zone].continent][0]);
+	} else if (!*arg2 || (!is_abbrev(arg1, "zones") && !is_abbrev(arg1, "levels") && !is_abbrev(arg1, "continent"))) {
+		sprintf(buf, "Usage:\r\n\r\n  zinfo\r\n   - or -\r\n  zinfo {zones | levels | continent} <target>\r\n");
+	} else {
+		if (is_abbrev(arg1, "zones"))
+			target = 1;
+		else if (is_abbrev(arg1, "levels"))
+			target = 2;
+		else if (is_abbrev(arg1, "continent"))
+			target = 3;
+		
+		strcpy(buf, "#   Zone                           Author     Levels     Continent\r\n");   
+		
+		for (nr = 0; nr <= top_of_world; nr++) {
+			if (!is_olc_set(ch, world[nr].number/100)) {
+				continue;
+			}
+
+			switch (target) {
+				case 1:
+					sprintf(tempbuf, "%s", zone_table[world[nr].zone].name);
+					break;
+				case 2:
+					sprintf(tempbuf, "%s", zone_table[world[nr].zone].levels);
+					break;
+				case 3:
+					sprintf(tempbuf, "%s", zone_continent[(int)zone_table[world[nr].zone].continent][0]);
+			}
+			strip_color(tempbuf); 
+			if (isname(arg2, tempbuf)) {
+				if(strlen(buf) > 32500) {
+					sprintf(buf + strlen(buf), "Buffer limit exceeded, you need to refine your search\r\n");
+					nr=top_of_world;
+					break;
+				} else {
+					sprintf(buf + strlen(buf), "%-3d %-30.30s&n %-10.10s %-10.10s %-20.20s\r\n", 
+						++found,
+						zone_table[world[nr].zone].name, 
+						zone_table[world[nr].zone].author,
+						zone_table[world[nr].zone].levels, 
+						zone_continent[(int)zone_table[world[nr].zone].continent][0]);
+					/*  Skip to next zone */
+					for (temp_zone = world[nr].zone; temp_zone == world[++nr].zone; );
+					nr--;
+				}
+			}
+		}
+		if (!found)
+			sprintf(buf + strlen(buf), "Please refine your search.\r\n");
+	}
+	if (ch->desc)
+		page_string(ch->desc, buf, TRUE, "");
+	
+	release_buffer(tempbuf);
+	release_buffer(arg2);
+	release_buffer(arg1);
 	release_buffer(buf);
+
 }
 
 ACMD(do_levels)
