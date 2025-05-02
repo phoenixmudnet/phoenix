@@ -589,15 +589,15 @@ $n falls face down in some mud created by $N.
 * throw
 M
  123
-Your missle violates $N's heart.
-$n's missle sails right into your heart, you die now.
-$n's missle strikes $N DEAD.
-Your $p flies right by $N's head.
-A $p flashes right in front of your face.
-$n's $p sails right by $N.
-Your $p makes a satisfying *THUNK* as it violates $N.
-A $p strikes you!
-$n's $p hits $N with a meaty *THUNK*!
+Your weapon violates $N's heart.
+$n's missile sails right into your heart, you die now.
+$n's missile strikes $N DEAD.
+Your weapon flies right by $N's head.
+A missile flashes right in front of your face.
+$n's missile sails right by $N.
+Your weapon makes a satisfying *THUNK* as it violates $N.
+A missile strikes you!
+$n's missile hits $N with a meaty *THUNK*!
 The mighty $N begins to think you a nuisance!!!
 Your patience is almost gone when you stare back at $n.
 The air is loaded when $N angrily wards off a nasty attack from $n.
@@ -620,18 +620,18 @@ The air is loaded when $N angrily wards off a piercing attack from $n.
 * sling
 M
  125
-Your missle thunks into $N's head.
-$n's missle sails right into your head, you die now.
-$n's missle strikes $N DEAD.
-Your missle flies right by $N's head.
-An missle flashes right in front of your face.
-$n's missle sails right by $N.
-Your missle makes a satisfying *THUNK* as it collides with $N.
-A $p strikes you!
-$n's missle hits $N with a meaty *THUNK*!
+Your missile thunks into $N's head.
+$n's missile sails right into your head, you die now.
+$n's missile strikes $N DEAD.
+Your missile flies right by $N's head.
+An missile flashes right in front of your face.
+$n's missile sails right by $N.
+Your missile makes a satisfying *THUNK* as it collides with $N.
+A missile strikes you!
+$n's missile hits $N with a meaty *THUNK*!
 The mighty $N begins to think you a nuisance!!!
 Your patience is almost gone when you stare back at $n.
-The air is loaded when $N angrily wards off a missle attack from $n.
+The air is loaded when $N angrily wards off a missile attack from $n.
 * crossbow
 M
  126
