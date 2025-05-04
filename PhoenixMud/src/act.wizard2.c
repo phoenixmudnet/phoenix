@@ -44,7 +44,7 @@ extern zone_rnum top_of_zone_table;
 extern struct zone_data *zone_table;
 extern struct room_data *world;
 int damage_obj_range(int base,int pos,int material,int ImmBit);
-int damage_obj_chance();
+int damage_obj_chance(int dex, int wis);
 
 ACMD(do_get_obj_list)
    {
@@ -81,12 +81,12 @@ ACMD(do_test)
    for(j=1;j<NUM_WEARS;j++)
       {
       range=damage_obj_range(base,j,0,0);
-      chance = damage_obj_chance();
+      chance = damage_obj_chance(GET_DEX(ch), GET_WIS(ch));
       percent = (float)chance/(float)range;
       total_chance += percent;
       send_to_char(ch,"%s %d in %d = %f\r\n",where[j],chance,range,percent);
       }
-   send_to_char(ch,"%f totan_chance\r\n",total_chance);
+   send_to_char(ch,"%f total_chance\r\n",total_chance);
    }
 
 #define ZCOM zone_table[zone].cmd[cmd_no]  /*from DB.C*/
