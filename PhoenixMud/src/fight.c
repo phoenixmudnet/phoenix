@@ -2883,7 +2883,7 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
                {
                obj=unequip_char(victim,j);
                /* Nomikos 5/2/2025: don't want to lose it
-	       ** obj_to_room(obj,IN_ROOM(victim)); */
+               ** obj_to_room(obj,IN_ROOM(victim)); */
                scrap_item(obj,victim);
                }
             }
