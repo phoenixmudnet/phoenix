@@ -22,10 +22,11 @@ extern int cha_align_table[][21];
 #define mudlog(a,b,c,d)        mudlogf(b,c,d,"%s",a)
 
 /* public functions in utils.c */
-int	str_cmp(char *arg1, char *arg2);
-int	strn_cmp(char *arg1, char *arg2, int n);
-int	touch(char *path);
-int     stat_index(int stat_to_check);
+int   str_cmp(char *arg1, char *arg2);
+int   strn_cmp(char *arg1, char *arg2, int n);
+int   touch(char *path);
+int   stat_index(int stat_to_check);
+int   min_level(struct char_data *ch,int spellnum);
 
 void count_items(struct char_data * ch, struct obj_data * obj, long *nitems);
 
