@@ -1,10 +1,7 @@
-name: Compile Code
+name: Compile Code on Ubuntu
 
 on:
   push:
-    branches:
-      - master
-  pull_request:
 
 jobs:
   build:
