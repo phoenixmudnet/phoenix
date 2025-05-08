@@ -3002,12 +3002,6 @@ ACMD(do_where)
 /* 4/30/2025 Nomikos - Added ability for mortals to list zones based on criteria */
 ACMD(do_zinfo)
 {
-	room_vnum nr;
-	int temp_zone;
-	int found = 0;
-	int target;
-	char *buf, *tempbuf, *arg1, *arg2;
-
 	/* check these three things so that techno-mudders can't abuse it */
 	if (AFF_FLAGGED(ch, AFF_BLIND)) {
 		send_to_char(ch, "You can't see a damned thing, you're blind!\r\n");
@@ -3017,91 +3011,92 @@ ACMD(do_zinfo)
 		send_to_char(ch, "It is pitch black...\r\n");
 		return;
 	}
-	/*
-	   if (!IS_NPC(ch) && PRF_FLAGGED(ch, PRF_BRIEF))
-	   {
-	   send_to_char(ch,"You have brief on... what do you care who made the zone???\r\n");
-	   return;
-	   }
-	 */
 
-	buf = get_buffer(32750);
-	arg1 = get_buffer(MAX_INPUT_LENGTH);
-	arg2 = get_buffer(MAX_INPUT_LENGTH);
-	tempbuf = get_buffer(MAX_STRING_LENGTH);
+	char* whatkind = get_buffer(MAX_INPUT_LENGTH);
+	char* searchstring = get_buffer(MAX_INPUT_LENGTH);
 
-	two_arguments(argument, arg1, arg2);
-	
-	if (!*arg1) {
-		sprintf(buf + strlen(buf), "Zone: %s\r\n",
-			zone_table[world[IN_ROOM(ch)].zone].name);
-		sprintf(buf + strlen(buf), " Author:    %s\r\n",
-			zone_table[world[IN_ROOM(ch)].zone].author);
-		sprintf(buf + strlen(buf), " Editor:    %s\r\n",
-			zone_table[world[IN_ROOM(ch)].zone].editor);
-		sprintf(buf + strlen(buf), " Levels:    %s\r\n",
-			zone_table[world[IN_ROOM(ch)].zone].levels);
-		sprintf(buf + strlen(buf), " Source:    %s\r\n",
-			zone_source[(int)zone_table[world[IN_ROOM(ch)].zone].source]);
-		sprintf(buf + strlen(buf), " Continent: %s\r\n",
-			zone_continent[(int)zone_table[world[IN_ROOM(ch)].zone].continent][0]);
-	} else if (!*arg2 || (!is_abbrev(arg1, "zones") && !is_abbrev(arg1, "levels") && !is_abbrev(arg1, "continent"))) {
-		sprintf(buf, "Usage:\r\n\r\n  zinfo\r\n   - or -\r\n  zinfo {zones | levels | continent} <target>\r\n");
-	} else {
-		if (is_abbrev(arg1, "zones"))
-			target = 1;
-		else if (is_abbrev(arg1, "levels"))
-			target = 2;
-		else if (is_abbrev(arg1, "continent"))
-			target = 3;
-		
-		strcpy(buf, "#   Zone                           Author     Levels     Continent\r\n");   
-		
-		for (nr = 0; nr <= top_of_world; nr++) {
-			if (!is_olc_set(ch, world[nr].number/100)) {
-				continue;
-			}
+	two_arguments(argument, whatkind, searchstring);
 
-			switch (target) {
-				case 1:
-					sprintf(tempbuf, "%s", zone_table[world[nr].zone].name);
-					break;
-				case 2:
-					sprintf(tempbuf, "%s", zone_table[world[nr].zone].levels);
-					break;
-				case 3:
-					sprintf(tempbuf, "%s", zone_continent[(int)zone_table[world[nr].zone].continent][0]);
-			}
-			strip_color(tempbuf); 
-			if (isname(arg2, tempbuf)) {
-				if(strlen(buf) > 32500) {
-					sprintf(buf + strlen(buf), "Buffer limit exceeded, you need to refine your search\r\n");
-					nr=top_of_world;
-					break;
-				} else {
-					sprintf(buf + strlen(buf), "%-3d %-30.30s&n %-10.10s %-10.10s %-20.20s\r\n", 
-						++found,
-						zone_table[world[nr].zone].name, 
-						zone_table[world[nr].zone].author,
-						zone_table[world[nr].zone].levels, 
-						zone_continent[(int)zone_table[world[nr].zone].continent][0]);
-					/*  Skip to next zone */
-					for (temp_zone = world[nr].zone; temp_zone == world[++nr].zone; );
-					nr--;
-				}
-			}
-		}
-		if (!found)
-			sprintf(buf + strlen(buf), "Please refine your search.\r\n");
+	if (strlen(whatkind) == 0) {
+		send_to_char(ch, "Zone: %s\r\n", zone_table[world[IN_ROOM(ch)].zone].name);
+		send_to_char(ch, " Author:    %s\r\n", zone_table[world[IN_ROOM(ch)].zone].author);
+		send_to_char(ch, " Editor:    %s\r\n", zone_table[world[IN_ROOM(ch)].zone].editor);
+		send_to_char(ch, " Levels:    %s\r\n", zone_table[world[IN_ROOM(ch)].zone].levels);
+		send_to_char(ch, " Source:    %s\r\n", zone_source[(int)zone_table[world[IN_ROOM(ch)].zone].source]);
+		send_to_char(ch, " Continent: %s\r\n", zone_continent[zone_table[world[IN_ROOM(ch)].zone].continent][0]);
+
+		release_buffer(whatkind);
+		release_buffer(searchstring);
+		return;
+	} 
+
+	int target = 0;
+	if (is_abbrev(whatkind, "zones"))
+		target = 1;
+	else if (is_abbrev(whatkind, "levels"))
+		target = 2;
+	else if (is_abbrev(whatkind, "continent"))
+		target = 3;
+
+	if (target == 0 || strlen(searchstring) == 0) {
+		send_to_char(ch, "Usage:\r\n\r\n  zinfo\r\n   - or -\r\n  zinfo {zones | levels | continent} <target>\r\n");
+
+		release_buffer(whatkind);
+		release_buffer(searchstring);
+		return;
 	}
-	if (ch->desc)
-		page_string(ch->desc, buf, TRUE, "");
-	
-	release_buffer(tempbuf);
-	release_buffer(arg2);
-	release_buffer(arg1);
-	release_buffer(buf);
 
+	char* buf = get_buffer(32750);
+	sprintf(buf, "#   Zone                           Author     Levels     Continent\r\n");
+
+	int found = 0;
+	for (zone_rnum ii=0; ii<=top_of_zone_table; ii++) {
+		char* subject = NULL;
+
+		switch (target) {
+			case 1: //zones
+				subject = strdup(zone_table[ii].name);
+				break;
+			case 2: //levels
+				subject = strdup(zone_table[ii].levels);
+				break;
+			case 3: //continents
+				subject = strdup(zone_continent[zone_table[ii].continent][0]);
+				break;
+		}
+
+		// Is this necessary? Do we actually have color in any of these?
+		strip_color(subject);
+
+		if (!isname(searchstring, subject)) {
+			free(subject);
+			continue;
+		}
+
+		if (strlen(buf) > 32500) {
+			sprintf(buf + strlen(buf), "Buffer limit exceeded, you need to refine your search\r\n");
+			free(subject);
+			break;
+		}
+
+		sprintf(buf + strlen(buf), "%-3d %-30.30s&n %-10.10s %-10.10s %-20.20s\r\n",
+				++found,
+				zone_table[ii].name,
+				zone_table[ii].author,
+				zone_table[ii].levels,
+				zone_continent[zone_table[ii].continent][0]);
+
+		free(subject);
+	}
+
+	if (found == 0)
+		sprintf(buf + strlen(buf), "Please refine your search.\r\n");
+
+	page_string(ch->desc, buf, TRUE, "");
+
+	release_buffer(searchstring);
+	release_buffer(whatkind);
+	release_buffer(buf);
 }
 
 ACMD(do_levels)
