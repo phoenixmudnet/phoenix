@@ -1166,6 +1166,12 @@ ACMD(do_stand)
             act("$n stops resting, and clambers on $s feet.", TRUE, ch, 0, 0,
                 TO_ROOM);
             GET_POS(ch) = POS_STANDING;
+            break;         
+	 case POS_BANDAGE:
+            send_to_char(ch, "You unwrap your wounds and stand up.\r\n");
+            act("$n removes $s bandages, and jumps to $s feet.", TRUE, ch, 0, 0,
+                TO_ROOM);
+            GET_POS(ch) = POS_STANDING;
             break;
          case POS_SLEEPING:
             send_to_char(ch, "You have to wake up first!\r\n");
