@@ -1695,8 +1695,8 @@ int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
       if ((GET_LEVEL(victim) + (GET_LEVEL(ch) * 1/4)) < GET_LEVEL(ch))
          return exp;
 
-   /* With the change above, adjusted this from 127 to 66 - Nomikos 5/8/2025 */
-   for (i = 0; i < 66; i++)
+   /* With the change above, adjusted this from 127 to 64 - Nomikos 5/8/2025 */
+   for (i = 0; i < 64; i++)
       {
       if(GET_KILLS_VNUM(ch, i) == victim_vnum)
          {
@@ -1713,7 +1713,7 @@ int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
 
    if (found == 255)
       {
-      for(i = 64; i >= 0; i--)
+      for(i = 62; i >= 0; i--)
          {
          GET_KILLS_VNUM(ch, i + 1) = GET_KILLS_VNUM(ch, i);
          GET_KILLS_AMMOUNT(ch, i + 1) = GET_KILLS_AMMOUNT(ch, i);
