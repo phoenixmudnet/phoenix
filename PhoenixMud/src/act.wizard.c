@@ -5716,28 +5716,32 @@ ACMD(do_show)
          CREATE(victim, struct char_data, 1);
          clear_char(victim);
 
-         store_to_char(&vbuf,victim);
+         store_to_char(&vbuf, victim);
          }
-      buf[0]='\0';
+      buf[0] = '\0';
 
-      sprintf(buf, "|#  ) VNUM (Lvl)[ Name          ]Count||#  ) VNUM (Lvl)[ Name          ]Count|\r\n");
+      sprintf(buf, "|#  ) VNUM [ Name          ](Lvl)Count||#  ) VNUM [ Name          ](Lvl)Count|\r\n");
       sprintf(buf + strlen(buf), "------------------------------------------------------------------------------\r\n");
-      for(i=0;i<127;i++)
+
+      /* Lowered kill buffer to 64 from 125 - Nomikos 5/8/2025 */
+      for(i = 0; i < 66; i++)
          {
 
          rmob_num = real_mobile(GET_KILLS_VNUM(victim, i));
-         sprintf(buf + strlen(buf), "|%-3ld) %-5ld(%-3d)[%-15.15s] %-3d |",
+         sprintf(buf + strlen(buf), "|%-3ld) %-5ld[%-15.15s](%-3d) %-3d |",
                  i + 1,
                  GET_KILLS_VNUM(victim, i),
-                 (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERR" : GET_LEVEL(mob_proto + rmob_num)) : 0,
                  (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERROR" : GET_NAME(mob_proto + rmob_num)) : "None",
+                 (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERR" : GET_LEVEL(mob_proto + rmob_num)) : 0,
                  GET_KILLS_AMMOUNT(victim, i)
                  );
-         if(i%2)
-            strcat(buf,"\r\n");
+
+         if(i % 2)
+            strcat(buf, "\r\n");
          }
+
       if(ch->desc)
-         page_string(ch->desc,buf,TRUE,"");
+         page_string(ch->desc, buf, TRUE, "");
 
       if (l)
          free_char(victim);
@@ -5747,7 +5751,7 @@ ACMD(do_show)
    case SHOW_NEWBIEEQ:
       strcpy(buf, "Newbie Equipment\r\n-------------------------");
       for(i=0,j=1; i<top_of_objt;i++)
-   {
+         {
          if(obj_proto[i].obj_flags.extra_flags & ITEM_NEWBIE)
             {
             if(j%2)
