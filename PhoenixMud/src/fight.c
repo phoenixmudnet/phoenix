@@ -1662,13 +1662,13 @@ void change_alignment(struct char_data * ch, struct char_data * victim)
  * slow exp decrease
  */
 #define KILL_UNDER_MF(exp, num_kills) \
-   (MAX(1, GET_PERCENT(exp, ((101 - (MIN(101, num_kills * 3)))))))
+   (MAX(1, GET_PERCENT(exp, ((101 - (MIN(101, (num_kills) * 3)))))))
 
 /*
  * Fast exp decrease
  */
 #define KILL_ABOVE_MF(exp, num_kills) \
-   (MAX(1, GET_PERCENT(exp, 100.0 / ((float)num_kills / 3.0))))
+   (MAX(1, GET_PERCENT(exp, 100.0 / ((float)(num_kills) / 3.0))))
 
 
 /* What is this!?! Nomi May 2025 */
@@ -1695,8 +1695,8 @@ int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
       if ((GET_LEVEL(victim) + (GET_LEVEL(ch) * 1/4)) < GET_LEVEL(ch))
          return exp;
 
-   /* With the change above, adjusted this from 127 to 64 - Nomikos 5/8/2025 */
-   for (i = 0; i < 65; i++)
+   /* With the change above, adjusted this from 127 to 66 - Nomikos 5/8/2025 */
+   for (i = 0; i < 66; i++)
       {
       if(GET_KILLS_VNUM(ch, i) == victim_vnum)
          {
