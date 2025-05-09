@@ -1656,7 +1656,7 @@ void change_alignment(struct char_data * ch, struct char_data * victim)
 /*
  * Killing Same mobs XP gain limit function
  */
-#define GET_PERCENT(num, from_v) ((int)((float)from_v / 100.0) * (float)num)
+#define GET_PERCENT(num, from_v) ((int)((float)(from_v) / 100.0) * (float)(num))
 
 /*
  * slow exp decrease
@@ -1764,8 +1764,8 @@ int kills_limit_damage_xpgain(struct char_data *ch, struct char_data *victim, in
    int i;
    int found = 255;
 
-   /* Lowered kill buffer from 127 to 65 - Nomikos 5/8/2025 */
-   for (i = 0; i < 65; i++)
+   /* Lowered kill buffer from 127 to 64 - Nomikos 5/8/2025 */
+   for (i = 0; i < 64; i++)
       {
       if (GET_KILLS_VNUM(ch, i) == victim_vnum)
          {
