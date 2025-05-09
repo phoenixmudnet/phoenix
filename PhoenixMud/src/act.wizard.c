@@ -5724,7 +5724,7 @@ ACMD(do_show)
       sprintf(buf + strlen(buf), "------------------------------------------------------------------------------\r\n");
 
       /* Lowered kill buffer to 64 from 125 - Nomikos 5/8/2025 */
-      for(i = 0; i < 66; i++)
+      for(i = 0; i < 64; i++)
          {
 
          rmob_num = real_mobile(GET_KILLS_VNUM(victim, i));
