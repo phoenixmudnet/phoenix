@@ -1656,51 +1656,46 @@ void change_alignment(struct char_data * ch, struct char_data * victim)
 /*
  * Killing Same mobs XP gain limit function
  */
-#define GET_PERCENT(num, from_v) ((int)((float)(from_v) / 100.0) * (float)(num))
+
+#define GET_PERCENT(num, from_v) ((int)((float)((float)(from_v)/(float)100.0) * (float)(num)))
 
 /*
  * slow exp decrease
  */
-#define KILL_UNDER_MF(exp, num_kills) \
-   (MAX(1, GET_PERCENT(exp, ((101 - (MIN(101, (num_kills) * 3)))))))
+#define KILL_UNDER_MF(exp,num_kills) \
+   (MAX(1,GET_PERCENT((exp),((101-(MIN(101,(num_kills)*3)))))))
 
 /*
  * Fast exp decrease
  */
-#define KILL_ABOVE_MF(exp, num_kills) \
-   (MAX(1, GET_PERCENT(exp, 100.0 / ((float)(num_kills) / 3.0))))
+#define KILL_ABOVE_MF(exp,num_kills)\
+   (MAX(1,GET_PERCENT(exp,(float)100/((float)num_kills/(2+1)))))
 
-
-/* What is this!?! Nomi May 2025 */
 void test()
    {
    }
-
-
 /*
- * Calculate the expgain limit and add to the kill buffer
+ * Calculate the expgain limit
  */
 int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
    {
    int victim_vnum = GET_MOB_VNUM(victim);
    int new_exp;
    int i;
-   int found = 255;
+   int found=255;
    int temp_num;
 
-   /* Adjusted this from 1/4 of your level to 3/4 of your level - Nomikos 5/8/2025 */
-   /* NPCs below 3/4 of your level don't go on your buffer */
+   /* NPCs below 1/4 of your level don't go on your buffer */
    /* this will keep newbie zones safer */
-   if (GET_LEVEL(victim) < GET_LEVEL(ch) && GET_LEVEL(ch) > LVL_NEWBIE)
-      if ((GET_LEVEL(victim) + (GET_LEVEL(ch) * 1/4)) < GET_LEVEL(ch))
+   if (GET_LEVEL(victim)<GET_LEVEL(ch) && GET_LEVEL(ch)>LVL_NEWBIE)
+      if ((GET_LEVEL(victim)+(GET_LEVEL(ch)*3/4)) < GET_LEVEL(ch))
          return exp;
 
-   /* With the change above, adjusted this from 127 to 64 - Nomikos 5/8/2025 */
-   for (i = 0; i < 64; i++)
+   for(i=0;i<127;i++)
       {
-      if(GET_KILLS_VNUM(ch, i) == victim_vnum)
+      if(GET_KILLS_VNUM(ch,i)==victim_vnum)
          {
-         found = i;
+         found=i;
          break;
          }
       }
@@ -1711,26 +1706,26 @@ int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
     *  }
     */
 
-   if (found == 255)
+   if(found==255)
       {
-      for(i = 62; i >= 0; i--)
+      for(i=125;i>=0;i--)
          {
-         GET_KILLS_VNUM(ch, i + 1) = GET_KILLS_VNUM(ch, i);
-         GET_KILLS_AMMOUNT(ch, i + 1) = GET_KILLS_AMMOUNT(ch, i);
+         GET_KILLS_VNUM(ch,i+1)=GET_KILLS_VNUM(ch,i);
+         GET_KILLS_AMMOUNT(ch,i+1)=GET_KILLS_AMMOUNT(ch,i);
          }
-      GET_KILLS_VNUM(ch, 0) = victim_vnum;
-      GET_KILLS_AMMOUNT(ch, 0) = 0;
+      GET_KILLS_VNUM(ch,0)=victim_vnum;
+      GET_KILLS_AMMOUNT(ch,0)=0;
       }
-   else if (found!=0)
+   else if(found!=0)
       {
-      temp_num = GET_KILLS_AMMOUNT(ch, found);
-      for(i = found - 1; i >= 0; i--)
+      temp_num=GET_KILLS_AMMOUNT(ch,found);
+      for(i=found-1;i>=0;i--)
          {
-         GET_KILLS_VNUM(ch, i + 1) = GET_KILLS_VNUM(ch, i);
-         GET_KILLS_AMMOUNT(ch, i + 1) = GET_KILLS_AMMOUNT(ch, i);
+         GET_KILLS_VNUM(ch,i+1)=GET_KILLS_VNUM(ch,i);
+         GET_KILLS_AMMOUNT(ch,i+1)=GET_KILLS_AMMOUNT(ch,i);
          }
-      GET_KILLS_VNUM(ch, 0) = victim_vnum;
-      GET_KILLS_AMMOUNT(ch, 0) = temp_num;
+      GET_KILLS_VNUM(ch,0)=victim_vnum;
+      GET_KILLS_AMMOUNT(ch,0)=temp_num;
       }
 
 
@@ -1743,51 +1738,44 @@ int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
          }
       else*/
 
-   if (GET_KILLS_AMMOUNT(ch, 0) > 101)
-      new_exp = KILL_UNDER_MF(exp, 101);
-   else if (GET_KILLS_AMMOUNT(ch, 0) > 1)
-      new_exp = KILL_UNDER_MF(exp, GET_KILLS_AMMOUNT(ch, 0));
+   if(GET_KILLS_AMMOUNT(ch,0) > 101)
+      new_exp = KILL_UNDER_MF(exp,101);
+   else if(GET_KILLS_AMMOUNT(ch,0) > 1)
+      new_exp = KILL_UNDER_MF(exp,GET_KILLS_AMMOUNT(ch,0));
    else
       new_exp = exp;
 
-   if(GET_KILLS_AMMOUNT(ch, 0) < 255)
-      GET_KILLS_AMMOUNT(ch, 0) += 1;
+   if(GET_KILLS_AMMOUNT(ch,0) < 255)
+      GET_KILLS_AMMOUNT(ch,0)+=1;
 
    return new_exp;
    }
 
-
-/* Calculate the per hit xpgain damage and kill buffer */
 int kills_limit_damage_xpgain(struct char_data *ch, struct char_data *victim, int exp)
 {
    int victim_vnum = GET_MOB_VNUM(victim);
    int i;
-   int found = 255;
+   int found=255;
 
-   /* Lowered kill buffer from 127 to 64 - Nomikos 5/8/2025 */
-   for (i = 0; i < 64; i++)
+   for(i=0;i<127;i++)
       {
-      if (GET_KILLS_VNUM(ch, i) == victim_vnum)
+      if(GET_KILLS_VNUM(ch,i)==victim_vnum)
          {
-         found = i;
+         found=i;
          break;
          }
       }
-
-   if (found == 255)
+   if(found==255)
    {
       return exp;
    }
-	
-   if (GET_KILLS_AMMOUNT(ch, found) > 101)
-      return KILL_UNDER_MF(exp, 101);
-   else if (GET_KILLS_AMMOUNT(ch, found) > 1)
-      return KILL_UNDER_MF(exp, GET_KILLS_AMMOUNT(ch, found));
+   if(GET_KILLS_AMMOUNT(ch,found) > 101)
+      return KILL_UNDER_MF(exp,101);
+   else if(GET_KILLS_AMMOUNT(ch,found) > 1)
+      return KILL_UNDER_MF(exp,GET_KILLS_AMMOUNT(ch,found));
    else
       return exp;
 }
-
-
 void death_cry(struct char_data * ch)
    {
    int door, was_in;
