@@ -164,7 +164,7 @@ void show_obj_i_to_char(struct obj_data *object, struct char_data *ch,
 			else
 				condition =
 				    (GET_OBJ_CSLOTS(object) * 10) /
-				    GET_OBJ_TSLOTS(object);
+				    GET_OBJ_OSLOTS(object); /* out of original, not total */
 
 			if ((GET_OBJ_CSLOTS(object) == 0)
 			    && (GET_OBJ_TSLOTS(object) == 0))
