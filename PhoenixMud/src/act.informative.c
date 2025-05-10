@@ -1404,8 +1404,11 @@ ACMD(do_examine)
 			condition =
 			    (GET_OBJ_CSLOTS(tmp_object) * 100) /
 			    GET_OBJ_OSLOTS(tmp_object);
+		
 		if (condition == 0)
 			send_to_char(ch, "This looks indestructable!\r\n");
+		else if (condition < 0)
+			send_to_char(ch, "This looks broken.\r\n");
 		else if (condition <= 10)
 			send_to_char(ch,
 				     "This looks in extremley poor condition.\r\n");
