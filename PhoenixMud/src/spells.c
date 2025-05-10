@@ -1094,7 +1094,7 @@ void id_obj_to_char(struct char_data *ch, struct obj_data *obj)
    if(GET_OBJ_TSLOTS(obj)==0)
       percent=0;
    else
-      percent = (GET_OBJ_CSLOTS(obj) * 100)/GET_OBJ_TSLOTS(obj);
+      percent = (GET_OBJ_CSLOTS(obj) * 100)/GET_OBJ_OSLOTS(obj);
 
    if ((GET_OBJ_CSLOTS(obj) == 0) && (GET_OBJ_TSLOTS(obj) == 0))
       condition=0;
