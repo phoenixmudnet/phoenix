@@ -2881,10 +2881,9 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
             if ((victim->equipment[j]->obj_flags.curr_dam_slots <= 0) &&
                     (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE))
                {
-               obj=unequip_char(victim,j);
-               /* Nomikos 5/2/2025: don't want to lose it
-               ** obj_to_room(obj,IN_ROOM(victim)); */
-               scrap_item(obj,victim);
+               /* Nomikos 5/2/2025: don't want to lose it */
+               obj_to_char(obj = unequip_char(victim, j), victim);
+               scrap_item(obj, victim);
                }
             }
          if(damage_item>=3)
