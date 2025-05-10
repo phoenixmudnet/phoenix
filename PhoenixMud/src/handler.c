@@ -1616,10 +1616,24 @@ void scrap_item(struct obj_data *obj,struct char_data *ch)
       }
    else
       {
-      act("Your $p falls to pieces!",FALSE,ch,obj,0,TO_CHAR);
-      act("$p falls to the ground in scraps!",FALSE,ch,obj,0,TO_ROOM);
-      log("Obj-Scrap: %s just lost '%s' (%dC %dT %dO slots)",GET_NAME(ch),
-         GET_OBJ_NAME(obj),GET_OBJ_CSLOTS(obj),GET_OBJ_TSLOTS(obj),GET_OBJ_OSLOTS(obj));
+      /* Change message to reflect falling into inventory - Nomikos 5/10/2025 */
+      act("Your $p is damaged! Please visit a repairman to fix it!",
+	      FALSE, ch, obj, 0, TO_CHAR);
+      act("$n's $p breaks and is damaged beyond use!",
+	      FALSE, ch, obj, 0, TO_ROOM);
+	  
+      log("Obj-Scrap: %s just broke '%s' (%dC %dT %dO slots)", GET_NAME(ch),
+         GET_OBJ_NAME(obj), GET_OBJ_CSLOTS(obj),
+		 GET_OBJ_TSLOTS(obj), GET_OBJ_OSLOTS(obj));
+
+      /* Exit out so we don't turn the item into scrap */
+      return;
+	      
+      /* Left here as a comparison for now.  						     **
+      ** act("Your $p falls to pieces!",FALSE,ch,obj,0,TO_CHAR);			     **
+      ** act("$p falls to the ground in scraps!",FALSE,ch,obj,0,TO_ROOM);		     **
+      ** log("Obj-Scrap: %s just lost '%s' (%dC %dT %dO slots)",GET_NAME(ch),		     **
+      **    GET_OBJ_NAME(obj),GET_OBJ_CSLOTS(obj),GET_OBJ_TSLOTS(obj),GET_OBJ_OSLOTS(obj));  */
       }
 
    if(GET_OBJ_TYPE(obj) == ITEM_CONTAINER && obj->contains)
