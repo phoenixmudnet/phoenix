@@ -1488,7 +1488,7 @@ int get_repair_cost(struct obj_data *obj,struct char_data *keeper,
    {
    int cost = 0;
    cost =GET_OBJ_OSLOTS(obj)+5*(GET_OBJ_TSLOTS(obj)-GET_OBJ_CSLOTS(obj));
-/*   cost =GET_OBJ_OSLOTS(obj)+GET_OBJ_OSLOTS(obj)*(GET_OBJ_TSLOTS(obj)-GET_OBJ_CSLOTS(obj));*/
+   /* cost =GET_OBJ_OSLOTS(obj)+GET_OBJ_OSLOTS(obj)*(GET_OBJ_TSLOTS(obj)-GET_OBJ_CSLOTS(obj));*/
    
    /* odinian, 10/25/99, CHA price adjustment */
    cost = price_adjust(ch, keeper, cost);
@@ -1563,44 +1563,42 @@ SPECIAL(repair_guy)
          return TRUE;
          }
 
-      cost = get_repair_cost(obj,keeper,ch);
+      cost = get_repair_cost(obj, keeper, ch);
 
-      if(GET_GOLD(ch)<cost)
+      if(GET_GOLD(ch) < cost)
          {
          sprintf(buf,"%s You need at least %d gold on-hand to repair %s.",
-                 GET_NAME(ch),cost, GET_OBJ_NAME(obj));
+                 GET_NAME(ch), cost, GET_OBJ_NAME(obj));
          do_tell(keeper, buf, cmd_tell, 0);
          release_buffer(buf);
          return TRUE;
          }
 
-      GET_GOLD(ch)-=cost;
-      total_repair+=cost;
-      act("$N take some gold and $p from $n.",TRUE,ch,obj,keeper,TO_ROOM);
-      send_to_char(ch,"%s takes %d gold and %s from you.\r\n",GET_NAME(keeper),
-                   cost,GET_OBJ_NAME(obj));
-      if(GET_OBJ_CSLOTS(obj)<0)
+      /* Subtract total slots. If all out, have a master fix it */
+      GET_OBJ_TSLOTS(obj) -= 2;
+      if(GET_OBJ_TSLOTS(obj) < 1)
          {
-         act("$n tries to repair $p, but it crumbles away!",TRUE,keeper,
-             obj,0,TO_ROOM);
+         act("$n tries to repair $p, but $e is not skilled enough!",
+		 TRUE, keeper, obj, 0, TO_ROOM);
          release_buffer(buf);
-         extract_obj(obj);
          return (TRUE);
          }
-      GET_OBJ_TSLOTS(obj)-=2;
-      GET_OBJ_CSLOTS(obj)=GET_OBJ_TSLOTS(obj);
 
-      if(GET_OBJ_TSLOTS(obj)<1)
-         {
-         act("$n tries to repair $p, but it crumbles away!",TRUE,keeper,
-             obj,0,TO_ROOM);
-         release_buffer(buf);
-         extract_obj(obj);
-         return (TRUE);
-         }
-      act("$n repairs $p, making it as good as new again!", TRUE, keeper,
-          obj, 0, TO_ROOM);
-      act("$n hands $p back to $N.",TRUE,keeper,obj,ch,TO_ROOM);
+      /* Subtract current slots after total slots check */
+      GET_OBJ_CSLOTS(obj) = GET_OBJ_TSLOTS(obj);
+
+      /* Let's charge the player ONLY when we can fix it - Nomikos 5/10/25 */
+      GET_GOLD(ch) -= cost;
+      total_repair += cost;
+      act("$N takes some gold and $p from $n.",
+	      TRUE, ch, obj, keeper, TO_ROOM);
+      send_to_char(ch,"%s takes %d gold and %s from you.\r\n",
+	      GET_NAME(keeper), cost, GET_OBJ_NAME(obj));		 
+		 
+      act("$n repairs $p, making it almost as good as new again!", 
+	      TRUE, keeper, obj, 0, TO_ROOM);
+      act("$n hands $p back to $N.",
+	      TRUE, keeper, obj, ch, TO_ROOM);
       release_buffer(buf);
       return (TRUE);
       }
