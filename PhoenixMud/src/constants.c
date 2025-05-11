@@ -62,6 +62,7 @@ const char      *armor_types[] =
 
 const char *item_condition[] = {
    "&WINDESTRUCTABLE&n",
+   "&MBroken&n",
    "&RBarely hanging on&n",
    "&RSeriously Damaged&n",
    "&MDamaged&n",
@@ -78,6 +79,7 @@ const char *item_condition[] = {
 
 const char* item_condition_no_color[] = {
    "INDESTRUCTABLE",
+   "Broken",
    "Barely hanging on",
    "Seriously Damaged",
    "Damaged",
