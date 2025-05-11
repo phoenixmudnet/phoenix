@@ -162,15 +162,18 @@ void show_obj_i_to_char(struct obj_data *object, struct char_data *ch,
 			if (GET_OBJ_TSLOTS(object) == 0)
 				condition = 0;
 			else
-				condition =
-				    (GET_OBJ_CSLOTS(object) * 10) /
-				    GET_OBJ_TSLOTS(object);
+				condition = (GET_OBJ_CSLOTS(object) * 10) /
+				             GET_OBJ_OSLOTS(object);
 
-			if ((GET_OBJ_CSLOTS(object) == 0)
-			    && (GET_OBJ_TSLOTS(object) == 0))
+			if ((GET_OBJ_CSLOTS(object) == 0) &&
+		            (GET_OBJ_TSLOTS(object) == 0))
 				condition = 0;
+			else if (GET_OBJ_CSLOTS(object) < 0)
+				/* Added a broken status at position 1 - Nomi 5/10/25 */
+				condition = 1;
 			else
-				condition += 1;
+				/* Position 2 is the lowest before it breaks */
+				condition += 2;
 
 			if (GET_LEVEL(ch) >= LVL_IMMORT)
 				sprintf(buf + strlen(buf),
@@ -1401,35 +1404,30 @@ ACMD(do_examine)
 		if (GET_OBJ_TSLOTS(tmp_object) == 0)
 			condition = 0;
 		else
-			condition =
-			    (GET_OBJ_CSLOTS(tmp_object) * 100) /
-			    GET_OBJ_TSLOTS(tmp_object);
+			condition = (GET_OBJ_CSLOTS(tmp_object) * 100) /
+			             GET_OBJ_OSLOTS(tmp_object);
 		if (condition == 0)
 			send_to_char(ch, "This looks indestructable!\r\n");
+		else if (condition < 0)
+			send_to_char(ch, "This looks broken.\r\n");
 		else if (condition <= 10)
-			send_to_char(ch,
-				     "This looks in extremley poor condition.\r\n");
+			send_to_char(ch, "This looks in extremely poor condition.\r\n");
 		else if (condition <= 20)
 			send_to_char(ch, "This looks in poor condition.\r\n");
 		else if (condition <= 30)
 			send_to_char(ch, "This looks in fair condition.\r\n");
 		else if (condition <= 40)
-			send_to_char(ch,
-				     "This looks in moderate condition.\r\n");
+			send_to_char(ch, "This looks in moderate condition.\r\n");
 		else if (condition <= 50)
 			send_to_char(ch, "This looks in good condition.\r\n");
 		else if (condition <= 60)
-			send_to_char(ch,
-				     "This looks in very good condition.\r\n");
+			send_to_char(ch, "This looks in very good condition.\r\n");
 		else if (condition <= 70)
-			send_to_char(ch,
-				     "This looks in excellent condition.\r\n");
+			send_to_char(ch, "This looks in excellent condition.\r\n");
 		else if (condition <= 80)
-			send_to_char(ch,
-				     "This looks in superior condition.\r\n");
+			send_to_char(ch, "This looks in superior condition.\r\n");
 		else if (condition <= 90)
-			send_to_char(ch,
-				     "This looks in extremely superior condition.\r\n");
+			send_to_char(ch, "This looks in extremely superior condition.\r\n");
 		else
 			send_to_char(ch, "This looks as good as new!.\r\n");
 
