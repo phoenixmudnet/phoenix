@@ -2363,13 +2363,15 @@ ACMD(do_wear)
          next_obj = obj->next_content;
          if (CAN_SEE_OBJ(ch, obj) && (where_pos = find_eq_pos(ch, obj, 0))>=0)
             {
-            if (IS_NPC(ch) && (!trait_info[GET_RACE(ch)].has_hands) && (where_pos==WEAR_SHIELD))
+            if (IS_NPC(ch) && (!trait_info[GET_RACE(ch)].has_hands) && (where_pos == WEAR_SHIELD))
                send_to_char(ch, "Your lack of hands prevents you from using %s!\r\n",
                             GET_OBJ_NAME(obj));
+	    else if (GET_OBJ_CSLOTS(obj) < 0)
+	       send_to_char(ch, "You try wearing %s but it is too badly damaged!\r\n",
+			    GET_OBJ_NAME(obj));
             else
                {
                items_worn++;
-
                perform_wear(ch, obj, where_pos, TRUE);
                }
             }
@@ -2397,14 +2399,13 @@ ACMD(do_wear)
             if ((where_pos = find_eq_pos(ch, obj, 0)) >= 0)
                {
                if (IS_NPC(ch) && (!trait_info[GET_RACE(ch)].has_hands) && (where_pos==WEAR_SHIELD))
-                  {
                   send_to_char(ch, "Your lack of hands prevents you from using %s!\r\n", 
                                GET_OBJ_NAME(obj));
-                  }
+	       else if (GET_OBJ_CSLOTS(obj) < 0)
+		  send_to_char(ch, "You try wearing %s but it is too badly damaged!\r\n",
+			       GET_OBJ_NAME(obj));
                else
-                  {
                   perform_wear(ch, obj, where_pos, TRUE);
-                  }
                }
             else
                act("You can't wear $p.", FALSE, ch, obj, 0, TO_CHAR);
@@ -2422,14 +2423,13 @@ ACMD(do_wear)
          if ((where_pos = find_eq_pos(ch, obj, arg2)) >= 0)
             { 
             if (IS_NPC(ch) && (!trait_info[GET_RACE(ch)].has_hands) && (where_pos==WEAR_SHIELD))
-               {
                send_to_char(ch, "Your lack of hands prevents you from using %s!\r\n",
                             GET_OBJ_NAME(obj));
-               }
+	    else if (GET_OBJ_CSLOTS(obj) < 0)
+	       send_to_char(ch, "You try wearing %s but it is too badly damaged!\r\n",
+			    GET_OBJ_NAME(obj));
             else
-               {
                perform_wear(ch, obj, where_pos, TRUE);
-               }
             }
          else if (!*arg2)
             act("You can't wear $p.", FALSE, ch, obj, 0, TO_CHAR);
@@ -2488,8 +2488,10 @@ ACMD(do_wield)
                 (GET_OBJ_VAL(obj,3)==13) ||
                 (GET_OBJ_VAL(obj,3)==15)))
          send_to_char(ch, "That weapon would interfere with your magic!\r\n");
+      else if (GET_OBJ_CSLOTS(obj) < 0)
+         send_to_char(ch, "You sense the futility in wielding a broken weapon.\r\n");
       else
-         perform_wear(ch, obj, WEAR_WIELD_1, TRUE);
+	 perform_wear(ch, obj, WEAR_WIELD_1, TRUE);
       }
    release_buffer(arg);
    }
@@ -2511,6 +2513,10 @@ ACMD(do_grab)
       }
    else if (IS_NPC(ch) && (!trait_info[GET_RACE(ch)].has_hands))
       send_to_char(ch, "But you don't have any hands to hold that!\r\n");
+   /* Just in case a broken piece of equipment can be held. */
+   else if (GET_OBJ_CSLOTS(obj) < 0)
+      send_to_char(ch, "You try to hold %s but can't seem to figure out how.\r\n",
+                   GET_OBJ_NAME(obj));
    else
       {
       if (GET_OBJ_TYPE(obj) == ITEM_LIGHT)
