@@ -502,30 +502,40 @@ ACMD(do_shop)
     int i = 1;
     for (; item; item = item->next) {
       struct obj_data* obj = item->item;
+
       if (strlen(arg1) > 0 && !is_name(arg1, obj->name)) {
 	/* If the player used a filter, and the object doesn't match, skip the object. */
 	continue;
       }
+	    
       int percent;
-      if(GET_OBJ_TSLOTS(obj)==0)
-	percent=0;
+      if(GET_OBJ_TSLOTS(obj) == 0)
+	    percent = 0;
       else
-	percent = (GET_OBJ_CSLOTS(obj) * 100)/GET_OBJ_TSLOTS(obj);
+	    /* Base object status from original, not total - Nomikos 5/10/2025 */
+	    percent = (GET_OBJ_CSLOTS(obj) * 100) / GET_OBJ_OSLOTS(obj);
+	
       int wpercent;
-      if(GET_OBJ_OSLOTS(obj)==0)
-	wpercent=0;
+      if(GET_OBJ_OSLOTS(obj) == 0)
+	    wpercent = 0;
       else
-	wpercent = (GET_OBJ_TSLOTS(obj) * 100)/GET_OBJ_OSLOTS(obj);
+	    wpercent = (GET_OBJ_TSLOTS(obj) * 100) / GET_OBJ_OSLOTS(obj);
+	
       int condition;
       if ((GET_OBJ_CSLOTS(obj) == 0) && (GET_OBJ_TSLOTS(obj) == 0))
-	condition=0;
+	    condition = 0;
+      else if (GET_OBJ_CSLOTS(obj) < 0)
+	    /* Added a broken status at position 1 - Nomi 5/10/25 */
+	    condition = 1;
       else
-	condition=(percent/10)+1;
+	    /* Position 2 is the lowest before it breaks */
+	    condition = (percent / 10) + 2;
+	
       int wcondition;
       if ((GET_OBJ_TSLOTS(obj) == 0) && (GET_OBJ_OSLOTS(obj) == 0))
-	wcondition=0;
+	    wcondition = 0;
       else
-	wcondition=(wpercent/10)+1;
+	    wcondition = (wpercent / 10) + 1;
 
       sprintf(buffer1, " %3d) %-40.40s  %8d   %-15.15s   %-15.15s\r\n",
 	      i, GET_OBJ_NAME(obj), item->amount,
