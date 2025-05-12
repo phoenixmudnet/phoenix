@@ -4003,7 +4003,7 @@ void load_char_ascii(struct char_file_u *ch, char *name)
     player_saved->skills_learn[i] = (byte)arr[1];
   }
   fscanf(fp, "\n");
-  for (i = 0; i < 127; i++) {
+  for (i = 0; i < 64; i++) {
     fscanf(fp, "%ld %d ", &player_saved->kills_vnum[i], &arr[0]);
     player_saved->kills_ammount[i] = (ubyte)arr[0];
   }
@@ -4150,7 +4150,7 @@ void save_char_ascii(struct char_file_u *ch)
     strcat(buf, buf2);
   }
   strcat(buf, "\n");
-  for (i = 0; i < 127; i++) {
+  for (i = 0; i < 64; i++) {
     sprintf(buf2, "%d %d ", player_saved->kills_vnum[i], player_saved->kills_ammount[i]);
     strcat(buf, buf2);
   }
@@ -4932,7 +4932,7 @@ void init_char(struct char_data * ch)
    for (i = 0; i < 5; i++)
       GET_SAVE(ch, i) = 0;
 
-   for(i=0;i<127;i++)
+   for(i=0;i<64;i++)
       {
       GET_KILLS_VNUM(ch,i)=0;
       GET_KILLS_AMMOUNT(ch,1)=0;
