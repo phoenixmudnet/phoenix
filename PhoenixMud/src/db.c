@@ -3414,9 +3414,9 @@ void reset_zone(zone_rnum zone)
                gold_percent=(float)number(50,130);
                GET_GOLD(mob)=(int)((float)GET_GOLD(mob)*
                                    (float)(((float)gold_percent/(float)100)));
+               load_keeper(mob);
                load_mtrigger(mob);
                tmob=mob;
-               load_keeper(mob);
                }
             else
                last_cmd = 0;
