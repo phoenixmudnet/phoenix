@@ -1685,13 +1685,13 @@ int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
    int found=255;
    int temp_num;
 
-   /* NPCs below 1/4 of your level don't go on your buffer */
+   /* NPCs below 3/4 of your level don't go on your buffer */
    /* this will keep newbie zones safer */
    if (GET_LEVEL(victim)<GET_LEVEL(ch) && GET_LEVEL(ch)>LVL_NEWBIE)
-      if ((GET_LEVEL(victim)+(GET_LEVEL(ch)*3/4)) < GET_LEVEL(ch))
+      if ((GET_LEVEL(victim)+(GET_LEVEL(ch)*1/4)) < GET_LEVEL(ch))
          return exp;
 
-   for(i=0;i<127;i++)
+   for(i=0;i<64;i++)
       {
       if(GET_KILLS_VNUM(ch,i)==victim_vnum)
          {
@@ -1705,10 +1705,9 @@ int kills_limit_xpgain(struct char_data *ch, struct char_data *victim, int exp)
     *  log("Percent:%d, kill_under:%d",GET_PERCENT(100,i),KILL_UNDER_MF(100,255-i));
     *  }
     */
-
    if(found==255)
       {
-      for(i=125;i>=0;i--)
+      for(i=62;i>=0;i--)
          {
          GET_KILLS_VNUM(ch,i+1)=GET_KILLS_VNUM(ch,i);
          GET_KILLS_AMMOUNT(ch,i+1)=GET_KILLS_AMMOUNT(ch,i);
@@ -1757,7 +1756,7 @@ int kills_limit_damage_xpgain(struct char_data *ch, struct char_data *victim, in
    int i;
    int found=255;
 
-   for(i=0;i<127;i++)
+   for(i=0;i<64;i++)
       {
       if(GET_KILLS_VNUM(ch,i)==victim_vnum)
          {
@@ -2882,7 +2881,7 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
                     (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE))
                {
                /* Nomikos 5/2/2025: don't want to lose it */
-               obj_to_char(obj = unequip_char(victim, j), victim);
+               obj_to_char(obj=unequip_char(victim,j),victim);
                scrap_item(obj, victim);
                }
             }
