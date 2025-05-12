@@ -2881,7 +2881,7 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
                     (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE))
                {
                /* Nomikos 5/2/2025: don't want to lose it */
-               obj_to_char(obj=unequip_char(victim,j),victim);
+               obj_to_char(obj = unequip_char(victim, j), victim);
                scrap_item(obj, victim);
                }
             }
