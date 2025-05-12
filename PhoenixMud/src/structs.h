@@ -1530,8 +1530,8 @@ struct player_special_data_saved {
    int  q_points;		/* Number of quest points a player has */
    int  board_number;		/* Number of board being looked at */
    int  olc_zone[MAX_OLC_ZONES]; /* which zones you can edit */
-   long  kills_vnum[127];	/* list of the vnums of the mobs killed */
-   ubyte kills_ammount[127];	/* how many times you killed each mob */
+   long  kills_vnum[64];	/* list of the vnums of the mobs killed */
+   ubyte kills_ammount[64];	/* how many times you killed each mob */
    /* spares below for future expansion.  You can change the names from
       'sparen' to something meaningful, but don't change the order.  */
 
