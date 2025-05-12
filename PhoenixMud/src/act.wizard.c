@@ -5730,7 +5730,7 @@ ACMD(do_show)
                  i + 1,
                  GET_KILLS_VNUM(victim, i),
                  (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERROR" : GET_NAME(mob_proto + rmob_num)) : "None",
-				 (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERR" : GET_LEVEL(mob_proto + rmob_num)) : 0,
+		 (GET_KILLS_VNUM(victim, i) != 0) ? ((rmob_num == -1) ? "ERR" : GET_LEVEL(mob_proto + rmob_num)) : 0,
                  GET_KILLS_AMMOUNT(victim, i)
                  );
          if(i%2)
