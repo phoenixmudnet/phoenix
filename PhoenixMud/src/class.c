@@ -996,6 +996,12 @@ void advance_level(struct char_data * ch, bool show)
     }
   }
 
+  // Remort happens automatically when the mob is defeated. Give those folks a
+  // minor break and assume they had good leveling gear.
+  if (GET_LEVEL(ch) >= 100 && GET_LEVEL(ch) <= 103) {
+      stat_bonus = 25;
+  }
+
   if (show) {
     mudlogf(CMP, LVL_IMMORT, TRUE, "Levels: %s gained with base stats %d int, %d wis, %d dex, %d con",
 	    GET_NAME(ch), intel, wis, dex, con);
