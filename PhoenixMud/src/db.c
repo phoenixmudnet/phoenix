@@ -4004,7 +4004,7 @@ void load_char_ascii(struct char_file_u *ch, char *name)
   }
   fscanf(fp, "\n");
   for (i = 0; i < 64; i++) {
-    fscanf(fp, "%ld %d ", &player_saved->kills_vnum[i], &arr[0]);
+    fscanf(fp, " %ld %d", &player_saved->kills_vnum[i], &arr[0]);
     player_saved->kills_ammount[i] = (ubyte)arr[0];
   }
   fscanf(fp, "\n");
