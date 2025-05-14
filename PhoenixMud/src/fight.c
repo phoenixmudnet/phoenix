@@ -2640,7 +2640,7 @@ int Obj_Imm_Dam(struct obj_data *tobj,int ImmBit)
    return 1;
    }
 
-/* Nomikos 5/4/2025 - Added ability to better avoid equipment damage. Previously was 4, now between 1 and 4 */
+/* Nomikos 5/13/2025 - Chance of a percentage reduction of damage of 0% to 75% , based on dex and wis */
 int damage_obj_chance(int dex, int wis)
    {
    float average, modifier;
@@ -2649,12 +2649,12 @@ int damage_obj_chance(int dex, int wis)
    /* Keep it between 0 and 25 */
    average = MAX(MIN((float)(dex + wis) / 2.0, 25.0), 0.0);
 	   
-   /* Normalize and multiply by 3, giving us a range between 0 and 3 */
-   modifier = (average / 25.0) * 3.0;
+   /* Normalize and multiply by 75, giving us a range between 0 and 75 */
+   modifier = (average / 25.0) * 75.0;
 
-   /* At a maximum of 25 dex/wis, obtain a 4x reduction in equipment damage. */
-   /* At a minimum of 0 dex/wis (w/affects), keep same as before, at 4 */
-   return MAX(1, (int)(4.0 - modifier));
+   /* At a maximum of 25 dex/wis, obtain a 75% reduction in equipment damage. */
+   /* At a minimum of 0 dex/wis (w/affects), keep same as before, at 0% reduction */
+   return MAX(1, 100 - (int)modifier);
    }
 
 int damage_obj_range(int base,int pos,int material,int ImmBit)
@@ -2851,7 +2851,9 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
          {
          if (victim->equipment[j])
             {
-            range = damage_obj_range(500,j,victim->equipment[j]->material,ImmBit);
+	    /* Nomikos 5/13/2025 - chance of damage more sensitive. Instead of int range of 1 to 4, **
+            ** now int range of 25 to 100. Range adjusted from 500 to 12500 to reflect 25x increase */
+            range = damage_obj_range(12500,j,victim->equipment[j]->material,ImmBit);
             /* log("condition after : %d, %s ",condition,equipment_types[j]); */
             damage_chance = damage_obj_chance(GET_DEX(victim), GET_WIS(victim));
             /* log("damage chance : %d, in  %d (tslot: %d) ",damage_chance,condition,GET_OBJ_TSLOTS(victim->equipment[j])); */
