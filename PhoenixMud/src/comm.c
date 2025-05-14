@@ -1989,15 +1989,6 @@ int process_input(struct descriptor_data *t)
 	 } 
      /* at this point, we know we got some data from the read */ 
 
-   FILE *debug_file = fopen("debuglog", "a");
-   if (debug_file) {
-       fprintf(debug_file, "Descriptor: %d, Bytes Read: %d, Data: ", t->descriptor, bytes_read);
-       fwrite(read_point, sizeof(char), bytes_read, debug_file);
-       fprintf(debug_file, "\n");
-       fflush(debug_file);
-       fclose(debug_file);
-   }
- 
       *(read_point + bytes_read) = '\0'; /* terminate the string */ 
  
      /* search for a newline in the data we just read */ 
