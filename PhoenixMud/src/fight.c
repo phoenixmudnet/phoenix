@@ -2877,7 +2877,7 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
                   }
                }
 
-            if ((victim->equipment[j]->obj_flags.curr_dam_slots <= 0) &&
+            if ((victim->equipment[j]->obj_flags.curr_dam_slots < 0) &&
                     (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE))
                {
                /* Nomikos 5/2/2025: don't want to lose it */
