@@ -2412,7 +2412,7 @@ int find_all_dots(char *arg)
       return FIND_ALL;
    else if (!strncmp(arg, "all.", 4))
       {
-      strcpy(arg, arg + 4);
+      memmove(arg, arg + 4, strlen(arg));
       return FIND_ALLDOT;
       }
    else
