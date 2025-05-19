@@ -1086,7 +1086,7 @@ void furniture_ok(struct char_data * ch, char *arg, char *text, int pos)
    if ((GET_OBJ_TYPE(furniture) != ITEM_FURNITURE) ||
            (pos < GET_OBJ_VAL(furniture, 0)))
       {
-      buf = get_buffer(512);
+      buf = get_buffer(MAX_STRING_LENGTH);
       strcpy(buf,furniture->short_description);
       send_to_char(ch, "%s isn't for %s on!\r\n",
                    CAP(buf),
