@@ -1175,9 +1175,13 @@ ACMD(do_stand)
             break;
          case POS_SLEEPING:
             send_to_char(ch, "You have to wake up first!\r\n");
+            act("$n mumbles something unintelligible in $s sleep.",
+                TRUE, ch, 0, 0, TO_ROOM);
             break;
          case POS_FIGHTING:
             send_to_char(ch, "Do you not consider fighting as standing?\r\n");
+            act("$n yawns loudly, daydreaming of sleep.",
+                TRUE, ch, 0, 0, TO_ROOM);
             break;
          default:
             send_to_char(ch,"You stop floating around, and put your feet "
@@ -1218,6 +1222,8 @@ ACMD(do_sit)
             break;
          case POS_SITTING:
             send_to_char(ch, "You're sitting already.\r\n");
+            act("$n sits up as straight as $e can.",
+                TRUE, ch, 0, 0, TO_ROOM);
             break;
          case POS_RESTING:
             send_to_char(ch, "You stop resting, and sit up.\r\n");
@@ -1226,11 +1232,21 @@ ACMD(do_sit)
             break;
          case POS_SLEEPING:
             send_to_char(ch, "You have to wake up first.\r\n");
+            act("$n sits up in $s sleep, then falls over and begins to snore.",
+                TRUE, ch, 0, 0, TO_ROOM);
             break;
          case POS_FIGHTING:
             send_to_char(ch, "Sit down while fighting? are you MAD?\r\n");
+            act("$n tries to sit this one out.",
+                TRUE, ch, 0, 0, TO_ROOM);
             break;
-         default:
+	 case POS_BANDAGE:
+            send_to_char(ch, "You fling away your bandages and sit up.\r\n");
+            act("$n gets tired of $s bandages, casts them aside, and sits up.", TRUE, ch, 0, 0,
+                TO_ROOM);
+            GET_POS(ch) = POS_SITTING;
+            break;
+	 default:
             send_to_char(ch, "You stop floating around, and sit down.\r\n");
             act("$n stops floating around, and sits down.", TRUE,ch,0,0,
                 TO_ROOM);
@@ -1272,11 +1288,21 @@ ACMD(do_rest)
             break;
          case POS_SLEEPING:
             send_to_char(ch,"You have to wake up first.\r\n");
+            act("$n rolls around in $s sleep, getting little rest.",
+                TRUE, ch, 0, 0, TO_ROOM);
             break;
          case POS_FIGHTING:
             send_to_char(ch, "Rest while fighting?  Are you MAD?\r\n");
+            act("$n takes a quick break, then jumps back into the fight.",
+                TRUE, ch, 0, 0, TO_ROOM);
             break;
-         default:
+	 case POS_BANDAGE:
+            send_to_char(ch, "You toss your bandages and get into a comforable position.\r\n");
+            act("$n unwraps $s bandages and gets comfortable.", TRUE, ch, 0, 0,
+                TO_ROOM);
+            GET_POS(ch) = POS_RESTING;
+            break;
+	 default:
             send_to_char(ch, "You stop floating around, and stop to rest "
                          "your tired bones.\r\n");
             act("$n stops floating around, and rests.", FALSE, ch, 0, 0,
@@ -1316,11 +1342,20 @@ ACMD(do_sleep)
             break;
          case POS_FIGHTING:
             send_to_char(ch, "Sleep while fighting?  Are you MAD?\r\n");
+            act("$n dreams of sleep while fighting.",
+                TRUE, ch, 0, 0, TO_ROOM);
+            break;
+	 case POS_BANDAGE:
+            send_to_char(ch, "You unwrap your wounds and lie down to sleep.\r\n");
+            act("$n removes $s bandages, and falls to the floor, unconscious.", TRUE, ch, 0, 0,
+                TO_ROOM);
+	    act("$n begins to snore, loudly.", TRUE, ch, 0, 0, TO_ROOM);
+            GET_POS(ch) = POS_SLEEPING;
             break;
          default:
             send_to_char(ch, "You stop floating around, and lie down "
                          "to sleep.\r\n");
-            act("$n stops floating around, and lie down to sleep.",
+            act("$n stops floating around, and lays down to sleep.",
                 TRUE, ch, 0, 0, TO_ROOM);
             GET_POS(ch) = POS_SLEEPING;
             break;
