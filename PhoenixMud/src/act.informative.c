@@ -3037,9 +3037,12 @@ ACMD(do_zinfo)
 		target = 2;
 	else if (is_abbrev(whatkind, "continent"))
 		target = 3;
-
+	else if (is_abbrev(whatkind, "author"))
+		target = 4;
+	
 	if (target == 0 || strlen(searchstring) == 0) {
-		send_to_char(ch, "Usage:\r\n\r\n  zinfo\r\n   - or -\r\n  zinfo {zones | levels | continent} <target>\r\n");
+		send_to_char(ch, "Usage:\r\n\r\n  zinfo\r\n   - or -\r\n"
+		                 "  zinfo {zones | author | levels | continent} <target>\r\n");
 
 		release_buffer(whatkind);
 		release_buffer(searchstring);
@@ -3059,14 +3062,18 @@ ACMD(do_zinfo)
 				break;
 			case 2: //levels
 				subject = strdup(zone_table[ii].levels);
+				/* Strip out the hyphen */
+				for (int jj = 0; subject[jj] != '\0'; jj++)
+					if (subject[jj] == '-')
+						subject[jj] = ' ';
 				break;
 			case 3: //continents
 				subject = strdup(zone_continent[zone_table[ii].continent][0]);
 				break;
+			case 4: //author
+				subject = strdup(zone_table[ii].author);
+				break;
 		}
-
-		// Is this necessary? Do we actually have color in any of these?
-		strip_color(subject);
 
 		if (!isname(searchstring, subject)) {
 			free(subject);
