@@ -979,8 +979,8 @@ int improve_skill(struct char_data *ch, int skill, int passcheck)
    */
   if(number(0,chance)<=percent)
     {
-    /* set already gained flag */
-    GET_LEARN_TIC(ch)++;
+    /* Use a defined # of seconds between skill practices - Nomikos 5/22/25 */
+    GET_LEARN_TIC(ch) = SECS_PER_SKILL_PRAC;
     GET_LAST_LEARN(ch)=skill;
 
     /* gain skill */
