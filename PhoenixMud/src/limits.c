@@ -535,8 +535,6 @@ void point_update(void)
          ++i->char_specials.timer;
          if (GET_LEVEL(i) < idle_max_level)
             check_idling(i);
-         GET_LEARN_TIC(i)=0;
-
          }
       }
 
