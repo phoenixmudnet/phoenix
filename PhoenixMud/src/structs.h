@@ -990,6 +990,7 @@ struct obj_material_affs
 #define MOBILE_PERCENT 10
 
 /* Skill lag times */
+#define SECS_PER_SKILL_PRAC       60 /* Nomi 5/22/25 - lowered from 75 */
 #define HALF_SKILL_COUNT           5  /* seconds */
 #define FULL_SKILL_COUNT          10
 #define SKILL_LAG      (1  RL_SEC)/2 /* same as PULSE_VIOLENCE */
