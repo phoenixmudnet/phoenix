@@ -1033,7 +1033,7 @@ void heartbeat()
 
    if(!(pulse % PASSES_PER_SEC))
       time_info.minutes++;
-	
+
    if (!(pulse % (SECS_PER_MUD_HOUR * PASSES_PER_SEC))) 
       { 
       weather_and_time(1); 
