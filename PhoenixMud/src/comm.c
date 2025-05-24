@@ -1010,10 +1010,10 @@ void heartbeat()
    /* Lower skill practice timer before skill checks. -Nomikos 5/22/25 **
    ** Also changed skill practice lag from one practice per tic to     **
    ** SECS_PER_SKILL_PRAC seconds after a successful practice.         */
-   if (!(pulse % (SECS_PER_SKILL_PRAC * PASSES_PER_SEC)))
+   if (!(pulse % PASSES_PER_SEC))
       for (i = character_list; i; i = i->next)
-	 if (GET_LEARN_TIC(i) > 0)
-	    GET_LEARN_TIC(i)--;
+	     if (!IS_NPC(i) && GET_LEARN_TIC(i) > 0)
+	        GET_LEARN_TIC(i)--;
 
    if (!(pulse % PULSE_VIOLENCE))
       perform_violence(); 
