@@ -3800,6 +3800,56 @@ long load_char(char *name, struct char_file_u * char_element)
    }
 
 
+/*
+ * This version is identical to save_char except that it does not update the
+ * host or last logon. It is only used when logging on as an existing character
+ * but typing the wrong password
+ */
+void save_char_no_logon(struct char_data* ch, room_rnum load_room) {
+   struct char_file_u st;
+   struct char_file_u tmp;
+   int k,table_pos;
+   if (IS_NPC(ch) || !ch->desc/* || GET_PFILEPOS(ch) < 0*/)
+      return;
+
+   load_char(ch->player.name, &tmp);
+   ch->player.time.logon = tmp.last_logon;
+
+   char_to_store(ch, &st, FALSE);
+
+   if (!PLR_FLAGGED(ch, PLR_LOADROOM))
+      {
+      if (load_room == NOWHERE)
+         st.player_specials_saved.load_room = NOWHERE;
+      else
+         st.player_specials_saved.load_room = GET_ROOM_VNUM(load_room);
+      }
+
+   save_char_ascii(&st);
+
+   /*
+     TODO: Why is this BEFORE updating the player table struct entry?
+   fseek(player_fl, GET_PFILEPOS(ch) * sizeof(struct char_file_u), SEEK_SET);
+   fwrite(&st, sizeof(struct char_file_u), 1, player_fl);
+   */
+   if((table_pos = find_id(GET_IDNUM(ch)))!=-1)
+      {
+      player_table[table_pos].level = GET_LEVEL(ch);
+      player_table[table_pos].plr_flags=PLR_FLAGS(ch);
+
+      for(k=0;k<5;k++)
+         player_table[table_pos].gold[k]
+         = ch->points.gold[k];
+      for(k=0;k<32;k++)
+         player_table[table_pos].bank_gold[k]
+         = ch->points.bank_gold[k];
+      }
+   write_player_index_file();
+
+
+   check_weapon_weight(ch);
+   save_char_vars(ch);
+}
 
 
 /*

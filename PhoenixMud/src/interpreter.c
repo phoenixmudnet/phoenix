@@ -2408,7 +2408,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				else
 					load_room = NOWHERE;
 
-				save_char(d->character, load_room);
+				save_char_no_logon(d->character, load_room);
 
 				if (++(d->bad_pws) >= max_bad_pws) {
 					/* 3 strikes and you're out. */
