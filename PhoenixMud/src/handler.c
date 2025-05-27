@@ -2410,12 +2410,12 @@ int find_all_dots(char *arg)
    {
    if (!strcmp(arg, "all"))
       return FIND_ALL;
-   else if (!strncmp(arg, "all.", 4))
-      {
-      memmove(arg, arg + 4, strlen(arg));
+
+   else if (!strncmp(arg, "all.", 4)) {
+      // Copy remainder of the original argument, and the null byte
+      memmove(arg, arg + 4, strlen(arg + 4) + 1);  
       return FIND_ALLDOT;
-      }
-   else
+   } else
       return FIND_INDIV;
    }
 
