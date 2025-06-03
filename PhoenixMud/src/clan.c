@@ -192,7 +192,7 @@ void init_clan_vari (struct descriptor_data *d)
                GET_LEADER(d->character) =1;
             GET_CLAN(d->character) = cur->cl_number;
             GET_CLAN_ROOM(d->character)= cur->cl_room;
-	    GET_CLAN_DONATE(d->character) = cur->clan_donate; /* nomi 6/2/25 */
+	    GET_CLAN_DONATE(d->character) = cur->cl_donate; /* nomi 6/2/25 */
             return;
             }
          }
