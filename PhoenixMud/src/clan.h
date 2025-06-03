@@ -18,8 +18,10 @@ struct clan_data
 {
    int cl_number; /* clan number*/
    short cl_room; /* the clan's room number */
+   int cl_donate; /* cdonate room (V3) nomi 6/2/25 */
    long cl_piece; /* vnum of clan member piece */
    char *cl_name; /* name of clan */
+   char *cl_desc; /* clan description (V3) nomi 6/2/25 */
    long cl_bank;
    char *cl_players[150]; /*first player is leader*/
    struct clan_data *next;  /*pointer to next*/
