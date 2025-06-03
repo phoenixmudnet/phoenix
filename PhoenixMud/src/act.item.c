@@ -865,7 +865,7 @@ ACMD(do_drop)
          }
       sname = "cdonate";
       mode = SCMD_DONATE;
-      RDR = real_room(GET_CLAN_ROOM(ch)+1);
+      RDR = real_room(GET_CLAN_DONATE(ch));
       if (RDR == NOWHERE)
          {
          send_to_char(ch, "Sorry, you can't donate anything right now.\r\n");
