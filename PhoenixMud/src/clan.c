@@ -707,6 +707,7 @@ ACMD (do_addmember)
                send_to_char(victim, "You now belong to %s.\r\n",cur->cl_name);
                GET_CLAN(victim) = clan_num;
                GET_CLAN_ROOM(victim) = cur->cl_room;
+	       GET_CLAN_DONATE(victim) = cur->cl_donate; /* nomi 6/3/25 */
                strcpy (GET_CLAN_NAME(victim),cur->cl_name);
                if (cur->cl_piece <= 0)
                   send_to_char(ch,"Have a god set your clan piece, please.\r\n");
@@ -820,6 +821,7 @@ ACMD (do_removemember)
                   {
                   GET_CLAN(victim)=0;
                   GET_CLAN_ROOM(victim)=0;
+	          GET_CLAN_DONATE(victim) = 0; /* nomi 6/3/25 */
                   victim->player_specials->saved.board_number = 0;
                   strcpy(GET_CLAN_NAME(victim),"");
                   if (GET_EQ(victim, WEAR_HEART))
@@ -1168,6 +1170,7 @@ ACMD (do_change_leader)
     clan = clan->next;
   }
   if (!clan) {
+	  
     send_to_char(ch, "Couldn't find your clan.  Ask an implementor.\r\n");
     return;
   }
