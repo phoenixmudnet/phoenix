@@ -51,8 +51,6 @@ struct clan_data *clan_list;
 void init_clan_list(void)
    {
    char *string=get_buffer(1024);
-   char *send=get_buffer(256);
-   /* char report[256]; */
    struct clan_data *cur,*new,*prev;
    short cl_room;
    long cl_piece;
@@ -74,7 +72,6 @@ void init_clan_list(void)
       if (string[0] == ' ' || string[0] == '\n')
          {
          fclose(clan_fl);
-         release_buffer(send);
          release_buffer(string);
          return;
          }
@@ -86,7 +83,6 @@ void init_clan_list(void)
          fgets(string,1024,clan_fl);
          }
 
-      sprintf (send,"length = %d",strlen(string));
       CREATE(new,struct clan_data,1);
       string[strlen(string)-1]='\0';
       cnumber=atoi(string);
@@ -97,8 +93,18 @@ void init_clan_list(void)
       cl_room=atoi(string);
       new->cl_room = cl_room;
 
+      /* Add clan donate room - Nomikos 6/2/2025 */
+      if (ver >= 3)
+      	 {
+         fgets(string, 1024, clan_fl);
+         string[strlen(string) - 1] = '\0';
+         new->cl_donate = atoi(string);
+         }
+      else
+	 new->cl_donate = 0;
+
       new->cl_piece = 0;
-      if (ver == 2)
+      if (ver >= 2)
          {
          fgets(string,1024,clan_fl);
          string[strlen(string)-1]='\0';
@@ -110,6 +116,7 @@ void init_clan_list(void)
       string[strlen(string)-1]='\0';
       CREATE (new->cl_name,char,strlen(string)+1);
       strcpy (new->cl_name,string);
+
       if(cl_banks==TRUE)
          {
          fgets(string,1024,clan_fl);
@@ -119,6 +126,18 @@ void init_clan_list(void)
          {
          new->cl_bank=0;
          }
+
+      /* Add clan description - Nomikos 6/2/2025 */
+      if (ver >= 3)
+      	 {
+         fgets(string, 1024, clan_fl);
+         string[strlen(string) - 1] = '\0';
+         CREATE (new->cl_desc, char, strlen(string) + 1);
+         strcpy (new->cl_desc, string);
+         }
+      else
+	 new->cl_desc = '\0';
+
       while (fgets(string,1024,clan_fl) != NULL)
          {
          if (string[0] == '\n')
@@ -150,7 +169,6 @@ void init_clan_list(void)
 
       }
 
-   release_buffer(send);
    release_buffer(string);
    }
 
@@ -162,6 +180,7 @@ void init_clan_vari (struct descriptor_data *d)
    GET_CLAN(d->character) =0;
    GET_LEADER(d->character) =0;
    GET_CLAN_ROOM(d->character)=0;
+   GET_CLAN_DONATE(d->character) = 0; /* nomi 6/2/25 */
    while (cur != NULL)
       {
       while (cur->cl_players[count] != NULL)
@@ -173,6 +192,7 @@ void init_clan_vari (struct descriptor_data *d)
                GET_LEADER(d->character) =1;
             GET_CLAN(d->character) = cur->cl_number;
             GET_CLAN_ROOM(d->character)= cur->cl_room;
+	    GET_CLAN_DONATE(d->character) = cur->clan_donate; /* nomi 6/2/25 */
             return;
             }
          }
@@ -199,8 +219,10 @@ void write_clan_file (void)
       {
       fprintf (clan_fl,"%d\n",cur->cl_number);
       fprintf (clan_fl,"%d\n",cur->cl_room);
+      fprintf (clan_fl,"%d\n",cur->cl_donate); /* nomi 6/2/25 */
       fprintf (clan_fl,"%ld\n",cur->cl_piece);
       fprintf (clan_fl,"%s\n",cur->cl_name);
+      fprintf (clan_fl,"%s\n",cur->cl_desc); /* nomi 6/2/25 */
       fprintf (clan_fl,"%ld\n",cur->cl_bank);
       while (cur->cl_players[count2] != NULL)
          {
@@ -215,35 +237,40 @@ void write_clan_file (void)
 
 ACMD (do_makeclan)
    {
-   char *string_send=get_buffer(1024);
    char *temp_room=get_buffer(256);
+   char *temp_donate = get_buffer(256); /* nomi 6/2/25 */
    char *buf=get_buffer(MAX_STRING_LENGTH);
    char *buf2=get_buffer(MAX_STRING_LENGTH);
    struct clan_data *cur,*prev,*new;
    struct char_data *victim;
    int count =1;
    room_vnum cl_room;
+   room_vnum cl_donate; /* nomi 6/2/25 */
 
    half_chop (argument,buf,buf2);
    half_chop (buf2,temp_room,buf2);
-   if (!(is_number(temp_room)))
+   half_chop(buf2, temp_donate, buf2); /* nomi 6/2/25 */
+   if (!is_number(temp_room) || !is_number(temp_donate))
       {
-      send_to_char(ch,
-                   "format: makeclan <who> <clan_room> <clan_name>\r\n");
+      send_to_char(ch, "format: makeclan <who> <clan_room> "
+	               "<clan_donate_room> <clan_name>\r\n"); /* nomi 6/2/25 */
       release_buffer(buf2);
       release_buffer(buf);
+      release_buffer(temp_donate); /* nomi 6/2/25 */
       release_buffer(temp_room);
-      release_buffer(string_send);
       return;
       }
+
    cl_room=atoi(temp_room);
+   cl_donate = atoi(temp_donate); /* nomi 6/2/25 */
+   release_buffer(temp_donate);
+   release_buffer(temp_room);
+
    if (!(victim=get_char_vis(ch,buf,FIND_CHAR_WORLD)))
       {
       send_to_char(ch,"Who is that?\r\n");
       release_buffer(buf2);
       release_buffer(buf);
-      release_buffer(temp_room);
-      release_buffer(string_send);
       return;
       }
 
@@ -254,8 +281,6 @@ ACMD (do_makeclan)
        send_to_char(ch,"Immortals can't run clans.\r\n");
        release_buffer(buf2);
        release_buffer(buf);
-       release_buffer(temp_room);
-       release_buffer(string_send);
        return;
        }
    */
@@ -264,8 +289,6 @@ ACMD (do_makeclan)
       send_to_char(ch,"They're already in a clan.\r\n");
       release_buffer(buf2);
       release_buffer(buf);
-      release_buffer(temp_room);
-      release_buffer(string_send);
       return;
       }
    if (GET_GOLD(victim) < COST_CREATE)
@@ -276,8 +299,6 @@ ACMD (do_makeclan)
                    COST_CREATE);
       release_buffer(buf2);
       release_buffer(buf);
-      release_buffer(temp_room);
-      release_buffer(string_send);
       return;
       }
    CREATE(new,struct clan_data,1);
@@ -304,6 +325,7 @@ ACMD (do_makeclan)
       }
    new->cl_number = count;
    GET_CLAN_ROOM(victim)=cl_room;
+   GET_CLAN_DONATE(victim) = cl_donate; /* nomi 6/2/25 */
    GET_CLAN(victim) = count;
    GET_LEADER(victim) =1;
    strcpy (GET_CLAN_NAME(victim),new->cl_name);
@@ -324,8 +346,6 @@ ACMD (do_makeclan)
    GET_GOLD(victim) -= COST_CREATE;
    release_buffer(buf2);
    release_buffer(buf);
-   release_buffer(temp_room);
-   release_buffer(string_send);
    }
 
 ACMD(do_listclans)
@@ -359,14 +379,14 @@ ACMD(do_listclans)
       send_to_char(ch,
               "---------------------------------------------------------------------------------\r\n");
       send_to_char(ch,
-              "| Clan Leader  |   Clan Name   | Clan room | Clan Number | Clan Bank  | Piece   |\r\n");
+              "| Clan Leader  |   Clan Name   | Room # | Donate | Cl # | Clan Bank  | Piece  |\r\n");
       send_to_char(ch,
               "---------------------------------------------------------------------------------\r\n");
       while (cur != NULL)
          {
-         send_to_char(ch, "| %-13.13s| %-14.14s| %7d   | %10d  | %10ld | %7ld |\r\n",
-                      cur->cl_players[0],cur->cl_name,cur->cl_room,cur->cl_number,
-                      cur->cl_bank, cur->cl_piece);
+         send_to_char(ch, "| %-13.13s| %-14.14s| %6d | %6d | %4d | %10ld | %6ld |\r\n",
+                      cur->cl_players[0],cur->cl_name,cur->cl_room, cur->cl_donate,
+		      cur->cl_number,cur->cl_bank, cur->cl_piece);
          send_to_char(ch,
               "---------------------------------------------------------------------------------\r\n");
          cur=cur->next;
@@ -401,7 +421,10 @@ ACMD (do_listmembers)
          send_to_char(ch,"\r\n");
          send_to_char(ch, "Clan Name:   %s\r\n",cur->cl_name);
          send_to_char(ch, "-------------------------------\r\n");
-         send_to_char(ch, "Clan Room:   %d\r\n",cur->cl_room);
+         send_to_char(ch, "Clan Description:\r\n %s\r\n",cur->cl_desc); /* nomi 6/2/25 */
+         send_to_char(ch, "-------------------------------\r\n"); /* nomi 6/2/25 */
+	 send_to_char(ch, "Clan Room:   %d\r\n",cur->cl_room);
+	 send_to_char(ch, "Clan Donate: %d\r\n",cur->cl_donate); /* nomi 6/2/25 */
          send_to_char(ch, "Clan leader: %s\r\n",cur->cl_players[count++]);
          while (cur->cl_players[count] !=NULL)
             {
