@@ -1544,7 +1544,7 @@ struct player_special_data_saved {
    int screensize;
    int times_remorted;
    int mute_channels;          /* bitvector for listening selectively */
-   int spare9;
+   int cl_donate;              /* clan donate room - nomi 6/2/2025 */
    int spare10;
    int spare11;
    int spare12;
