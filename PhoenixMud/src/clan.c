@@ -192,7 +192,7 @@ void init_clan_vari (struct descriptor_data *d)
                GET_LEADER(d->character) =1;
             GET_CLAN(d->character) = cur->cl_number;
             GET_CLAN_ROOM(d->character)= cur->cl_room;
-	    GET_CLAN_DONATE(d->character) = cur->cl_donate; /* nomi 6/2/25 */
+	         GET_CLAN_DONATE(d->character) = cur->cl_donate; /* nomi 6/2/25 */
             return;
             }
          }
@@ -304,9 +304,11 @@ ACMD (do_makeclan)
    CREATE(new,struct clan_data,1);
    CREATE(new->cl_name,char,strlen(buf2)+1);
    strcpy(new->cl_name,buf2);
+   nee->cl_desc = '\0';
    CREATE(new->cl_players[0],char,strlen(GET_NAME(victim))+1);
    strcpy(new->cl_players[0],GET_NAME(victim));
    new->cl_room=cl_room;
+   new->cl_donate = cl_donate; /* nomi 6/4/25 */
    new->cl_piece=0;
    new->cl_bank=0;
    new->cl_players[1] = NULL;
