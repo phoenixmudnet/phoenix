@@ -304,7 +304,7 @@ ACMD (do_makeclan)
    CREATE(new,struct clan_data,1);
    CREATE(new->cl_name,char,strlen(buf2)+1);
    strcpy(new->cl_name,buf2);
-   nee->cl_desc = '\0';
+   new->cl_desc = '\0';
    CREATE(new->cl_players[0],char,strlen(GET_NAME(victim))+1);
    strcpy(new->cl_players[0],GET_NAME(victim));
    new->cl_room=cl_room;
