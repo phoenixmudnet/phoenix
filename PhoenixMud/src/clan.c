@@ -426,7 +426,7 @@ ACMD (do_listmembers)
          send_to_char(ch,"\r\n");
          send_to_char(ch, "Clan Name:   %s\r\n",cur->cl_name);
          send_to_char(ch, "-------------------------------\r\n");
-	 if (strcmp(cur->cl_desc, "Nothing.\r\n"))
+	 if (cur->cl_desc && strcmp(cur->cl_desc, "Nothing.\r\n"))
 	    {
             send_to_char(ch, "Clan Charter:\r\n\r\n%s",cur->cl_desc); /* nomi 6/2/25 */
             send_to_char(ch, "-------------------------------\r\n"); /* nomi 6/2/25 */
