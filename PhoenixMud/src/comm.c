@@ -36,6 +36,7 @@
 #include "queue.h" 
 #include "constants.h"
 #include "dg_scripts.h"
+#include "spells.h"
  
 #ifdef HAVE_ARPA_TELNET_H 
 #include <arpa/telnet.h> 
@@ -46,6 +47,10 @@
 #ifndef INVALID_SOCKET 
 #define INVALID_SOCKET -1 
 #endif 
+
+#define MSSP 70
+#define MSSP_VAR 1
+#define MSSP_VAL 2
  
 FILE *logfile = NULL;           /* Where to send the log messages. */
 /* externs */ 
@@ -59,6 +64,10 @@ extern const char *LOGNAME;
 extern int MAX_PLAYERS; 
 extern int MAX_DESCRIPTORS_AVAILABLE; 
 extern int xap_objs;           /* ascii objects. */
+extern time_t boot_time;
+extern int top_of_mobt;
+extern int top_of_objt;
+extern int top_of_helpt;
  
 extern int top_of_zone_table;
 extern struct zone_data *zone_table;
@@ -1824,6 +1833,7 @@ int new_descriptor(int s)
   /* prepend to list */ 
    newd->next = descriptor_list; 
    descriptor_list = newd; 
+   SEND_TO_Q(newd, "%c%c%c", IAC, WILL, MSSP);
    if(port!=4999)
       SEND_TO_Q(newd, "%s", GREETINGS); 
    SEND_TO_Q(newd,"Please wait"); 
@@ -1942,219 +1952,264 @@ int write_to_descriptor(socket_t desc, const char *txt)
  
    return 0; 
 } 
- 
+
+void handle_iac(struct descriptor_data *d) { 
+
+   for (unsigned char* ptr = d->inbuf; *ptr != 0; ptr++) {
+      if (*ptr == IAC) {
+         unsigned char cmd = *(ptr + 1);
+
+         if (!cmd) break;
+
+         unsigned char opt = *(ptr + 2);
+
+         if (!opt) break;
+
+         switch (cmd) {
+            case DO:
+               if (opt == MSSP) {
+                  SEND_TO_Q(d, "%c%c%c", IAC, SB, MSSP);
+                  SEND_TO_Q(d, "%cNAME%cPhoenixMud", MSSP_VAR, MSSP_VAL);
+
+                  int players = 0;
+
+                  for (struct char_data* vict = character_list; vict != 0; vict = vict->next) {
+                     if (IS_NPC(vict)) continue;
+                     if (vict->desc) players++;
+                  }
+
+                  SEND_TO_Q(d, "%cPLAYERS%c%d", MSSP_VAR, MSSP_VAL, players);
+                  SEND_TO_Q(d, "%cUPTIME%c%ld", MSSP_VAR, MSSP_VAL, boot_time);
+
+                  SEND_TO_Q(d, "%cCREATED%c1996", MSSP_VAR, MSSP_VAL);
+                  SEND_TO_Q(d, "%cDISCORD%chttps://discord.gg/dUE3Nm2rEE", MSSP_VAR, MSSP_VAL);
+                  SEND_TO_Q(d, "%cHOSTNAME%cphoenixmud.net", MSSP_VAR, MSSP_VAL);
+                  SEND_TO_Q(d, "%cPORT%c4000", MSSP_VAR, MSSP_VAL);
+                  SEND_TO_Q(d, "%cWEBSITE%chttps://phoenixmud.net", MSSP_VAR, MSSP_VAL);
+
+                  SEND_TO_Q(d, "%cFAMILY%cPhoenixMUD%cCircleMUD%cDikuMUD%cAberMUD", MSSP_VAR, MSSP_VAL, MSSP_VAL, MSSP_VAL, MSSP_VAL);
+                  SEND_TO_Q(d, "%cGENRE%cFantasy", MSSP_VAR, MSSP_VAL);
+                  SEND_TO_Q(d, "%cSTATUS%cLive", MSSP_VAR, MSSP_VAL);
+
+                  SEND_TO_Q(d, "%cAREAS%c%d", MSSP_VAR, MSSP_VAL, top_of_zone_table + 1);
+                  SEND_TO_Q(d, "%cHELPFILES%c%d", MSSP_VAR, MSSP_VAL, top_of_helpt + 1);
+                  SEND_TO_Q(d, "%cMOBILES%c%d", MSSP_VAR, MSSP_VAL, top_of_mobt + 1);
+                  SEND_TO_Q(d, "%cOBJECTS%c%d", MSSP_VAR, MSSP_VAL, top_of_objt + 1);
+                  SEND_TO_Q(d, "%cROOMS%c%ld", MSSP_VAR, MSSP_VAL, top_of_world + 1);
+
+                  SEND_TO_Q(d, "%cCLASSES%c15", MSSP_VAR, MSSP_VAL);
+                  SEND_TO_Q(d, "%cLEVELS%c%d", MSSP_VAR, MSSP_VAL, 101+102+103+104);
+                  SEND_TO_Q(d, "%cRACES%c15", MSSP_VAR, MSSP_VAL);
+                  SEND_TO_Q(d, "%cSKILLS%c%d", MSSP_VAR, MSSP_VAL, MAX_SPELLS);
+
+                  SEND_TO_Q(d, "%cANSI%c1", MSSP_VAR, MSSP_VAL);
+
+                  SEND_TO_Q(d, "%c%c", IAC, SE);
+               }
+
+               // We processed three bytes: IAC, DO, opt. Overwrite those three with everything after them.
+               // Move the pointer back one to account for the increment in the for loop.
+               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               ptr--;
+               break;
+            case DONT:
+
+               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               ptr--;
+               break;
+            case WILL:
+
+               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               ptr--;
+               break;
+            case WONT:
+
+               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               ptr--;
+               break;
+            case SB:
+               // Read until IAC SE
+               break;
+            default:
+               break;
+         }
+      }
+   }
+
+}
  
 /* 
  * ASSUMPTION: There will be no newlines in the raw input buffer when this 
  * function is called.  We must maintain that before returning. 
- */ 
-int process_input(struct descriptor_data *t) 
-{ 
-   int buf_length, bytes_read, space_left, failed_subst; 
-   char *ptr, *read_point, *write_point, *nl_pos = NULL; 
+ */
+int process_input(struct descriptor_data *t) {
+   int failed_subst;
+   char *write_point;
    char *tmp;
- 
-  /* first, find the point where we left off reading data */ 
-   buf_length = strlen(t->inbuf); 
-   read_point = t->inbuf + buf_length; 
-   space_left = MAX_RAW_INPUT_LENGTH - buf_length - 1; 
- 
-   do 
-      { 
-      if (space_left <= 0) 
-	 { 
-	 log("WARNING: process_input: about to close connection: input overflow"); 
-	 return -1; 
-	 } 
-      if ((bytes_read = read(t->descriptor, read_point, space_left)) < 0) 
-	 { 
-#ifdef EWOULDBLOCK 
-	 if (errno == EWOULDBLOCK) 
-	    errno = EAGAIN; 
-#endif /* EWOULDBLOCK */ 
-	 if ((errno != EAGAIN) && (errno!=EINTR))
-	    { 
-	    perror("SYSERR: process_input: about to lose connection"); 
-	    return -1;  /* some error condition was encountered on 
-			 * read */ 
-	    } 
-	 else 
-	    return 0;  /* the read would have blocked: just means no 
-			* data there but everything's okay */ 
-	 } 
-      else if (bytes_read == 0) 
-	 { 
-	 log("WARNING: EOF on socket read (connection broken by peer)"); 
-	 return -1; 
-	 } 
-     /* at this point, we know we got some data from the read */ 
 
-   FILE *debug_file = fopen("debuglog", "a");
-   if (debug_file) {
-       fprintf(debug_file, "Descriptor: %d, Bytes Read: %d, Data: ", t->descriptor, bytes_read);
-       fwrite(read_point, sizeof(char), bytes_read, debug_file);
-       fprintf(debug_file, "\n");
-       fflush(debug_file);
-       fclose(debug_file);
+   /* first, find the point where we left off reading data */
+   int buf_length = strlen(t->inbuf);
+   char *read_point = t->inbuf + buf_length;
+   int space_left = MAX_RAW_INPUT_LENGTH - buf_length - 1;
+
+   if (space_left <= 0) {
+      log("WARNING: process_input: about to close connection: input overflow");
+      return -1;
    }
- 
-      *(read_point + bytes_read) = '\0'; /* terminate the string */ 
- 
-     /* search for a newline in the data we just read */ 
-      for (ptr = read_point; *ptr && !nl_pos; ptr++) 
-	 if (ISNEWL(*ptr)) 
-	    nl_pos = ptr; 
- 
-      read_point += bytes_read;
-      space_left -= bytes_read; 
- 
-/* 
- * on some systems such as AIX, POSIX-standard nonblocking I/O is broken, 
- * causing the MUD to hang when it encounters input not terminated by a 
- * newline.  This was causing hangs at the Password: prompt, for example. 
- * I attempt to compensate by always returning after the _first_ read, instead 
- * of looping forever until a read returns -1.  This simulates non-blocking 
- * I/O because the result is we never call read unless we know from select() 
- * that data is ready (process_input is only called if select indicates that 
- * this descriptor is in the read set).  JE 2/23/95. 
- */ 
-/*    #if !defined(POSIX_NONBLOCK_BROKEN)  */
-/*       }  */
-/*    while (nl_pos == NULL);  */
-/*    #else  */
-      } 
-   while (0); 
-   
-   if (nl_pos == NULL) 
-      return 0; 
-/*#endif*/ /* POSIX_NONBLOCK_BROKEN */ 
 
-/* 
- * okay, at this point we have at least one newline in the string; now we 
- * can copy the formatted data to a new array for further processing. 
- */ 
+   int bytes_read = read(t->descriptor, read_point, space_left);
 
-   read_point = t->inbuf; 
-   
+   if (bytes_read < 0) {
+      if (errno == EWOULDBLOCK) errno = EAGAIN;
+
+      if ((errno != EAGAIN) && (errno != EINTR)) {
+         perror("SYSERR: process_input: about to lose connection");
+         return -1; /* some error condition was encountered on
+                     * read */
+      } else {
+         return 0; /* the read would have blocked: just means no
+                     * data there but everything's okay */
+      }
+   } else if (bytes_read == 0) {
+      log("WARNING: EOF on socket read (connection broken by peer)");
+      return -1;
+   }
+   /* at this point, we know we got some data from the read */
+
+   *(read_point + bytes_read) = '\0'; /* terminate the string */
+
+   handle_iac(t); /* check for IAC commands */
+
+   /* search for a newline in the data we just read */
+
+   char* nl_pos = NULL;
+   for (char* ptr = read_point; *ptr && !nl_pos; ptr++) {
+      if (ISNEWL(*ptr))
+      {
+         nl_pos = ptr;
+      }
+   }
+
+   read_point += bytes_read;
+   space_left -= bytes_read;
+
+   if (nl_pos == NULL) {
+      return 0;
+   }
+
+   /*
+    * okay, at this point we have at least one newline in the string; now we
+    * can copy the formatted data to a new array for further processing.
+    */
+
+   read_point = t->inbuf;
+
    tmp = get_buffer(MAX_INPUT_LENGTH + 8);
-   while (nl_pos != NULL) 
-      {   
-      write_point = tmp; 
-      space_left = MAX_INPUT_LENGTH - 1; 
-      
-      for (ptr = read_point; (space_left > 0) && (ptr < nl_pos); ptr++) 
-	 { 
-	 if ((*ptr == '\b') || (*ptr == 127))
-	    { 
-/* handle backspacing */ 
-	    if (write_point > tmp) 
-	       { 
-	       if (*(--write_point) == '$') 
-		  { 
-		  write_point--; 
-		  space_left += 2; 
-		  } 
-	       else 
-		  space_left++; 
-	       } 
-	    } 
-	 else if (isascii(*ptr) && isprint((int)*ptr)) 
-	    { 
-	    if ((*(write_point++) = *ptr) == '$') 
-	       {  
-/* copy one character */ 
-	       *(write_point++) = '$'; /* if it's a $, double it */ 
-	       space_left -= 2; 
-	       } 
-	    else 
-	       space_left--; 
-	    } 
-	 } 
-      
-      *write_point = '\0'; 
-      
-      if ((space_left <= 0) && (ptr < nl_pos)) 
-	 { 
-	 char *bufferout = get_buffer(MAX_INPUT_LENGTH + 64);
-	 
-	 sprintf(bufferout, "Line too long.  Truncated to:\r\n%s\r\n", tmp); 
-	 if (write_to_descriptor(t->descriptor, bufferout) < 0)
-	    {
-	    release_buffer(tmp);
-	    release_buffer(bufferout);
-	    return -1; 
-	    }
-	 release_buffer(bufferout);
-	 } 
-      if (t->snoop_by) 
-	 { 
-	 SEND_TO_Q(t->snoop_by, "%% %s\r\n", tmp);
-	 } 
-      failed_subst = 0; 
-      
-      if ((*tmp == '!') && !(*(tmp+1)))	/* redo last command */
-	 strcpy(tmp, t->last_input); 
-      else if (*tmp == '!' && *(tmp + 1)) 
-	 {
-	 char *commandln = (tmp + 1);
-	 int starting_pos = t->history_pos;
-	 int cnt=(t->history_pos == 0 ? HISTORY_SIZE - 1 : t->history_pos - 1);
+   while (nl_pos != NULL) {
+      write_point = tmp;
+      space_left = MAX_INPUT_LENGTH - 1;
 
-	 skip_spaces(&commandln);
-	 for (; cnt != starting_pos; cnt--) 
-	    {
-	    if (t->history[cnt] && is_abbrev(commandln, t->history[cnt])) 
-	       {
-	       strcpy(tmp, t->history[cnt]);
-	       strcpy(t->last_input, tmp);
-	       SEND_TO_Q(t, "%s\r\n", tmp);
-	       break;
-	       }
-	    if (cnt == 0)	/* At top, loop to bottom. */
-	       cnt = HISTORY_SIZE;
-	    }
-	 }
-      else if (*tmp == '^') 
-	 { 
-	 if (!(failed_subst = perform_subst(t, t->last_input, tmp))) 
-	    strcpy(t->last_input, tmp); 
-	 } 
-      else 
-	 {
-	 strcpy(t->last_input, tmp); 
-	 if (t->history[t->history_pos])
-	    free(t->history[t->history_pos]);	/* Clear the old line. */
-	 t->history[t->history_pos] = str_dup(tmp);	/* Save the new. */
-	 if (++t->history_pos >= HISTORY_SIZE)	/* Wrap to top. */
-	    t->history_pos = 0;
-	 }
- 
-      if (!failed_subst) 
-	 write_to_q_d(tmp, t, 0); 
-      
-     /* find the end of this line */ 
-      while (ISNEWL(*nl_pos)) 
-	 nl_pos++; 
-      
-     /* see if there's another newline in the input buffer */ 
-      read_point = ptr = nl_pos; 
-      for (nl_pos = NULL; *ptr && !nl_pos; ptr++) 
-	 if (ISNEWL(*ptr)) 
-	    nl_pos = ptr; 
-      } 
-   
-/* now move the rest of the buffer up to the beginning for the next pass */ 
-   write_point = t->inbuf; 
-   while (*read_point) 
-      *(write_point++) = *(read_point++); 
-   *write_point = '\0'; 
-   
+      char* ptr = NULL;
+
+      for (ptr = read_point; (space_left > 0) && (ptr < nl_pos); ptr++) {
+         if ((*ptr == '\b') || (*ptr == 127)) {
+            /* handle backspacing */
+            if (write_point > tmp)
+            {
+               if (*(--write_point) == '$')
+               {
+                  write_point--;
+                  space_left += 2;
+               }
+               else
+                  space_left++;
+            }
+         } else if (isascii(*ptr) && isprint((int)*ptr)) {
+            if ((*(write_point++) = *ptr) == '$') {
+               /* copy one character */
+               *(write_point++) = '$'; /* if it's a $, double it */
+               space_left -= 2;
+            }
+            else {
+               space_left--;
+            }
+         }
+      }
+
+      *write_point = '\0';
+
+      if ((space_left <= 0) && (ptr < nl_pos)) {
+         char *bufferout = get_buffer(MAX_INPUT_LENGTH + 64);
+
+         sprintf(bufferout, "Line too long.  Truncated to:\r\n%s\r\n", tmp);
+         if (write_to_descriptor(t->descriptor, bufferout) < 0) {
+            release_buffer(tmp);
+            release_buffer(bufferout);
+            return -1;
+         }
+         release_buffer(bufferout);
+      }
+      if (t->snoop_by) {
+         SEND_TO_Q(t->snoop_by, "%% %s\r\n", tmp);
+      }
+      failed_subst = 0;
+
+      if ((*tmp == '!') && !(*(tmp + 1)))  {/* redo last command */
+         strcpy(tmp, t->last_input);
+      } else if (*tmp == '!' && *(tmp + 1)) {
+         char *commandln = (tmp + 1);
+         int starting_pos = t->history_pos;
+         int cnt = (t->history_pos == 0 ? HISTORY_SIZE - 1 : t->history_pos - 1);
+
+         skip_spaces(&commandln);
+         for (; cnt != starting_pos; cnt--) {
+            if (t->history[cnt] && is_abbrev(commandln, t->history[cnt])) {
+               strcpy(tmp, t->history[cnt]);
+               strcpy(t->last_input, tmp);
+               SEND_TO_Q(t, "%s\r\n", tmp);
+               break;
+            }
+            if (cnt == 0) { /* At top, loop to bottom. */
+               cnt = HISTORY_SIZE;
+            }
+         }
+      } else if (*tmp == '^') {
+         if (!(failed_subst = perform_subst(t, t->last_input, tmp))) {
+            strcpy(t->last_input, tmp);
+         }
+      } else {
+         strcpy(t->last_input, tmp);
+         if (t->history[t->history_pos])
+            free(t->history[t->history_pos]);       /* Clear the old line. */
+         t->history[t->history_pos] = str_dup(tmp); /* Save the new. */
+         if (++t->history_pos >= HISTORY_SIZE)      /* Wrap to top. */
+            t->history_pos = 0;
+      }
+
+      if (!failed_subst)
+         write_to_q_d(tmp, t, 0);
+
+      /* find the end of this line */
+      while (ISNEWL(*nl_pos))
+         nl_pos++;
+
+      /* see if there's another newline in the input buffer */
+      read_point = ptr = nl_pos;
+      for (nl_pos = NULL; *ptr && !nl_pos; ptr++)
+         if (ISNEWL(*ptr))
+            nl_pos = ptr;
+   }
+
+   /* now move the rest of the buffer up to the beginning for the next pass */
+   write_point = t->inbuf;
+   while (*read_point)
+      *(write_point++) = *(read_point++);
+   *write_point = '\0';
+
    release_buffer(tmp);
-   return 1; 
-} 
+   return 1;
+}
 
-
- 
 /* 
  * perform substitution for the '^..^' csh-esque syntax 
  * orig is the orig string (i.e. the one being modified. 

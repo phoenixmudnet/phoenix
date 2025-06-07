@@ -356,6 +356,7 @@
 #define MOB_FLY          (1 << 28) /* mob is flying (obsolete)*/
 #define MOB_FOOLHARDY    (1 << 29) /* -5 to morale (less chance to flee)*/
 #define MOB_STAY_TERRAIN (1 << 30) /* Mob shouldn't wander out of a terrain type */
+#define MOB_MASTER       (1 << 31) /* Mob is a master of something      */
 /**** 2 Extra sets of 32 flags with act2 and act3 *****/
 #define MOB2_NOTRIP      (1 << 0)  /* no trip this mob */
 #define MOB2_NOSTUN      (1 << 1)  /* no stun this mob */
