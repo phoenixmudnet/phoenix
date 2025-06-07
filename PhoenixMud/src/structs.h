@@ -319,6 +319,7 @@
 #define PLR_FISH_ON     (1 << 20)  /* Player has a fish on their line  */
 #define PLR_PK          (1 << 21)  /* Player has purchased a PK flag */
 #define PLR_NOCOMMUNE   (1 << 22)  /* Player can't commune */
+#define PLR_CHARTER     (1 << 23)  /* Player is editing their clan charter */
 
 /*** 2 Extra sets of 32 flags with act2 and act3  *****/
 
