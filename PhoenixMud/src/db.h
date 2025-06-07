@@ -30,7 +30,7 @@ extern room_rnum top_of_world;
 #define CUR_ZONE_VER    5
 #define CUR_PATH_VER    1
 #define CUR_GUILD_VER   1
-#define CUR_CLAN_VER    2
+#define CUR_CLAN_VER    3 /* V3 - Nomikos 6/2/25 */
 
 /* player data file versions */
 #define CUR_POBJ_VER    2

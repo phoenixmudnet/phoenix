@@ -147,7 +147,9 @@ ACMD(do_camouflage);
 ACMD(do_cast);
 ACMD(do_castout);
 ACMD(do_chant);
+ACMD(do_charter);
 ACMD(do_circle);
+ACMD(do_clandonation);
 ACMD(do_clan_recall);
 ACMD(do_clanleader);
 ACMD(do_clanpiece);
@@ -449,6 +451,7 @@ ACMD(do_shop);
  * priority.
  */
 
+
 const struct command_info cmd_info[] = {
 	{"RESERVED", 0, 0, 0, 0}
 	,			/* this must be first -- for specprocs */
@@ -534,10 +537,13 @@ const struct command_info cmd_info[] = {
 	{"chant", POS_SLEEPING, do_chant, 1, 0},
 	{"check", POS_STANDING, do_not_here, 1, 0},
 	{"changeleader", POS_STANDING, do_change_leader, 0, 0},
+	{"charter", POS_SLEEPING, do_charter, 1, 0},
 	{"circle", POS_FIGHTING, do_circle, 1, 0},
 	{"clear", POS_DEAD, do_gen_ps, 0, SCMD_CLEAR},
 	{"close", POS_SITTING, do_gen_door, 0, SCMD_CLOSE},
 	{"cls", POS_DEAD, do_gen_ps, 0, SCMD_CLEAR},
+	{"claninfo", POS_SITTING, do_listmembers, 1, 0},
+	{"clandonation", POS_SITTING, do_clandonation, 1, 0},
 	{"clanleader", POS_DEAD, do_clanleader, LVL_SIMP, 0},
 	{"clanpiece", POS_DEAD, do_clanpiece, LVL_SIMP, 0},
 	{"consider", POS_CHANT, do_consider, 0, 0},
