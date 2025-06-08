@@ -364,6 +364,9 @@
 #define MOB2_COMPONENT   (1 << 3)  /* component mobs */
 #define MOB2_NODISARM    (1 << 4)  /* can't disarm the mob              */
 #define MOB2_SUMMONABLE  (1 << 5)
+#define MOB2_WEAPONSMITH (1 << 6)  /* Mob works with weapons            */
+#define MOB2_ARMORER     (1 << 7)  /* Mob works with armor              */
+#define MOB2_JEWELER     (1 << 8)  /* Mob works with accessories        */
 
 /* Preference flags: used by char_data.char_specials.pref */
 #define PRF_BRIEF       (1 << 0)  /* Room descs won't normally be shown	*/
