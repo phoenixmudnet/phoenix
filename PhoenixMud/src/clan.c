@@ -1286,7 +1286,7 @@ ACMD(do_charter)
 
    cur = clan_list;
 
-   if(GET_LEVEL(ch)<LVL_DGOD)
+   if(GET_LEVEL(ch) < LVL_ADMIN)
       {
       if (GET_LEADER(ch) == 0)
          {
