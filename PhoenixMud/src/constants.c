@@ -374,6 +374,7 @@ const char *player_bits[] = {
   "FISH_ON",
   "PK",
   "!COMMUNE",
+  "CHARTER(R)",
   "\n"
 };
 
@@ -411,6 +412,7 @@ const char *action_bits[] = {
   "FLY(R)",
   "FOOLHARDY",
   "STAY-TERRAIN",
+  "MASTER",
   "\n"
 };
 
@@ -421,6 +423,9 @@ const char *action2_bits[] = {
    "COMPONENT(R)",
    "!DISARM",
    "SUMMONABLE",
+   "WEAPONSMITH",
+   "ARMORER",
+   "JEWELER",
    "\n"
 };
 
