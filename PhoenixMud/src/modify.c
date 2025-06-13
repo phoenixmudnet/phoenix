@@ -35,7 +35,6 @@ void hedit_disp_menu(struct descriptor_data *d);
 void trigedit_disp_menu(struct descriptor_data *d);
 char *find_name_by_id(long id);
 int file_to_string_alloc(char *name, char **buf);
-void write_clan_file (void);
  
 #if defined(OASIS_MPROG)
 void medit_change_mprog(struct descriptor_data *d);
@@ -993,11 +992,7 @@ void string_add(struct descriptor_data *d, char *str)
 	 } 
       
       if (d->character && !IS_NPC(d->character)) 
-	 {
-	 if (PLR_FLAGGED(d->character, PLR_CHARTER))
-	    write_clan_file();
-	 REMOVE_BIT(PLR_FLAGS(d->character), PLR_WRITING | PLR_MAILING | PLR_CHARTER); 
-	 }
+	 REMOVE_BIT(PLR_FLAGS(d->character), PLR_WRITING | PLR_MAILING); 
       if (d->backstr) 
 	 free(d->backstr); 
       d->backstr = NULL; 

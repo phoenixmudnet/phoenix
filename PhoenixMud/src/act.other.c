@@ -2661,14 +2661,13 @@ void commit_reimb(struct char_data* ch)
     }
   }
 
-  if (REMORT_LEVEL(ch) == TRIPLE_REMORT)
-    GET_GOLD(ch) += 25000 * GET_LEVEL(ch);	
-  else if (REMORT_LEVEL(ch) == DOUBLE_REMORT)
+  if (REMORT_LEVEL(ch) == DOUBLE_REMORT) {
     GET_GOLD(ch) += 20000 * GET_LEVEL(ch);
-  else if (REMORT_LEVEL(ch) == SINGLE_REMORT)
+  } else if (REMORT_LEVEL(ch) == SINGLE_REMORT) {
     GET_GOLD(ch) += 15000 * GET_LEVEL(ch);
-  else
+  } else {
     GET_GOLD(ch) += 10000 * GET_LEVEL(ch);
+  }
 
   mudlogf(BRF, LVL_IMMORT, TRUE, "(GC) %s has been reimbursed to level %d.", GET_NAME(ch), GET_LEVEL(ch));
 

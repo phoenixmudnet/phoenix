@@ -1203,8 +1203,6 @@ void check_weapon_weight(struct char_data *ch)
    
 }
 
-/* Adjusts the cost of an item, based on charisma and vendor alignment, from between
-   a plus 20% for those really fugly ones, to minus 46% for our rare beauties     */
 int price_adjust (struct char_data * ch, struct char_data * vendor, int price)
 {
          int iPrice2;
@@ -1212,12 +1210,7 @@ int price_adjust (struct char_data * ch, struct char_data * vendor, int price)
 	 int iAlignMod;
 
 	 iChCha = stat_index(GET_CHA(ch));
-	 /* As it was it didn't make sense and the cha_align_table shouldn't be **
-   	 ** using player's alignment. The vendor will adjust prices because     **
-         ** they are either good or evil, as is their nature -Nomikos 5/30/2025 **
-	 ** iAlignMod = cha_align_table[10+(int)((GET_ALIGNMENT(vendor))/100)]  **
-  	 **			       [10+(int)((GET_ALIGNMENT(vendor))/100)]; */
-	 iAlignMod = ((GET_ALIGNMENT(vendor)) / 200); /* +/- 5 */
+	 iAlignMod = cha_align_table[10+(int)((GET_ALIGNMENT(ch))/100)][10+(int)((GET_ALIGNMENT(vendor))/100)];
 	 iChCha = iChCha + iAlignMod;
 	 iChCha = MIN(35,MAX(0,iChCha));
 	 iPrice2 = price + (int)(((float)cha_app[iChCha].adj_price/100.0) * (float)price);

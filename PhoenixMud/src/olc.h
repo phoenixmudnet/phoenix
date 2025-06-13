@@ -39,8 +39,8 @@
 #define NUM_TELEPORT            10
 #define NUM_ORE_TYPES           22
 
-#define NUM_MOB_FLAGS		32
-#define NUM_MOB2_FLAGS		9
+#define NUM_MOB_FLAGS		31
+#define NUM_MOB2_FLAGS		6
 #define NUM_IMMUN_FLAGS		21
 #define NUM_AFF_FLAGS		32
 #define NUM_ATTACK_TYPES	16

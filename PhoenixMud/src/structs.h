@@ -319,7 +319,6 @@
 #define PLR_FISH_ON     (1 << 20)  /* Player has a fish on their line  */
 #define PLR_PK          (1 << 21)  /* Player has purchased a PK flag */
 #define PLR_NOCOMMUNE   (1 << 22)  /* Player can't commune */
-#define PLR_CHARTER     (1 << 23)  /* Player is editing their clan charter */
 
 /*** 2 Extra sets of 32 flags with act2 and act3  *****/
 
@@ -356,7 +355,6 @@
 #define MOB_FLY          (1 << 28) /* mob is flying (obsolete)*/
 #define MOB_FOOLHARDY    (1 << 29) /* -5 to morale (less chance to flee)*/
 #define MOB_STAY_TERRAIN (1 << 30) /* Mob shouldn't wander out of a terrain type */
-#define MOB_MASTER       (1 << 31) /* Mob is a master of something      */
 /**** 2 Extra sets of 32 flags with act2 and act3 *****/
 #define MOB2_NOTRIP      (1 << 0)  /* no trip this mob */
 #define MOB2_NOSTUN      (1 << 1)  /* no stun this mob */
@@ -364,9 +362,6 @@
 #define MOB2_COMPONENT   (1 << 3)  /* component mobs */
 #define MOB2_NODISARM    (1 << 4)  /* can't disarm the mob              */
 #define MOB2_SUMMONABLE  (1 << 5)
-#define MOB2_WEAPONSMITH (1 << 6)  /* Mob works with weapons            */
-#define MOB2_ARMORER     (1 << 7)  /* Mob works with armor              */
-#define MOB2_JEWELER     (1 << 8)  /* Mob works with accessories        */
 
 /* Preference flags: used by char_data.char_specials.pref */
 #define PRF_BRIEF       (1 << 0)  /* Room descs won't normally be shown	*/
@@ -1549,7 +1544,7 @@ struct player_special_data_saved {
    int screensize;
    int times_remorted;
    int mute_channels;          /* bitvector for listening selectively */
-   int cl_donate;              /* clan donate room - nomi 6/2/2025 */
+   int spare9;
    int spare10;
    int spare11;
    int spare12;

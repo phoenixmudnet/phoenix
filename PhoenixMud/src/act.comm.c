@@ -222,8 +222,8 @@ void perform_tell(struct char_data *ch, struct char_data *vict, char *arg)
    {
    char *buf = get_buffer(MAX_STRING_LENGTH);
    char *buf2 = get_buffer(MAX_STRING_LENGTH);
-   sprintf(buf, "%s%s tells you, '%s'%s",CCRED(vict, C_NRM), 
-           CAP(strdup(GET_NAME(ch))), arg, CCNRM(vict, C_NRM));
+   sprintf(buf, "%s$n tells you, '%s'%s",CCRED(vict, C_NRM), arg,
+           CCNRM(vict, C_NRM));
    sprintf(buf2, "%sAn immortal tells you, '%s'%s",CCRED(vict, C_NRM), arg,
            CCNRM(vict, C_NRM));
    if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT)) {
@@ -251,8 +251,6 @@ void perform_tell(struct char_data *ch, struct char_data *vict, char *arg)
    release_buffer(buf2);
    release_buffer(buf);
    }
-   
-   
 bool is_tell_ok(struct char_data *ch, struct char_data *vict)
    {
    if (ch == vict)
