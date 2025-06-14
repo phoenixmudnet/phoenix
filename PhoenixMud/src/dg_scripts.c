@@ -2024,7 +2024,10 @@ void find_replacement(void *go, struct script_data *sc, trig_data *trig,
          {
          if (text_processed(field,subfield,vd,str))
             return;
+	 /* Fixed name and alias - Nomikos 6/14/2025 */
          else if (!str_cmp(field, "name"))
+            strcpy(str, o->short_description);
+         else if (!str_cmp(field, "alias"))
             strcpy(str, o->name);
          /* MANWE_OACCESS: Allow access to object data*/
          else if (!str_cmp(field, "in_obj"))
