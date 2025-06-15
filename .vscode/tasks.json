@@ -4,7 +4,7 @@
     {
       "label": "Build with Makefile",
       "type": "shell",
-      "command": "make -C PhoenixMud/src",
+      "command": "make",
       "group": {
         "kind": "build",
         "isDefault": true
