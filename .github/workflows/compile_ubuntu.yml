@@ -1,7 +1,6 @@
-name: Compile Code on Ubuntu
+name: Compile using on Ubuntu
 
-on:
-  push:
+on: push
 
 jobs:
   build:
@@ -18,4 +17,4 @@ jobs:
         sudo apt-get install -y gcc-multilib make libc6-dev:i386
 
     - name: Compile code
-      run: make -C PhoenixMud/src
+      run: make

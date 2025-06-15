@@ -1,7 +1,6 @@
-name: Compile and Deploy using AlmaLinux
+name: Compile using AlmaLinux
 
-on:
-  push:
+on: push
 
 jobs:
   build:
@@ -17,18 +16,4 @@ jobs:
       run: dnf install -y gcc make glibc-devel.i686 openssh-clients
 
     - name: Compile code
-      run: make -C PhoenixMud/src
-
-    - name: Upload compiled binary via SCP
-      if: github.ref_name == 'main'
-      run: |
-        echo "${{ secrets.DEPLOY_KEY }}" > ~/id_ed25519
-        chmod 600 ~/id_ed25519
-        scp -i ~/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null circle/bin/circle ph03n1x@phoenixmud.net:
-
-    - name: Upload compiled binary via SCP
-      if: github.ref_name == 'dev'
-      run: |
-        echo "${{ secrets.DEV_DEPLOY_KEY }}" > ~/id_ed25519
-        chmod 600 ~/id_ed25519
-        scp -i ~/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null circle/bin/circle ph03n1x@phoenixmud.net:
+      run: make

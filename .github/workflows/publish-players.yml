@@ -1,0 +1,25 @@
+name: Deploy to players
+
+on: workflow_dispatch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: almalinux:8.9
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: dnf install -y gcc make glibc-devel.i686 openssh-clients
+
+    - name: Compile code
+      run: make
+
+    - name: Upload compiled binary for players
+      run: |
+        echo "${{ secrets.DEPLOY_KEY }}" > ~/id_ed25519
+        chmod 600 ~/id_ed25519
+        scp -i ~/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null circle/bin/circle ph03n1x@phoenixmud.net:

@@ -2735,6 +2735,13 @@ ACMD(do_gen_ps)
 		break;
 	case SCMD_VERSION:
 		send_to_char(ch, "%s", circlemud_version);
+#ifdef GIT_REF
+#define STRING(a) #a
+#define XSTRING(a) STRING(a)
+		send_to_char(ch, "Latest commit: %s", XSTRING(GIT_REF));
+#undef STRING
+#undef XSTRING
+#endif
 		break;
 	case SCMD_WHOAMI:
 		send_to_char(ch, "%s\r\n", GET_NAME(ch));
