@@ -1,0 +1,83 @@
+name: Compile using AlmaLinux
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: almalinux:8.9
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: dnf install -y gcc make glibc-devel.i686
+
+    - name: Compile code
+      run: make
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: phoenix
+        path: ./build/circle
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    container:
+      image: almalinux:8.9
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: dnf install -y glibc.i686
+
+    - name: Download binary
+      uses: actions/download-artifact@v4
+      with:
+        name: phoenix
+        path: ./circle/bin/
+
+    - name: Start Phoenix
+      working-directory: ./circle
+      run: |
+        chmod +x bin/circle
+        bin/circle &
+        echo $! > pid.txt
+
+    - name: Install expect
+      run: dnf install -y expect telnet
+
+    - name: Test Basic Functionality
+      timeout-minutes: 1
+      run: |
+        expect << 'EOF'
+        spawn telnet 127.0.0.1 4000
+        expect "By what name dost thou wish to be known?"
+        send "tester\r"
+        expect "Did I get that right"
+        send "yes\r"
+        expect "Are you new to PhoenixMud (Y/N)?"
+        send "yes\r"
+        expect "Give me a password"
+        send "test\r"
+        expect "Please retype password:"
+        send "test\r"
+        expect "What is your sex (M/F)?"
+        send "M\r"
+        expect "Please select a race or '? <race>' for help:"
+        send "A\r"
+        expect "Please select a class or type '? <class>' for help"
+        send "o\r"
+        expect "*** PRESS RETURN:"
+        send "\r"
+        expect "MAKE YOUR CHOICE (0 to 6):"
+        send "1\r"
+        expect "The Temple of the Phoenix"
+        send "shutdown\r"
+        expect eof
+        EOF
