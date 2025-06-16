@@ -1,0 +1,31 @@
+name: Deploy to testers
+
+on: workflow_dispatch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: almalinux:8.9
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: dnf install -y gcc make glibc-devel.i686 openssh-clients
+
+    - name: Compile code
+      run: make
+
+    - name: Upload compiled binary for testers
+      run: |
+        echo "${{ secrets.TESTERS_DEPLOY_KEY }}" > ~/id_ed25519
+        chmod 600 ~/id_ed25519
+        scp -i ~/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null circle/bin/circle ph03n1x@phoenixmud.net:
+
+    - name: Start the testers server
+      run: |
+        echo "${{ secrets.TESTERS_RUN_KEY }}" > ~/id_ed25519
+        chmod 600 ~/id_ed25519
+        ssh -i ~/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ph03n1x@phoenixmud.net phoenix/start_testers.sh
