@@ -2708,6 +2708,9 @@ void load_help(FILE *fl,char *filename)
    char *key = get_buffer(READ_SIZE+1);
    char *entry = get_buffer(32750);
    char *line = get_buffer(READ_SIZE+1);
+   int i, j, t;
+   struct help_index_element temp;
+
 
    /* get the keyword line */
    get_one_line(fl, key);
@@ -2737,6 +2740,20 @@ void load_help(FILE *fl,char *filename)
       /* get next keyword line (or $) */
       get_one_line(fl, key);
       }
+
+   /* Added a selection sort so that looking up help entries is done in **
+   ** alphabetical order - Nomikos 6/24/2025                            */
+   for (i = t = 0; i < top_of_helpt; i++)
+   {
+      for (j = i + 1; j < top_of_helpt; j++)
+	 if (strcmp(help_table[j].keywords, help_table[t].keywords) < 0) 
+	    t = j;
+
+      temp = help_table[t];
+      help_table[t] = help_table[i];
+      help_table[i] = temp;
+   }
+   
    log("   %d entries loaded.",top_of_helpt+1);
    release_buffer(key);
    release_buffer(entry);
