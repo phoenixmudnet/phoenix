@@ -226,10 +226,12 @@ void what_does_gm_know(int guild_nr, struct char_data * ch,int learn)
           strcat(buf2,"Completely Knowledgable\r\n");
         else if(GET_SKILL_LEARN(ch,i)==100)
           strcat(buf2,"&YReady To Practice&n\r\n");
-	else if(GET_SKILL_LEARN(ch,i) > 0) {
+	else if(GET_SKILL_LEARN(ch,i) > 0) 
+	{
 	  strcat(buf2,"[");
-	  for (int ii = 0; ii <= 100; ii += 20) {
-	    if (ii <= GET_SKILL_LEARN(ch,i)
+	  for (int ii = 0; ii <= 100; ii += 20) 
+	  {
+	    if (ii <= GET_SKILL_LEARN(ch,i))
 	      strcat(buf2,"*");
 	    else
 	      strcat(buf2,"-");
