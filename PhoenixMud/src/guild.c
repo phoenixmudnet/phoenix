@@ -270,7 +270,7 @@ void list_skills(struct char_data * ch)
         else if(GET_SKILL_LEARN(ch,i) > 0) 
 	      {
 	        strcat(buf2,"[");
-	        for (int ii = 0; ii <= 100; ii += 20) 
+	        for (int ii = 20; ii <= 100; ii += 20) 
 	        {
 	          if (ii <= GET_SKILL_LEARN(ch,i))
 	            strcat(buf2,"*");
@@ -309,7 +309,7 @@ void list_skills(struct char_data * ch)
         else if(GET_SKILL_LEARN(ch,i) > 0) 
 	      {
 	        strcat(buf2,"[");
-	        for (int ii = 0; ii <= 100; ii += 20) 
+	        for (int ii = 20; ii <= 100; ii += 20) 
 	        {
 	          if (ii <= GET_SKILL_LEARN(ch,i))
 	            strcat(buf2,"*");
