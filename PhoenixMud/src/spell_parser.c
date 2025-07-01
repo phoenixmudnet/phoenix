@@ -1540,7 +1540,7 @@ void mag_objectmagic(struct char_data * ch, struct obj_data * obj,
       else
          {
          GET_OBJ_VAL(obj, 2)--;
-         WAIT_STATE(ch, PULSE_VIOLENCE);
+         WAIT_STATE(ch, SKILL_LAG);
          if(IS_SET(spells[GET_OBJ_VAL(obj,3)].routines,MAG_AREAS))
             {
             if (GET_OBJ_VAL(obj, 0))
@@ -1696,7 +1696,7 @@ void mag_objectmagic(struct char_data * ch, struct obj_data * obj,
          return;
          }
       GET_OBJ_VAL(obj, 2)--;
-      WAIT_STATE(ch, PULSE_VIOLENCE);
+      WAIT_STATE(ch, SKILL_LAG);
       if(arg!=NULL && *arg)
          {
          strncpy(CAST_ARG(ch),arg,120);
@@ -1723,7 +1723,7 @@ void mag_objectmagic(struct char_data * ch, struct obj_data * obj,
          act("You try to recite $p.", FALSE, ch, obj, NULL, TO_CHAR);
          act("But a sudden move in combat causes you to rip it.", FALSE, ch, obj, NULL, TO_CHAR);
          act("$n tries to recite $p but combat distracts $m.", TRUE, ch, obj, NULL, TO_ROOM);
-         WAIT_STATE(ch, PULSE_VIOLENCE);
+         WAIT_STATE(ch, SKILL_LAG);
          }
       else
          {
@@ -1733,7 +1733,7 @@ void mag_objectmagic(struct char_data * ch, struct obj_data * obj,
          else
             act("$n recites $p.", FALSE, ch, obj, NULL, TO_ROOM);
 
-         WAIT_STATE(ch, PULSE_VIOLENCE);
+         WAIT_STATE(ch, SKILL_LAG);
 
          for (i = 1; i < 4&&GET_OBJ_VAL(obj,i)>0; i++)
             {
@@ -1772,12 +1772,12 @@ void mag_objectmagic(struct char_data * ch, struct obj_data * obj,
          act("You try to quaff $p.", FALSE, ch, obj, NULL, TO_CHAR);
          act("But it slips from your grasp in combat and smashes to shards.", FALSE, ch, obj, NULL, TO_CHAR);
          act("$n tries to quaff $p but it slips and smashes on the ground.", TRUE, ch, obj, NULL, TO_ROOM);
-         WAIT_STATE(ch, PULSE_VIOLENCE);
+         WAIT_STATE(ch, SKILL_LAG);
          }
       else if (IS_OBJ_STAT(obj, ITEM_NEWBIE) && (REMORT_LEVEL(ch) > 0 || GET_LEVEL(ch) > LVL_POTION_NEWBIE))
 	{
 	  act("You try to quaff $p, but are too advanced for a newbie potion.", FALSE, ch, obj, NULL, TO_CHAR);
-	  WAIT_STATE(ch, PULSE_VIOLENCE);
+	  WAIT_STATE(ch, SKILL_LAG);
 	}
       else
          {
@@ -1787,7 +1787,7 @@ void mag_objectmagic(struct char_data * ch, struct obj_data * obj,
          else
             act("$n quaffs $p.", TRUE, ch, obj, NULL, TO_ROOM);
 
-         WAIT_STATE(ch, PULSE_VIOLENCE);
+         WAIT_STATE(ch, SKILL_LAG);
          for (i = 1; i < 4&&GET_OBJ_VAL(obj,i)>0; i++)
             {
             if (!(call_magic(ch, ch, NULL, NULL,NULL, GET_OBJ_VAL(obj, i),
@@ -1810,7 +1810,7 @@ void mag_objectmagic(struct char_data * ch, struct obj_data * obj,
       else
          act("$n swallows $p.", TRUE, ch, obj, NULL, TO_ROOM);
 
-      WAIT_STATE(ch, PULSE_VIOLENCE);
+      WAIT_STATE(ch, SKILL_LAG);
       for (i = 1; i < 4; i++)
          if (!(call_magic(ch, ch, NULL, NULL,NULL, GET_OBJ_VAL(obj, i),
                           GET_OBJ_VAL(obj, 0), CAST_PILL)))
@@ -2290,7 +2290,7 @@ ACMD(do_cast)
 
    if (chance> percentage)
       {
-      WAIT_STATE(ch, PULSE_VIOLENCE);
+      WAIT_STATE(ch, SKILL_LAG);
       improve_skill(ch,spellnum,USE_FAIL);
       /*
        * just to make sure someone casting below their level doesn't get
