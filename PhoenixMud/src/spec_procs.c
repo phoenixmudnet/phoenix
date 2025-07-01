@@ -4220,7 +4220,7 @@ SPECIAL(explore_seer)
     }
   }
 
-  /* WAIT_STATE(ch, PULSE_VIOLENCE); */
+  /* WAIT_STATE(ch, SKILL_LAG); */
   page_string(ch->desc, buf, TRUE, "");
   release_buffer(buf2);
   release_buffer(buf);
