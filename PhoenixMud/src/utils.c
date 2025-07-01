@@ -1149,7 +1149,7 @@ int handleGetOutOfDeathFree(struct char_data* ch)
       char_to_room(ch, real_room(3014));
     }
     command_interpreter(ch, "look");
-    WAIT_STATE(ch, PULSE_VIOLENCE);
+    WAIT_STATE(ch, SKILL_LAG);
 
     return 1;
   }
