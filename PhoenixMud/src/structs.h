@@ -998,7 +998,7 @@ struct obj_material_affs
 /* Skill lag times */
 #define HALF_SKILL_COUNT           5  /* seconds */
 #define FULL_SKILL_COUNT          10
-#define SKILL_LAG      (1  RL_SEC)/2 /* same as PULSE_VIOLENCE */
+#define SKILL_LAG      (1  RL_SEC)/2
 
 /* Variables for the output buffering system */
 #define HISTORY_SIZE            5   /* Keep Last 5 commands. */
