@@ -2926,9 +2926,9 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
          {
          /* if both are PCs, then give command lag instead - nomi*/
          if (!IS_NPC(ch) && !IS_NPC(victim))
-            WAIT_STATE(victim, PULSE_VIOLENCE * 2);
+            WAIT_STATE(victim, SKILL_LAG * 2);
          else
-            STUN_STATE(victim, PULSE_VIOLENCE * 2);
+            STUN_STATE(victim, SKILL_LAG * 2);
          GET_POS(victim)=POS_SITTING;
          }
 
@@ -2940,9 +2940,9 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
          {
          /* if both are PCs, then give command lag instead - nomi*/
          if (!IS_NPC(ch) && !IS_NPC(victim))
-            WAIT_STATE(victim, PULSE_VIOLENCE);
+            WAIT_STATE(victim, SKILL_LAG);
          else
-            STUN_STATE(victim, PULSE_VIOLENCE);
+            STUN_STATE(victim, SKILL_LAG);
          }
 
       }
@@ -4186,7 +4186,7 @@ void fire_missile(struct char_data *ch, char arg1[MAX_INPUT_LENGTH],
                extract_obj(unequip_char(ch, pos));
             miss_missile(ch, vict, missile, dir, attacktype);
             }
-         WAIT_STATE(ch, (PULSE_VIOLENCE/2));
+         WAIT_STATE(ch, (SKILL_LAG/2));
          return;
          }
       room = nextroom;
