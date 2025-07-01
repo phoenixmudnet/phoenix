@@ -641,7 +641,7 @@ void perform_drop_gold(struct char_data * ch, int amount,
       {
       if (mode != SCMD_JUNK)
          {
-         WAIT_STATE(ch, PULSE_VIOLENCE); /* to prevent coin-bombing */
+         WAIT_STATE(ch, SKILL_LAG); /* to prevent coin-bombing */
          obj = create_money(amount);
          if ((mode == SCMD_DONATE)||(mode == SCMD_CDONATE))
             {
