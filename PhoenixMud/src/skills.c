@@ -105,7 +105,7 @@ ACMD(do_ambush)
    if (!ok_damage_shopkeeper(ch, vict))
       return;
 
-   WAIT_STATE(ch, PULSE_VIOLENCE * 2);
+   WAIT_STATE(ch, SKILL_LAG * 2);
 
    if((MOB_FLAGGED(vict, MOB_AWARE))||
            (!IS_NPC(ch)&& (!SCR_SKILLCHECK(ch, SKILL_AMBUSH) || GET_SKILL(ch, SKILL_AMBUSH) <= 0)))
@@ -202,7 +202,7 @@ ACMD(do_backstab)
    if (!ok_damage_shopkeeper(ch, vict))
       return;
 
-   WAIT_STATE(ch, PULSE_VIOLENCE * 2);
+   WAIT_STATE(ch, SKILL_LAG * 2);
 
    if ((MOB_FLAGGED(vict, MOB_AWARE)) ||
        (!IS_NPC(ch)&&(!SCR_SKILLCHECK(ch, SKILL_BACKSTAB)||GET_SKILL(ch,SKILL_BACKSTAB)<=0)))
@@ -421,7 +421,7 @@ ACMD(do_bash)
    if (!ok_damage_shopkeeper(ch, vict))
       return;
 
-   WAIT_STATE(ch, PULSE_VIOLENCE * 3);
+   WAIT_STATE(ch, SKILL_LAG * 3);
    if (!skill_roll(ch,SKILL_BASH,0))
       {
       damage(ch, vict, 0, SKILL_BASH,IMM_BLUNT);
@@ -497,7 +497,7 @@ ACMD(do_berserk)
       act("$n tries to hit everyone in the room and MISSES!!!", FALSE, ch, 0,
           0, TO_NOTVICT);
       }
-   WAIT_STATE(ch, PULSE_VIOLENCE * 1 );
+   WAIT_STATE(ch, SKILL_LAG * 1 );
    }
 
 /*
@@ -738,7 +738,7 @@ ACMD(do_circle)
    if (!ok_damage_shopkeeper(ch, vict))   
       return;
    
-   WAIT_STATE(ch, PULSE_VIOLENCE * 2);
+   WAIT_STATE(ch, SKILL_LAG * 2);
    if (FIGHTING(vict) && !skill_roll(ch,SKILL_CIRCLE,dex_app[stat_index(GET_DEX(ch))].reaction))
       {
       damage(ch, vict, 0, SKILL_CIRCLE,IMM_PIERCE);
@@ -1041,7 +1041,7 @@ ACMD(do_disarm)
             set_fighting(ch,vict);
             }
          }
-      WAIT_STATE(ch, PULSE_VIOLENCE*2);
+      WAIT_STATE(ch, SKILL_LAG*2);
       }
    else
       {
@@ -1060,7 +1060,7 @@ ACMD(do_disarm)
              vict, TO_CHAR);
          act("$p flies from your grasp.", FALSE, ch, target, vict, TO_VICT);
          obj_to_char(target, vict);
-         WAIT_STATE(vict, PULSE_VIOLENCE);
+         WAIT_STATE(vict, SKILL_LAG);
          }
 
       if ((IS_NPC(vict)) && (GET_POS(vict) > POS_SLEEPING) &&
@@ -1072,7 +1072,7 @@ ACMD(do_disarm)
             set_fighting(ch,vict);
             }
          }
-      WAIT_STATE(ch, PULSE_VIOLENCE*2);
+      WAIT_STATE(ch, SKILL_LAG*2);
       }
    }
 
@@ -1138,7 +1138,7 @@ ACMD(do_gore)
       return;
       }
 
-   WAIT_STATE(ch, PULSE_VIOLENCE * 3);
+   WAIT_STATE(ch, SKILL_LAG * 3);
    penalty = (10 - (GET_AC(vict) / 20)) * 2;
    if (!skill_roll(ch,SKILL_GORE,penalty))
       {
@@ -1211,7 +1211,7 @@ ACMD(do_headbutt)
       return;
       }
 
-   WAIT_STATE(ch, PULSE_VIOLENCE * 3);
+   WAIT_STATE(ch, SKILL_LAG * 3);
    penalty = (10 - (GET_AC(vict) / 20)) * 2;
    if (!skill_roll(ch,SKILL_HEADBUTT,penalty))
       {
@@ -1283,7 +1283,7 @@ ACMD(do_kick)
       return;
       }
 
-   WAIT_STATE(ch, PULSE_VIOLENCE*2);
+   WAIT_STATE(ch, SKILL_LAG*2);
    if (!skill_roll(ch,SKILL_KICK,((20-(GET_AC(vict)/20))*2)))
       {
       damage(ch, vict, 0, SKILL_KICK,IMM_BLUNT);
@@ -1643,7 +1643,7 @@ ACMD(do_peck)
       }
    crit = number(1, 20); /* calculates for critical hit */
     
-   WAIT_STATE(ch, PULSE_VIOLENCE*2);
+   WAIT_STATE(ch, SKILL_LAG*2);
    if (!skill_roll(ch,SKILL_PECK,((20-(GET_AC(vict)/20))*2)))
       {
       damage(ch, vict, 0, SKILL_PECK,IMM_PIERCE);
@@ -1731,7 +1731,7 @@ ACMD(do_quivering_palm)
       return;
       }
 
-   WAIT_STATE(ch, PULSE_VIOLENCE * 2);
+   WAIT_STATE(ch, SKILL_LAG * 2);
    penalty = ((10 - (GET_AC(vict) / 20)) * 2);
    if (!skill_roll(ch,SKILL_QUIVERING_PALM,penalty))
       {
@@ -1820,7 +1820,7 @@ ACMD(do_rage)
       act("$n gets a little hot under the collar!!!", FALSE, ch, 0, 0,
           TO_NOTVICT);
       }
-   WAIT_STATE(ch, PULSE_VIOLENCE * 1 );
+   WAIT_STATE(ch, SKILL_LAG * 1 );
    }
 
 
@@ -1907,7 +1907,7 @@ ACMD(do_redirect)
       act("With a deft combat manuever $n switches opponents and starts to "
           "fight $N!",FALSE,ch,0,vict,TO_NOTVICT);
       }
-   WAIT_STATE(ch, PULSE_VIOLENCE*2);
+   WAIT_STATE(ch, SKILL_LAG*2);
    }
 
 
@@ -1977,7 +1977,7 @@ ACMD(do_rescue)
       act("But nobody is fighting $M!", FALSE, ch, 0, vict, TO_CHAR);
       return;
       }
-   WAIT_STATE(ch, 1 * PULSE_VIOLENCE);
+   WAIT_STATE(ch, 1 * SKILL_LAG);
    if (!skill_roll(ch,SKILL_RESCUE,0))
       {
       send_to_char(ch,"You fail the rescue!\r\n");
@@ -1999,7 +1999,7 @@ ACMD(do_rescue)
       LAST_HAND_USED(ch)=0;
       set_fighting(ch, tmp_ch);
       set_fighting(tmp_ch, ch);
-      WAIT_STATE(vict, 1 * PULSE_VIOLENCE);
+      WAIT_STATE(vict, 1 * SKILL_LAG);
       }
    }
 
@@ -2129,16 +2129,16 @@ ACMD(do_shock)
          {
          if(GET_POS(vict)==POS_STUNNED)
             {
-            WAIT_STATE(vict,PULSE_VIOLENCE);
+            WAIT_STATE(vict,SKILL_LAG);
             }
          else
             {
             GET_POS(vict)=POS_STUNNED;
-            WAIT_STATE(vict,PULSE_VIOLENCE*2);
+            WAIT_STATE(vict,SKILL_LAG*2);
             }
          }
       }
-   WAIT_STATE(ch,PULSE_VIOLENCE*2);
+   WAIT_STATE(ch,SKILL_LAG*2);
    GET_MANA(ch) = GET_MANA(ch) - 10;
    }
 
@@ -2531,7 +2531,7 @@ ACMD(do_stomp)
       return;
       }
 
-   WAIT_STATE(ch, PULSE_VIOLENCE * 2);
+   WAIT_STATE(ch, SKILL_LAG * 2);
    penalty = (10 - (GET_AC(vict) / 20)) * 2;
    if (!skill_roll(ch,SKILL_STOMP,penalty))
       {
@@ -2611,7 +2611,7 @@ ACMD(do_stun)
 
    penalty =con_app[stat_index(GET_CON(vict))].hitp*5;
    penalty -=str_app[STRENGTH_APPLY_INDEX(ch)].tohit*3;
-   WAIT_STATE(ch,PULSE_VIOLENCE*3);
+   WAIT_STATE(ch,SKILL_LAG*3);
    if(!skill_roll(ch,SKILL_STUN,penalty))
       {
       damage(ch,vict,0,SKILL_STUN,IMM_HOLD);
@@ -2626,18 +2626,18 @@ ACMD(do_stun)
                {
                /* if both are PCs, then give command lag instead - nomi*/
                if (!IS_NPC(ch) && !IS_NPC(vict))
-                  WAIT_STATE(vict, PULSE_VIOLENCE);    
+                  WAIT_STATE(vict, SKILL_LAG);    
                else
-                  STUN_STATE(vict,PULSE_VIOLENCE);
+                  STUN_STATE(vict,SKILL_LAG);
                }
             else
                {
                GET_POS(vict)=POS_STUNNED;
                /* if both are PCs, then give command lag instead - nomi*/
                if (!IS_NPC(ch) && !IS_NPC(vict))  
-                  WAIT_STATE(vict, PULSE_VIOLENCE);  
+                  WAIT_STATE(vict, SKILL_LAG);  
                else
-                  STUN_STATE(vict,PULSE_VIOLENCE*2);
+                  STUN_STATE(vict,SKILL_LAG*2);
                }
             }
          }
@@ -2709,7 +2709,7 @@ ACMD(do_sweep)
    if (!ok_damage_shopkeeper(ch, vict))
       return;
 
-   WAIT_STATE(ch, PULSE_VIOLENCE*3);
+   WAIT_STATE(ch, SKILL_LAG*3);
    if (!skill_roll(ch,SKILL_SWEEP,0))
       {
       damage(ch, vict, 0, SKILL_SWEEP,IMM_HOLD);
@@ -2767,7 +2767,7 @@ ACMD(do_tame)
       }
    GET_MANA(ch) = GET_MANA(ch) - 20;
 
-   WAIT_STATE(ch,PULSE_VIOLENCE);
+   WAIT_STATE(ch,SKILL_LAG);
    if (vict == ch)
       send_to_char(ch,"You like yourself even better!\r\n");
    else if(!trait_info[GET_RACE(vict)].can_tame)
@@ -2896,7 +2896,7 @@ ACMD(do_trip)
    if (!ok_damage_shopkeeper(ch, vict))
       return;
 
-   WAIT_STATE(ch, PULSE_VIOLENCE*3);
+   WAIT_STATE(ch, SKILL_LAG*3);
    if (!skill_roll(ch,SKILL_TRIP,0))
       {
       damage(ch, vict, 0, SKILL_TRIP,IMM_HOLD);
