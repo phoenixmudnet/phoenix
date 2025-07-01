@@ -186,7 +186,7 @@ ACMD(do_hit)
             {
             LAST_HAND_USED(ch)=0;
             if (!IS_NPC(ch) && (GET_LEVEL(ch) < LVL_IMMORT))
-               WAIT_STATE(ch, PULSE_VIOLENCE);
+               WAIT_STATE(ch, SKILL_LAG);
             hit(ch, vict, TYPE_UNDEFINED);
             }
         else
