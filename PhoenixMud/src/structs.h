@@ -990,7 +990,7 @@ struct obj_material_affs
 #define PULSE_MOBILE    (1  RL_SEC)
 #define PULSE_OBJECT    (10 RL_SEC)
 #define PULSE_BUFFER    (5  RL_SEC)
-#define MAX_ATTACKS_PER_SECOND    5 /* Adjusted from 2 to 5. */ Add commentMore actions
+#define MAX_ATTACKS_PER_SECOND    5 /* Adjusted from 2 to 5. */
 /* Realistic current range is 2 to 10 attacks per second. -Nomikos 6/30/2025 */
 #define PULSE_VIOLENCE  (1  RL_SEC) / MAX_ATTACKS_PER_SECOND
 #define PULSE_MAGIC     (1  RL_SEC)
