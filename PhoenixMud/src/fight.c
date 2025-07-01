@@ -1163,10 +1163,19 @@ int calculate_speed(struct char_data *ch)
          speed-=6;
       }
 
-   /*    speed*=2; */
-   speed/=2;   /* this is for adjusting the round speeds */
+   /* Sanity check: previous attacks/sec was 2, only adjust if we attack more than that */
+   if (MAX_ATTACKS_PER_SECOND > 2)
+   {
+      speed /= 2;
+      speed += 17; /* new range is 0 to 39 */
+   }
+   /* The old max speed was 2 attacks per round. Adjust to reflect this */
+   speed *= (MAX_ATTACKS_PER_SECOND/4);   /* this is for adjusting the round speeds */
+
    /*  log("Speed: %s:%d",GET_NAME(ch),speed);  */
-   return MIN(40,MAX(0,speed));
+
+   /* Old max was 11 seconds, new max is 10 seconds between attacks */
+   return MIN(10 * MAX_ATTACKS_PER_SECOND, MAX(0, speed));
    }
 
 void appear(struct char_data * ch)
