@@ -159,7 +159,7 @@ void make_potion(struct char_data *ch, int potion, struct obj_data *container,
 
    if(chance>percentage)
       {
-      WAIT_STATE(ch, PULSE_VIOLENCE); 
+      WAIT_STATE(ch, SKILL_LAG); 
       improve_skill(ch,potion,USE_FAIL);
       if(chance>percentage+5)
          {
@@ -467,7 +467,7 @@ void make_scroll(struct char_data *ch, int scroll, struct obj_data *paper,
 
    if(chance>percentage)
       {
-      WAIT_STATE(ch, PULSE_VIOLENCE); 
+      WAIT_STATE(ch, SKILL_LAG); 
       improve_skill(ch,scroll,USE_FAIL);
       if(chance>percentage+5)
          {
