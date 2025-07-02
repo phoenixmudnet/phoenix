@@ -2928,7 +2928,7 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
          if (!IS_NPC(ch) && !IS_NPC(victim))
             WAIT_STATE(victim, SKILL_LAG * 2);
          else
-            STUN_STATE(victim, SKILL_LAG * 2);
+            STUN_STATE(victim, STUN_LAG * 2);
          GET_POS(victim)=POS_SITTING;
          }
 
@@ -2942,7 +2942,7 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
          if (!IS_NPC(ch) && !IS_NPC(victim))
             WAIT_STATE(victim, SKILL_LAG);
          else
-            STUN_STATE(victim, SKILL_LAG);
+            STUN_STATE(victim, STUN_LAG);
          }
 
       }
