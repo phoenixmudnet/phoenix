@@ -991,14 +991,18 @@ struct obj_material_affs
 #define PULSE_OBJECT    (10 RL_SEC)
 #define PULSE_BUFFER    (5  RL_SEC)
 #define MAX_ATTACKS_PER_SECOND 5
-#define PULSE_VIOLENCE  (1  RL_SEC) / MAX_ATTACKS_PER_SECOND
+#define PULSE_VIOLENCE ((1  RL_SEC) / MAX_ATTACKS_PER_SECOND)
 #define PULSE_MAGIC     (1  RL_SEC)
 #define MOBILE_PERCENT 10
 
 /* Skill lag times */
 #define HALF_SKILL_COUNT           5  /* seconds */
 #define FULL_SKILL_COUNT          10
-#define SKILL_LAG      (1  RL_SEC)/2
+/* This is only used with WAIT_STATE, as it is called 10 times per second */
+#define SKILL_LAG      ((1  RL_SEC) / 2)
+/* Use this for STUN_STATE, since it is called when perform_violence is called,
+   which is dependent on MAX_ATTACKS_PER_SECOND - Nomikos 7/1/2025 */
+#define STUN_LAG       ((1 RL_SEC) * MAX_ATTACKS_PER_SECOND / 2)
 
 /* Variables for the output buffering system */
 #define HISTORY_SIZE            5   /* Keep Last 5 commands. */
