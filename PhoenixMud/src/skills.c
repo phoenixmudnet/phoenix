@@ -2628,7 +2628,7 @@ ACMD(do_stun)
                if (!IS_NPC(ch) && !IS_NPC(vict))
                   WAIT_STATE(vict, SKILL_LAG);    
                else
-                  STUN_STATE(vict,SKILL_LAG);
+                  STUN_STATE(vict, STUN_LAG);
                }
             else
                {
@@ -2637,7 +2637,7 @@ ACMD(do_stun)
                if (!IS_NPC(ch) && !IS_NPC(vict))  
                   WAIT_STATE(vict, SKILL_LAG);  
                else
-                  STUN_STATE(vict,SKILL_LAG*2);
+                  STUN_STATE(vict,STUN_LAG*2);
                }
             }
          }
