@@ -143,8 +143,10 @@ void oedit_setup_existing(struct descriptor_data *d, int real_num)
 	    temp->next = NULL; 
 	 } 
       } 
-   if (SCRIPT(obj))
+   if (SCRIPT(&obj_proto[real_num])) {
+	  CREATE(SCRIPT(obj), struct script_data, 1);
       script_copy(obj, &obj_proto[real_num], OBJ_TRIGGER);
+   }
  
   /*
    * Attatch new obj to players descriptor 
