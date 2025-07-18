@@ -725,7 +725,14 @@ int perform_drop(struct char_data * ch, struct obj_data * obj,
       release_buffer(buf);
       return (0);
       }
-
+   /* I like doing this so I better disallow it - Nomikos 7/17/2025 */
+   if ((mode == SCMD_JUNK) && IS_OBJ_STAT(obj, ITEM_DONATED))
+      {
+      act("Some kind person donated $p, maybe you can re-donate it instead?",FALSE,ch,obj,0,TO_CHAR);
+      release_buffer(buf);
+      return (0);
+      }
+	   
    if(num>0)
       {
       sprintf(buf, "You %s $p.%s (x %d)", sname, VANISH(mode), num+1);
