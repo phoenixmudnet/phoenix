@@ -1717,8 +1717,10 @@ ACMD(do_sac)
    if (*buf)
       {
       if ((obj = get_obj_in_list_vis(ch, buf, world[IN_ROOM(ch)].contents)) &&
-              !((GET_OBJ_TYPE(obj)==ITEM_CONTAINER) && OBJVAL_FLAGGED(obj, CONT_LOCKED)) &&
-              (CAN_WEAR(obj, ITEM_WEAR_TAKE)))
+              !((GET_OBJ_TYPE(obj) == ITEM_CONTAINER) && 
+	        OBJVAL_FLAGGED(obj, CONT_LOCKED) &&
+	        IS_OBJ_STAT(obj, ITEM_DONATED)) &&
+              CAN_WEAR(obj, ITEM_WEAR_TAKE))
          {
          log_corpse(ch,obj,"sacrificed");
          while (obj->contains)
