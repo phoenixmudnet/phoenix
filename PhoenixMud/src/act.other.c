@@ -1748,7 +1748,8 @@ ACMD(do_sac)
    return;
    }
 
-
+/* remort! command to remort. Added same-race remort (SRR) -Nomikos 8/3/2025   *
+ * Also, if you're crazy enough, added Triple Remort for all classes and races */
 ACMD(do_remort)
    {
    int i, same=0;
@@ -1789,6 +1790,7 @@ ACMD(do_remort)
 
    if (!*argument)
       {
+      /* Single Remort */
       if((GET_CLASS(ch)<CLASS_KENSAI)&&is_remort_level(ch,NON_REMORT))
          {
          send_to_char(ch,"Usage: remort! <New Class>\r\n");
@@ -1798,8 +1800,8 @@ ACMD(do_remort)
                       pc_class_types[CLASS_NECROMANCER],
                       pc_class_types[CLASS_DEVA]);
 	 }
-      else if((GET_RACE(ch)<RACE_DRACONIAN)&&(GET_CLASS(ch)>=CLASS_KENSAI)&&
-              is_remort_level(ch,SINGLE_REMORT))
+      /* Double Remort */
+      else if((GET_RACE(ch)<RACE_DRACONIAN)&&is_remort_level(ch,SINGLE_REMORT))
          {
          send_to_char(ch, "Usage: remort! <New Race>\r\n");
          send_to_char(ch, "Valid Races: %s, %s, %s, and %s\r\n",
@@ -1808,7 +1810,8 @@ ACMD(do_remort)
                       pc_race_types[RACE_TITAN],
                       pc_race_types[RACE_AESIR]);
          }
-      else if (REMORT_LEVEL(ch) == DOUBLE_REMORT && GET_RACE(ch) >= RACE_DRACONIAN)
+      /* Triple Remort */
+      else if (REMORT_LEVEL(ch) == DOUBLE_REMORT)
       {
          send_to_char(ch, "Usage: remort! SAME\r\n");
       }
@@ -1923,8 +1926,7 @@ ACMD(do_remort)
                 same ? scr_male_pc_class_types[(int)GET_CLASS(ch)] : pc_class_types[(int)GET_CLASS(ch)]);
       send_to_char(ch,"%s", OK);
       }
-   else if((GET_RACE(ch)<RACE_DRACONIAN)&&(GET_CLASS(ch)>=CLASS_KENSAI)&&
-           (GET_LEVEL(ch)==LVL_ANGEL))
+   else if((GET_RACE(ch)<RACE_DRACONIAN)&&(GET_LEVEL(ch)==LVL_ANGEL))
       {
       if(is_abbrev(argument,pc_race_types[RACE_DRACONIAN]))
          {
@@ -1950,6 +1952,8 @@ ACMD(do_remort)
          ch->real_abils.str=MIN(ch->real_abils.str+1,
                                 race_max_stats[GET_RACE(ch)][0]);
          }
+      else if(is_abbrev(argument,"SAME"))
+         same=1;
       else
          {
          send_to_char(ch, "%s", "That is not a valid RACE!\r\n");
@@ -1984,42 +1988,6 @@ ACMD(do_remort)
 
       GET_WIMP_LEV(ch) = 0;
 
-      /*for (i = 1; i <= MAX_SKILLS; i++)
-        SET_SKILL(ch, i, 0);
-
-      GET_SKILL(ch,PROF_FISTICUFFS)=40;
-      GET_SKILL(ch,SKILL_READ_MAGIC)=60;
-      switch (GET_CLASS(ch))
-         {
-      case CLASS_KENSAI:
-         GET_SKILL(ch,PROF_SWORD)=35;
-         GET_SKILL(ch,PROF_HAMMER)=35;
-         GET_SKILL(ch,PROF_AXE)=35;
-         GET_SKILL(ch,PROF_DAGGER)=35;
-         break;
-      case CLASS_ASSASSIN:
-         GET_SKILL(ch,PROF_SWORD)=35;
-         GET_SKILL(ch,PROF_HAMMER)=35;
-         GET_SKILL(ch,PROF_AXE)=35;
-         GET_SKILL(ch,PROF_DAGGER)=35;
-         break;
-      case CLASS_NECROMANCER:
-         GET_SKILL(ch,SKILL_READ_MAGIC)=90;
-         GET_SKILL(ch,PROF_CLUB)=35;
-         GET_SKILL(ch,PROF_DAGGER)=35;
-         GET_ALIGNMENT(ch)=-1000;
-         break;
-      case CLASS_DEVA:
-         GET_SKILL(ch,SKILL_READ_MAGIC)=90;
-         GET_SKILL(ch,PROF_CLUB)=35;
-         GET_SKILL(ch,PROF_DAGGER)=35;
-         GET_ALIGNMENT(ch)=1000;
-         break;
-      default:
-         break;
-         }
-      */
-
       switch (GET_CLASS(ch))
       {
       case CLASS_NECROMANCER:
@@ -2034,7 +2002,7 @@ ACMD(do_remort)
                 pc_race_types[GET_RACE(ch)]);
       send_to_char(ch, "%s", OK);
       }
-   else if (REMORT_LEVEL(ch) == DOUBLE_REMORT && GET_RACE(ch) >= RACE_DRACONIAN)
+   else if (REMORT_LEVEL(ch) == DOUBLE_REMORT)
    {
       if(!is_abbrev(argument,"SAME"))
       {
