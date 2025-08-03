@@ -60,7 +60,7 @@ void extract_script(struct script_data *sc)
       trig = NULL;
       }
    TRIGGERS(sc) = NULL;
-   free(sc);
+   //free(sc);
 }
 
 /* erase the script memory of a mob */
