@@ -1541,10 +1541,8 @@ void extract_obj(struct obj_data * obj)
    if (GET_OBJ_RNUM(obj) >= 0)
       (obj_index[GET_OBJ_RNUM(obj)].number)--;
 
-   if (SCRIPT(obj)) {
+   if (SCRIPT(obj))
       extract_script(SCRIPT(obj));
-      SCRIPT(obj) = NULL;
-   }
 
    free_obj(obj);
    }
@@ -1876,11 +1874,8 @@ void extract_char(struct char_data * ch)
       if (GET_MOB_RNUM(ch) > -1)  /* if mobile */
          mob_index[GET_MOB_RNUM(ch)].number--;
       clearMemory(ch);  /* Only NPC's can have memory */
-      if (SCRIPT(ch)) {
+      if (SCRIPT(ch))
          extract_script(SCRIPT(ch));
-         SCRIPT(ch) = NULL;
-      }
-         
       if (SCRIPT_MEM(ch))
          extract_script_mem(SCRIPT_MEM(ch));
 

@@ -154,12 +154,8 @@ void redit_setup_existing(struct descriptor_data *d, int real_num)
       {
       room->tele->targ = 0;
       }
-
-   if (SCRIPT(&world[real_num])) {
-	  CREATE(SCRIPT(room), struct script_data, 1);
+   if (SCRIPT(&world[real_num]))
       script_copy(room, &world[real_num], WLD_TRIGGER);
-   }
-
    proto = world[real_num].proto_script;
    while (proto) 
       {

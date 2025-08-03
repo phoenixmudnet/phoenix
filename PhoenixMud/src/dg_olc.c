@@ -37,52 +37,54 @@ void trigedit_save(struct descriptor_data *d);
 void trigedit_create_index(int znum, char *type);
 
 /* copy an entire script from one holder (mob/obj/room) to another */
-void script_copy(void *dst, void *src, int type) {
-	struct script_data *s_src = NULL;
-	struct script_data *s_dst = NULL;
-	trig_data *t_src, *t_dst;
+void script_copy(void *dst, void *src, int type)
+{
+   struct script_data *s_src = NULL;
+   struct script_data *s_dst = NULL;
+   trig_data *t_src, *t_dst;
 
-	/* find the scripts of the source and destination */
-	switch (type) {
-		case MOB_TRIGGER:
-			s_src = SCRIPT((struct char_data *)src);
-			s_dst = SCRIPT((struct char_data *)dst);
-			((struct char_data *)dst)->proto_script =
-				((struct char_data *)src)->proto_script;
-			break;
-		case OBJ_TRIGGER:
-			s_src = SCRIPT((struct obj_data *)src);
-			s_dst = SCRIPT((struct obj_data *)dst);
-			((struct obj_data *)dst)->proto_script =
-				((struct obj_data *)src)->proto_script;
-			break;
-		case WLD_TRIGGER:
-			s_src = SCRIPT((struct room_data *)src);
-			s_dst = SCRIPT((struct room_data *)dst);
-			((struct room_data *)dst)->proto_script =
-				((struct room_data *)src)->proto_script;
-			break;
-		default:
-			log("SYSERR: Unknown type code sent to script_copy()!");
-			break;
-	}
+  /* find the scripts of the source and destination */
+   switch (type)
+      {
+       case MOB_TRIGGER:
+	  s_src = SCRIPT((struct char_data *)src);
+	  s_dst = SCRIPT((struct char_data *)dst);
+	  ((struct char_data *)dst)->proto_script =
+						   ((struct char_data *)src)->proto_script;
+	  break;
+       case OBJ_TRIGGER:
+	  s_src = SCRIPT((struct obj_data *)src);
+	  s_dst = SCRIPT((struct obj_data *)dst);
+	  ((struct obj_data *)dst)->proto_script =
+						  ((struct obj_data *)src)->proto_script;
+	  break;
+       case WLD_TRIGGER:
+	  s_src = SCRIPT((struct room_data *)src);
+	  s_dst = SCRIPT((struct room_data *)dst);
+	  ((struct room_data *)dst)->proto_script =
+						   ((struct room_data *)src)->proto_script;
+	  break;
+       default:
+	  log("SYSERR: Unknown type code sent to script_copy()!");
+	  break;
+      }
 
-	if (TRIGGERS(s_dst)) {
-		log("SYSERR: script_copy called with a destination that already has triggers");
-		return;
-	}
+  /* make sure the dst doesnt already have a script       */
+  /* if it does, delete it                                */
+   if (s_dst) extract_script(s_dst);
 
-	/* copy the scrip data */
-	s_dst->types = s_src->types;
-	t_src = TRIGGERS(s_src);
-	while (t_src) {
-		CREATE(t_dst, trig_data, 1);
-		if (!TRIGGERS(s_dst))
-			TRIGGERS(s_dst) = t_dst;
-		trig_data_copy(t_dst, t_src);
-		t_dst = t_dst->next;
-		t_src = t_src->next;
-	}
+  /* copy the scrip data */
+   s_dst->types = s_src->types;
+   t_src = TRIGGERS(s_src);
+   while (t_src)
+      {
+      CREATE(t_dst, trig_data, 1);
+      if (!TRIGGERS(s_dst)) TRIGGERS(s_dst) = t_dst;
+      trig_data_copy(t_dst, t_src);
+      t_dst = t_dst->next;
+      t_src = t_src->next;
+      }
+
 }
 
 /* called when a mob or object is being saved to disk, so its script can */
