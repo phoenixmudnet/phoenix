@@ -127,7 +127,7 @@ struct script_data {
    ubyte purged;			/* script is set to be purged */
    long context;			/* current context for statics */
  
-   //struct script_data *next;		/* used for purged_scripts    */
+   struct script_data *next;		/* used for purged_scripts    */
 };
 
 /* used for actor memory triggers */
