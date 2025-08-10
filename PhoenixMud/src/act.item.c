@@ -226,6 +226,10 @@ ACMD(do_put)
 
 int can_take_obj(struct char_data * ch, struct obj_data * obj)
    {
+   /* Added ability for imms to pick up anything - Nomikos 8/10/2025 */
+   if ((GET_LEVEL(ch) >= LVL_IMMORT) && PRF_FLAGGED(ch,PRF_NOHASSLE))
+	   return(1);
+	   
    if (IS_CARRYING_N(ch) >= CAN_CARRY_N(ch))
       {
       act("$p: you can't carry that many items.", FALSE, ch, obj, 0, TO_CHAR);
