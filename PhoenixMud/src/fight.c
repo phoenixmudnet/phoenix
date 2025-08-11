@@ -71,10 +71,10 @@ int skill_roll(struct char_data *ch, int skill_num, int penalty);
 struct obj_data *has_object_ref(struct char_data *ch, int iobj_vnum);
 
 
-float fight_group_exp_divisor = 2.5f;
-int fight_ldiff_dodge_multiplier = 4;
+float fight_group_exp_divisor = 1.75f;
+int fight_ldiff_dodge_multiplier = 2;
 int fight_grouped_dodge_multiplier = 1;
-int fight_dodge_random_bound = 190;
+int fight_dodge_random_bound = 250;
 
 ACMD(do_get); /* autosplit/loot code from snippets page --Erika */
 ACMD(do_split); /* autosplit/loot (hereafter asl) --Erika */
@@ -2185,7 +2185,7 @@ void group_gain(struct char_data * ch, struct char_data * victim)
       base=((exp_table[top_level]/1000)*(GET_LEVEL(victim)-killer_level))/(3*tot_levels);
       /*  log ("base: %d",base);  */
       /* base = base + MAX(1, GET_EXP(victim) / (int)((float)0.9 * (float)3 * (float)tot_levels)); */
-      base = base + MAX(1, GET_EXP(victim) / (int)(fight_group_exp_divisor * (float)tot_levels));
+      base = base + MAX(1, GET_EXP(victim) / MIN(1, (int)(fight_group_exp_divisor * (float)tot_levels)));
       /*  log ("base: %d",base);  */
       }
    else if(tot_members==1)
