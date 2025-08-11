@@ -269,9 +269,9 @@ void adjust_fight_usage(struct char_data *ch)
   strcat(buf, "f3 = fight_grouped_dodge_multiplier\r\n");
   strcat(buf, "  The larger this value, the easier it becomes to land attacks when grouped.\r\n");
   strcat(buf, "f4 = fight_dodge_random_bound\r\n");
-  strcat(buf, "  The lower this number, the better chance (in general) of landing attacks.\r\n");
+  strcat(buf, "  The higher this number, the better chance (in general) of landing attacks.\r\n");
   strcat(buf, "\r\n");
-  strcat(buf,   "Defaults are: 2.70, 4, 0, 190.\r\n");
+  strcat(buf,   "Defaults are: 1.75, 2, 1, 250.\r\n");
   char buf2[256];
   sprintf(buf2, "Current vals: %.2f, %d, %d, %d.\r\n",
     fight_group_exp_divisor,
