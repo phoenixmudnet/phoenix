@@ -2106,7 +2106,8 @@ void perform_group_gain(struct char_data * ch, int base,
    else
       send_to_char(ch,"You receive your share of experience -- one measly little point!\r\n");
 
-   gain_exp(ch, share);
+   /* gain_exp() should not be used here, as it shorts PC exp - Nomikos 8/17/2025 */
+   gain_exp_regardless(ch, share, FALSE);
    change_alignment(ch, victim);
    }
 
