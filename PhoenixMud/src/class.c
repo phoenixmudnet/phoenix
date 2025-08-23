@@ -1305,19 +1305,19 @@ int valid_class_align(struct char_data *ch)
  */
 const float class_exp_multipliers[] =
   {
-    1.5, /* WA */
-    1.3, /* CL */
+    1.4, /* WA */
+    1.4, /* CL */
     1.4, /* TH */
-    1.3, /* MU */
-    1.5, /* RA */
-    1.2, /* BD */
-    1.5, /* MO */
+    1.4, /* MU */
+    1.4, /* RA */
+    1.4, /* BD */
+    1.4, /* MO */
     0.0, /* *UNUSED*  */
-    1.6, /* BA */
-    1.6, /* PA */
-    1.6, /* AP */
-    1.3, /* DR */
-    1.3, /* Me */
+    1.4, /* BA */
+    1.4, /* PA */
+    1.4, /* AP */
+    1.4, /* DR */
+    0.0, /* Me */
     2.2, /* KEN */
     2.2, /* ASS */
     2.2, /* NEC */
