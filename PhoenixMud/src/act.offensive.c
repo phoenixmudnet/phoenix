@@ -754,12 +754,20 @@ ACMD(do_throw)
         send_to_char(ch, "No throwing in the clan hall!\r\n");
         return;
         }
+    /* Can now hold a throwable item too. -Nomikos 8/22/2025 */
     if(GET_EQ(ch, WEAR_WIELD_1)&&
             ((GET_OBJ_TYPE(GET_EQ(ch, WEAR_WIELD_1)) == ITEM_THROW) ||
              (GET_OBJ_TYPE(GET_EQ(ch, WEAR_WIELD_1)) == ITEM_GRENADE)))
         {
         missile = GET_EQ(ch, WEAR_WIELD_1);
         where_pos=WEAR_WIELD_1;
+        }
+    else if(GET_EQ(ch, WEAR_HOLD_1)&&
+            ((GET_OBJ_TYPE(GET_EQ(ch, WEAR_HOLD_1)) == ITEM_THROW) ||
+             (GET_OBJ_TYPE(GET_EQ(ch, WEAR_HOLD_1)) == ITEM_GRENADE)))
+        {
+        missile = GET_EQ(ch, WEAR_HOLD_1);
+        where_pos=WEAR_HOLD_1;
         }
     else if(GET_EQ(ch, WEAR_WIELD_2)&&
             ((GET_OBJ_TYPE(GET_EQ(ch, WEAR_WIELD_2)) == ITEM_THROW) ||
@@ -768,9 +776,16 @@ ACMD(do_throw)
         missile = GET_EQ(ch, WEAR_WIELD_2);
         where_pos=WEAR_WIELD_2;
         }
+    else if(GET_EQ(ch, WEAR_HOLD_2)&&
+            ((GET_OBJ_TYPE(GET_EQ(ch, WEAR_HOLD_2)) == ITEM_THROW) ||
+             (GET_OBJ_TYPE(GET_EQ(ch, WEAR_HOLD_2)) == ITEM_GRENADE)))
+        {
+        missile = GET_EQ(ch, WEAR_HOLD_2);
+        where_pos=WEAR_HOLD_2;
+        }
     else
         {
-        send_to_char(ch, "You should wield a throwing weapon first!\r\n");
+        send_to_char(ch, "You should wield or at least hold a throwing weapon first!\r\n");
         return;
         }
 
