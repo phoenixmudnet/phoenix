@@ -1501,7 +1501,7 @@ int get_repair_cost(struct obj_data *obj,struct char_data *keeper,
    /* Note: If material strength changes that could cause an issue here */
    /* original = material_affs[obj->material].default_dam_slots; */
    /* Load and extract a temp object to get its original oslots - Nomi 8/26/25 */
-   tempobj = read_object(obj->vnum, VIRTUAL);
+   tempobj = read_object(real_object(obj), REAL);
    original = GET_OBJ_OSLOTS(tempobj);
    extract_obj(tempobj);
        
@@ -1641,7 +1641,7 @@ SPECIAL(repair_guy)
                      /* If the material default oslots ever is adjusted, this could cause issues */
 		             /* original = material_affs[obj->material].default_dam_slots; */
                      /* Load and extract a temp object to get its original oslots - Nomi 8/26/25 */
-                     tempobj = read_object(obj->vnum, VIRTUAL);
+                     tempobj = read_object(real_object(obj), REAL);
                      original = GET_OBJ_OSLOTS(tempobj);
                      extract_obj(tempobj);
 
