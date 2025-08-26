@@ -463,6 +463,7 @@ void list_one_char(struct char_data *i, struct char_data *ch)
 		" is standing here."
 	};
 	char *buf = get_buffer(MAX_STRING_LENGTH);
+	char *buf2, *tmpbuf;
 
 	if (IS_NPC(i) && !strcmp(i->player.long_descr, "INVIS\r\n")) {
 		if (GET_LEVEL(ch) >= LVL_IMMORT)
@@ -521,12 +522,20 @@ void list_one_char(struct char_data *i, struct char_data *ch)
 	if (IS_NPC(i)) {
 		strcpy(buf, i->player.short_descr);
 		CAP(buf);
-	} else
-		sprintf(buf, "%s%s%s%s%s", i->player.name,
-			*(GET_TITLE(i)) == '\0' ? "" : " ", GET_TITLE(i),
-			(GET_CLAN(i) > 0) ? " " : "",
-			(GET_CLAN(i) > 0) ? GET_CLAN_NAME(i) : "");
-
+	} else {
+		/* Added clan name to room look - Nomikos 8/26/2025 */
+		buf2 = get_buffer(128);
+		if (GET_CLAN(i) > 0)
+			sprintf(buf2, " (%s)", GET_CLAN_NAME(i));
+		else
+			*buf2 = '\0';
+		
+		sprintf(buf, "%s%s%s%s", i->player.name,
+			*(GET_TITLE(i)) == '\0' ? "" : " ", GET_TITLE(i), buf2);
+		
+		release_buffer(buf2);
+	}
+	
 	if (PLR_FLAGGED(i, PLR_FISHING))
 		strcat(buf, " (fishing)");
 	if (AFF_FLAGGED(i, AFF_INVISIBLE))
@@ -546,7 +555,7 @@ void list_one_char(struct char_data *i, struct char_data *ch)
 			strcat(buf, PERS(RIDING(i), ch));
 		strcat(buf, ".");
 	} else if (FURNITURE(i) && IN_ROOM(FURNITURE(i)) == IN_ROOM(i)) {
-		char *tmpbuf = get_buffer(128);
+		tmpbuf = get_buffer(128);
 		strcpy(tmpbuf, position_types[(int)GET_POS(i)]);
 		tmpbuf = LOW(tmpbuf);
 		sprintf(buf + strlen(buf), " is here %s on %s.",
