@@ -522,8 +522,10 @@ void list_one_char(struct char_data *i, struct char_data *ch)
 		strcpy(buf, i->player.short_descr);
 		CAP(buf);
 	} else
-		sprintf(buf, "%s%s%s", i->player.name,
-			*(GET_TITLE(i)) == '\0' ? "" : " ", GET_TITLE(i));
+		sprintf(buf, "%s%s%s%s", i->player.name,
+			*(GET_TITLE(i)) == '\0' ? "" : " ",
+			(GET_CLAN(i) > 0) ? GET_CLAN_NAME(i) : "",
+			GET_TITLE(i));
 
 	if (PLR_FLAGGED(i, PLR_FISHING))
 		strcat(buf, " (fishing)");
