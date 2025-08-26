@@ -1487,26 +1487,38 @@ SPECIAL(robin_hood)
 int get_repair_cost(struct obj_data *obj,struct char_data *keeper,
                     struct char_data *ch)
    {
-   int cost, original, master_base, reductions;
+   struct obj_data *tempobj;
+   int cost, original, master_base, reductions, repair_quality;
    float one_log_reduction;
    
    /* Base cost is here for now. Should probably put it somewhere more useful */
-   master_base = 50000;
+   master_base = 250000;
    /* Cost is doubled for !repair items */
    if (IS_OBJ_STAT(obj, ITEM_NO_REPAIR))
       master_base *= 2;
    
    /* Compare with the original material slots of the item */
    /* Note: If material strength changes that could cause an issue here */
-   original = material_affs[obj->material].default_dam_slots;
+   /* original = material_affs[obj->material].default_dam_slots; */
+   /* Load and extract a temp object to get its original oslots - Nomi 8/26/25 */
+   tempobj = read_object(obj->vnum, VIRTUAL);
+   original = GET_OBJ_OSLOTS(tempobj);
+   extract_obj(tempobj);
+       
    /* One log reduction is technically 90% but who cares */
    one_log_reduction = (float)original * 0.1;
    /* Each reduction is 10% off the _original_ strength, so can do it 10 times */
    reductions = (int)(((float)original - (float)GET_OBJ_OSLOTS(obj)) / one_log_reduction);
-   
+
+   /* Since this is checked before the slots are subtracted, have to do it this way. */
+   if ((GET_OBJ_CSLOTS(obj) / GET_OBJ_TSLOTS(obj)) > 0.5)
+       repair_quality = 1;
+   else
+       repair_quality = 2;
+       
    /* If the item has total slots worn all the way down, or is !repair pay the master cost */
    /* Note that value of 2 will go down to -1, so if it less than 3 a master is needed */
-   if ((GET_OBJ_TSLOTS(obj) < 3) || IS_OBJ_STAT(obj, ITEM_NO_REPAIR))
+   if ((GET_OBJ_TSLOTS(obj) <= repair_quality) || IS_OBJ_STAT(obj, ITEM_NO_REPAIR))
       {
       /* If the master has repaired it already, increase the price by an extra 50% each time.
       If not, then it's just the base price. */
@@ -1515,8 +1527,9 @@ int get_repair_cost(struct obj_data *obj,struct char_data *keeper,
    else
       {
       /* Added in a multiplier for each reduction. Starts at normal, then goes up */
-      cost = (reductions + 1) * (GET_OBJ_OSLOTS(obj) + 5 * 
-	     (GET_OBJ_TSLOTS(obj) - GET_OBJ_CSLOTS(obj)));
+      /* Adjusted the price. Was based on oslots plus 5x difference, now it's oslots
+         times difference - Nomi 8/26/25 */
+      cost = (reductions + 1) * GET_OBJ_OSLOTS(obj) * (GET_OBJ_TSLOTS(obj) - GET_OBJ_CSLOTS(obj));
       }
    
    /* odinian, 10/25/99, CHA price adjustment */
@@ -1530,6 +1543,7 @@ SPECIAL(repair_guy)
    struct char_data *keeper = (struct char_data *) me;
    char *buf, *buf2;
    struct obj_data *obj;
+   struct obj_data *tempobj;
    int cost,  original, reduction, condition;
    int weap_flags = 0, armr_flags = 0, jewl_flags = 0;
 
@@ -1558,12 +1572,12 @@ SPECIAL(repair_guy)
           (ITEM_WEAR_WIELD | ITEM_WEAR_HOLD) : 0;
    armr_flags = MOB2_FLAGGED(keeper, MOB2_ARMORER) ?
           (ITEM_WEAR_BODY   | ITEM_WEAR_HEAD  | ITEM_WEAR_LEGS  | 
-	   ITEM_WEAR_FEET   | ITEM_WEAR_HANDS | ITEM_WEAR_ARMS  | 
-	   ITEM_WEAR_SHIELD | ITEM_WEAR_ABOUT | ITEM_WEAR_WAIST | 
-	   ITEM_WEAR_BACK   | ITEM_WEAR_FACE) : 0;
+	       ITEM_WEAR_FEET   | ITEM_WEAR_HANDS | ITEM_WEAR_ARMS  | 
+	       ITEM_WEAR_SHIELD | ITEM_WEAR_ABOUT | ITEM_WEAR_WAIST | 
+	       ITEM_WEAR_BACK   | ITEM_WEAR_FACE) : 0;
    jewl_flags = MOB2_FLAGGED(keeper, MOB2_JEWELER) ? 
           (ITEM_WEAR_HOLD  | ITEM_WEAR_FINGER | ITEM_WEAR_NECK  | 
-	   ITEM_WEAR_WRIST | ITEM_WEAR_EAR    | ITEM_WEAR_WAIST |
+	       ITEM_WEAR_WRIST | ITEM_WEAR_EAR    | ITEM_WEAR_WAIST |
            ITEM_WEAR_FACE  | ITEM_WEAR_ABOUT  | ITEM_WEAR_HEAD) : 0;
 
    /* Fix, evaluate, or list? */
@@ -1572,148 +1586,153 @@ SPECIAL(repair_guy)
       buf = get_buffer(MAX_STRING_LENGTH);
 
       if (!(*argument))
-         sprintf(buf, "%s What do you want me to evaluate??", 
-	         GET_NAME(ch));
+         sprintf(buf, "%s What do you want me to evaluate??", GET_NAME(ch));
       else
-	 {
+	     {
          one_argument(argument, buf);
 	  
          if (!(obj = get_obj_in_list_vis(ch, buf, ch->carrying)))
-            sprintf(buf,"%s Are you really sure you have that?", 
-		    GET_NAME(ch));
-	 else if (GET_OBJ_TSLOTS(obj) == INDESTRUCTABLE)
-            sprintf(buf,"%s What a lucky find, that will never need repairing.",
-                    GET_NAME(ch));
-         else if (IS_OBJ_STAT(obj, ITEM_NO_REPAIR) && 
-		  !MOB_FLAGGED(keeper, MOB_MASTER))
-            sprintf(buf,"%s I am not skilled enough to repair %s.", 
-		    GET_NAME(ch), GET_OBJ_NAME(obj));
-	 else if ((GET_OBJ_CSLOTS(obj) == GET_OBJ_TSLOTS(obj)) && 
-		  (GET_OBJ_TSLOTS(obj) > 0))
+            sprintf(buf,"%s Are you really sure you have that?", GET_NAME(ch));
+	     else if (GET_OBJ_TSLOTS(obj) == INDESTRUCTABLE)
+            sprintf(buf,"%s What a lucky find, that will never need repairing.", GET_NAME(ch));
+         else if (IS_OBJ_STAT(obj, ITEM_NO_REPAIR) && !MOB_FLAGGED(keeper, MOB_MASTER))
+            sprintf(buf,"%s I am not skilled enough to repair %s.", GET_NAME(ch), GET_OBJ_NAME(obj));
+	     else if ((GET_OBJ_CSLOTS(obj) == GET_OBJ_TSLOTS(obj)) && (GET_OBJ_TSLOTS(obj) > 0))
             sprintf(buf,"%s But %s is not damaged!", 
-		    GET_NAME(ch), GET_OBJ_NAME(obj));
+		            GET_NAME(ch), GET_OBJ_NAME(obj));
          else if ((weap_flags && !CAN_WEAR(obj, weap_flags)) || 
-		  (armr_flags && !CAN_WEAR(obj, armr_flags)) ||
-		  (jewl_flags && !CAN_WEAR(obj, jewl_flags)))
-	    act("$n looks at $p and shakes $s head. They do not specialize in this type of equipment.", 
-	        TRUE, keeper, obj, 0, TO_ROOM);
+		          (armr_flags && !CAN_WEAR(obj, armr_flags)) ||
+		          (jewl_flags && !CAN_WEAR(obj, jewl_flags)))
+            act("$n looks at $p and shakes $s head. They do not specialize in this type of equipment.", 
+	              TRUE, keeper, obj, 0, TO_ROOM);
          else
-	    {
+            {
             cost = get_repair_cost(obj,keeper,ch);
 
             if (GET_GOLD(ch) < cost)
                sprintf(buf,"%s You need at least %d gold on-hand to repair %s.",
                        GET_NAME(ch), cost, GET_OBJ_NAME(obj));
             else
-	       {
-	       *buf = '\0';
+               {
+               *buf = '\0';
 
-	       /* Subtract total slots. If all out, have a master fix it */
-               GET_OBJ_TSLOTS(obj) -= 2;
+	           /* Subtract total slots. If all out, have a master fix it */
+               /* Adjust object wear if it's repaired in decent shape - Nomi 8/26/25 */
+               if ((GET_OBJ_CSLOTS(obj) / GET_OBJ_TSLOTS(obj)) > 0.5)
+                  GET_OBJ_TSLOTS(obj)--;
+               else
+                  GET_OBJ_TSLOTS(obj) -= 2;
 
                /* Added a fix to prevent the repair guy from getting confused */
-	       /* that TSLOTS == 0 is indestructable */
-	       if (GET_OBJ_TSLOTS(obj) == 0)
-	          GET_OBJ_TSLOTS(obj)--;
+	           /* that TSLOTS == 0 is indestructable */
+	           if (GET_OBJ_TSLOTS(obj) == 0)
+	              GET_OBJ_TSLOTS(obj)--;
 
-	       /* Master-type skillz */
+			   /* Master-type skillz */
                if ((GET_OBJ_TSLOTS(obj) < 1) || (IS_OBJ_STAT(obj, ITEM_NO_REPAIR)))
-	          {
+	              {
                   if (!MOB_FLAGGED(keeper, MOB_MASTER))
                      act("$n tries to repair $p, but $e is not skilled enough!",
-			 TRUE, keeper, obj, 0, TO_ROOM);
-		  else
-	             {
-		     /* Master fixer dude */
-		     original = material_affs[obj->material].default_dam_slots;
-		     reduction = (float)original * 0.1;
+			             TRUE, keeper, obj, 0, TO_ROOM);
+		          else
+                     {
+		             /* Master fixer dude */
 
-		     /* Subtract 10% of default dam_slots, set the rest as max */
-		     GET_OBJ_OSLOTS(obj) -= reduction;
-		     GET_OBJ_CSLOTS(obj) = GET_OBJ_TSLOTS(obj) = GET_OBJ_OSLOTS(obj);
+                     /* If the material default oslots ever is adjusted, this could cause issues */
+		             /* original = material_affs[obj->material].default_dam_slots; */
+                     /* Load and extract a temp object to get its original oslots - Nomi 8/26/25 */
+                     tempobj = read_object(obj->vnum, VIRTUAL);
+                     original = GET_OBJ_OSLOTS(tempobj);
+                     extract_obj(tempobj);
 
-		     GET_GOLD(ch) -= cost;
+		             reduction = (float)original * 0.1;
+
+		             /* Subtract 10% of default dam_slots, then adjust the rest to the new oslot */
+		             GET_OBJ_OSLOTS(obj) -= reduction;
+                     GET_OBJ_CSLOTS(obj) = GET_OBJ_TSLOTS(obj) = GET_OBJ_OSLOTS(obj);
+
+		             GET_GOLD(ch) -= cost;
                      total_repair += cost;
 
-		     act("$N takes a small mountain of gold and $p from $n.",
-		         TRUE, ch, obj, keeper, TO_ROOM);
+		             act("$N takes a small mountain of gold and $p from $n.",
+		                 TRUE, ch, obj, keeper, TO_ROOM);
                      send_to_char(ch,"%s takes %d gold and %s from you.\r\n",
-		                  CAP(strdup(GET_NAME(keeper))), cost, GET_OBJ_NAME(obj));
+		                          CAP(strdup(GET_NAME(keeper))), cost, GET_OBJ_NAME(obj));
 					 
-		     /* figure out the new condition for messaging */
-		     condition = ((GET_OBJ_OSLOTS(obj) * 10) / original) + 2;
+		             /* figure out the new condition for messaging */
+		             condition = ((GET_OBJ_OSLOTS(obj) * 10) / original) + 2;
 
-		     buf2 = get_buffer(MAX_STRING_LENGTH);
+		             buf2 = get_buffer(MAX_STRING_LENGTH);
 					 
-		     /* Adjust these messages for master if needed */
-		     if (condition > 9)
-			sprintf(buf2, "$n repairs $p, restoring it to %s condition again!", 
-			        stolower(strdup(item_condition_no_color[condition])));
-		     else if (condition > 6)
-			sprintf(buf2, "$n frowns at the %s condition of $p after completing $s work.", 
-				stolower(strdup(item_condition_no_color[condition])));
-		     else if (condition > 4)
-			sprintf(buf2, "$p looks %s after $n repairs it, causing $m to shrug and chuckle.", 
-			        stolower(strdup(item_condition_no_color[condition])));
-		     else if (condition > 0)
-			sprintf(buf2, "$p appears to be %s after $n does whatever $e does with it.", 
-			        stolower(strdup(item_condition_no_color[condition])));
-		     else
-			/* Should never see this. Sorry in advance if you do... */
-			sprintf(buf2, "$n shoves $p up your arse -better tell an imm-",
-		                stolower(strdup(item_condition_no_color[condition])));
+		             /* Adjust these messages for master if needed */
+		             if (condition > 9)
+			            sprintf(buf2, "$n repairs $p, restoring it to %s condition again!", 
+			                    stolower(strdup(item_condition_no_color[condition])));
+		             else if (condition > 6)
+			            sprintf(buf2, "$n frowns at the %s condition of $p after completing $s work.", 
+				            stolower(strdup(item_condition_no_color[condition])));
+		             else if (condition > 4)
+		            	sprintf(buf2, "$p looks %s after $n repairs it, causing $m to shrug and chuckle.", 
+			                    stolower(strdup(item_condition_no_color[condition])));
+		             else if (condition > 0)
+			            sprintf(buf2, "$p appears to be %s after $n does whatever $e does with it.", 
+			                    stolower(strdup(item_condition_no_color[condition])));
+		             else
+			            /* Should never see this. Sorry in advance if you do... */
+			            sprintf(buf2, "$n shoves $p up your arse -better tell an imm-",
+		                        stolower(strdup(item_condition_no_color[condition])));
 			
-		     act(buf2, TRUE, keeper, obj, 0, TO_ROOM);
-		     act("$N hands $p back to $n.", TRUE, ch, obj, keeper, TO_ROOM);
-		     act("$N hands $p back to you.", TRUE, ch, obj, keeper, TO_CHAR);
+		             act(buf2, TRUE, keeper, obj, 0, TO_ROOM);
+		             act("$N hands $p back to $n.", TRUE, ch, obj, keeper, TO_ROOM);
+		             act("$N hands $p back to you.", TRUE, ch, obj, keeper, TO_CHAR);
 
-		     release_buffer(buf2);
-		     }
+		             release_buffer(buf2);
+		             }
                   }
-	       else
-	          {
-	          /* regular repair muchacho */
-	          original = GET_OBJ_OSLOTS(obj);
+	           else
+	              {
+	              /* regular repair muchacho */
+	             original = GET_OBJ_OSLOTS(obj);
 
-	          /* Subtract current slots after total slots check */
-	          GET_OBJ_CSLOTS(obj) = GET_OBJ_TSLOTS(obj);
+	              /* Subtract current slots after total slots check */
+	              GET_OBJ_CSLOTS(obj) = GET_OBJ_TSLOTS(obj);
 
-	          /* Let's charge the player ONLY when we can fix it - Nomikos 5/10/25 */
+	              /* Let's charge the player ONLY when we can fix it - Nomikos 5/10/25 */
                   GET_GOLD(ch) -= cost;
                   total_repair += cost;
 				  
                   act("$N takes some gold and $p from $n.",
-		      TRUE, ch, obj, keeper, TO_ROOM);
+		              TRUE, ch, obj, keeper, TO_ROOM);
                   send_to_char(ch,"%s takes %d gold and %s from you.\r\n",
-		               CAP(strdup(GET_NAME(keeper))), cost, GET_OBJ_NAME(obj));
+		                   CAP(strdup(GET_NAME(keeper))), cost, GET_OBJ_NAME(obj));
 
-	          /* figure out the new condition for messaging */
-	          condition = ((GET_OBJ_TSLOTS(obj) * 10) / original) + 2;
+	              /* figure out the new condition for messaging */
+	              condition = ((GET_OBJ_TSLOTS(obj) * 10) / original) + 2;
 	 
-	          buf2 = get_buffer(MAX_STRING_LENGTH);
-	          if (condition > 9)
-	             sprintf(buf2, "$n repairs $p, restoring it to %s condition again!",  
-		             stolower(strdup(item_condition_no_color[condition])));
-	          else if (condition > 6)
-	             sprintf(buf2, "$n frowns at the %s condition of $p after completing $s work.", 
-	                     stolower(strdup(item_condition_no_color[condition])));
-	          else if (condition > 4)
-	              sprintf(buf2, "$p looks %s after $n repairs it, causing $m to shrug and chuckle.",  
-		              stolower(strdup(item_condition_no_color[condition])));
-	          else if (condition > 0)
-		      sprintf(buf2, "$p appears to be %s after $n does whatever $e does with it.", 
-		   	      stolower(strdup(item_condition_no_color[condition])));
-	          else
-		     /* Should never see this. */
-		     sprintf(buf2, "$n broke something, but not $p. -tell an imm-",
-			     stolower(strdup(item_condition_no_color[condition])));
+	              buf2 = get_buffer(MAX_STRING_LENGTH);
+	              if (condition > 9)
+	                 sprintf(buf2, "$n repairs $p, restoring it to %s condition again!",  
+		                 stolower(strdup(item_condition_no_color[condition])));
+	              else if (condition > 6)
+	                 sprintf(buf2, "$n frowns at the %s condition of $p after completing $s work.", 
+	                         stolower(strdup(item_condition_no_color[condition])));
+	              else if (condition > 4)
+	                  sprintf(buf2, "$p looks %s after $n repairs it, causing $m to shrug and chuckle.",  
+		                      stolower(strdup(item_condition_no_color[condition])));
+	              else if (condition > 0)
+		              sprintf(buf2, "$p appears to be %s after $n does whatever $e does with it.", 
+		   	                  stolower(strdup(item_condition_no_color[condition])));
+	              else
+		             /* Should never see this. */
+		             sprintf(buf2, "$n broke something, but not $p. -tell an imm-",
+			                 stolower(strdup(item_condition_no_color[condition])));
 
-	          act(buf2, TRUE, keeper, obj, 0, TO_ROOM);
-	          act("$N hands $p back to $n.", TRUE, ch, obj, keeper, TO_ROOM);
-	          act("$N hands $p back to you.", TRUE, ch, obj, keeper, TO_CHAR);
+	              act(buf2, TRUE, keeper, obj, 0, TO_ROOM);
+	              act("$N hands $p back to $n.", TRUE, ch, obj, keeper, TO_ROOM);
+	              act("$N hands $p back to you.", TRUE, ch, obj, keeper, TO_CHAR);
 
-	          release_buffer(buf2);
-	          }
+	              release_buffer(buf2);
+	              }
                }
             }
          }
