@@ -1618,7 +1618,7 @@ SPECIAL(repair_guy)
 
 	           /* Subtract total slots. If all out, have a master fix it */
                /* Adjust object wear if it's repaired in decent shape - Nomi 8/26/25 */
-               if ((GET_OBJ_CSLOTS(obj) / GET_OBJ_TSLOTS(obj)) > 0.5)
+               if (((float)GET_OBJ_CSLOTS(obj) / (float)GET_OBJ_TSLOTS(obj)) > 0.5)
                   GET_OBJ_TSLOTS(obj)--;
                else
                   GET_OBJ_TSLOTS(obj) -= 2;
