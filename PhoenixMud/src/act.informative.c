@@ -523,9 +523,9 @@ void list_one_char(struct char_data *i, struct char_data *ch)
 		strcpy(buf, i->player.short_descr);
 		CAP(buf);
 	} else {
-		/* Added clan name to room look - Nomikos 8/26/2025 */
+		/* Added clan name to room look, but only when they have a title - Nomikos 8/26/2025 */
 		buf2 = get_buffer(128);
-		if (GET_CLAN(i) > 0)
+		if ((GET_CLAN(i) > 0) && *(GET_TITLE(i)) != '\0')
 			sprintf(buf2, " (%s)", GET_CLAN_NAME(i));
 		else
 			*buf2 = '\0';
