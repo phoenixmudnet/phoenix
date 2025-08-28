@@ -2767,7 +2767,6 @@ ACMD(do_tame)
       }
    GET_MANA(ch) = GET_MANA(ch) - 20;
 
-   WAIT_STATE(ch,PULSE_VIOLENCE);
    if (vict == ch)
       send_to_char(ch,"You like yourself even better!\r\n");
    else if(!trait_info[GET_RACE(vict)].can_tame)
@@ -2805,11 +2804,13 @@ ACMD(do_tame)
       }
    else if (!skill_roll(ch,SKILL_TAME,0))
       {
+      WAIT_STATE(ch,PULSE_VIOLENCE);
       send_to_char(ch,"You enrage the beast.\r\n");
       hit(vict,ch,TYPE_UNDEFINED);
       }
    else
       {
+	  WAIT_STATE(ch,PULSE_VIOLENCE/4);
       if (vict->master)
          stop_follower(vict);
       add_follower(vict, ch);
