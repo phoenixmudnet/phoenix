@@ -2204,14 +2204,19 @@ void perform_wear(struct char_data * ch, struct obj_data * obj, int where_pos, i
 
 
    /* Allows you to wear something while removing the old piece in that position*/
-
-   if(TWO_HANDED(obj)&&((where_pos==WEAR_WIELD_1)||(where_pos== WEAR_WIELD_2)))
+   /* Fixed by checking if its not a weapon first - Nomikos 8/30/2025 */
+   if (!((where_pos == WEAR_WIELD_1) || (where_pos == WEAR_WIELD_2) ||
+         (where_pos == WEAR_SHIELD) || (where_pos == WEAR_HOLD_1) ||
+         (where_pos == WEAR_HOLD_2)))
+      retval = perform_remove(ch, where_pos);
+   else if(TWO_HANDED(obj)&&((where_pos==WEAR_WIELD_1)||(where_pos== WEAR_WIELD_2)))
       {
       where_pos=WEAR_WIELD_1;
-      for(counter=0;counter <NUM_HAND_POSITIONS;counter++)
+      /* Work backwards to avoid re-equipping - Nomi 8/30/25 */
+      for(counter=NUM_HAND_POSITIONS-1; counter >= 0; counter--)
          if(GET_EQ(ch,hand_position[counter]))
-            if((retval = perform_remove(ch,hand_position[counter]))==0)
-               break;
+            /* If we want to dual wield, clear all hands - Nomi 8/30/25 */
+            retval = perform_remove(ch,hand_position[counter]);
       }
    else if((GET_EQ(ch,WEAR_WIELD_1)) && TWO_HANDED(GET_EQ(ch,WEAR_WIELD_1)))
       retval = perform_remove(ch,WEAR_WIELD_1);
