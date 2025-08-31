@@ -2029,8 +2029,9 @@ int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message)
    if (GET_LEVEL(ch) >= LVL_IMMORT)
       return 1;
 
-   /* level restricted 104+ god only */
-   if ((GET_OBJ_LR(obj) >= LVL_WANKER) && (GET_LEVEL(ch) < LVL_IMMORT))
+   /* level restricted 105+ god only 
+      Changed to 105+ Nomikos 8/30/25 */
+   if (GET_OBJ_LR(obj) >= LVL_IMMORT)
       {
       if (message)
          {
@@ -2040,6 +2041,12 @@ int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message)
              obj, 0, TO_CHAR);
          }
       return 0;
+      }
+
+   /* Triple remorts can wear anything */
+   if (REMORT_LEVEL(ch) == TRIPLE_REMORT)
+      {
+         return 1;
       }
 
    /* newbie items: level restricted to non-remorts levels 20 or below */
@@ -2057,12 +2064,7 @@ int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message)
          }
       return 0;
       }
-
-   if (REMORT_LEVEL(ch) == TRIPLE_REMORT)
-   {
-     return 1;
-   }
-
+   
    /* items lr < 104*/
    if (GET_OBJ_LR(obj) > GET_LEVEL(ch))
       {
