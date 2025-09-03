@@ -560,8 +560,15 @@ struct obj_data *get_purchase_obj(struct char_data * ch, char *arg,
 int buy_price(struct obj_data * obj, int shop_nr,struct char_data *ch,struct char_data *keeper)
    {
    int price;
-   price =(int) (GET_OBJ_COST(obj) * SHOP_BUYPROFIT(shop_nr));
+
+   /* Foolhardy shopkeepers don't adjust object value - Nomikos 9-2-2025 */
+   if (!MOB_FLAGGED(keeper, MOB_FOOLHARDY))
+      price = (int) (GET_OBJ_COST(obj) * SHOP_BUYPROFIT(shop_nr));
+   else
+      return GET_OBJ_COST(obj);
+
    price = (int)((1.0+((float)PRICE_ADJ_CHA(ch,keeper)/100.0))*(float)price);
+   
    if (price <= 0)
       price = 1;
 
@@ -788,8 +795,13 @@ int sell_price(struct char_data * ch, struct obj_data * obj, int shop_nr,struct 
    int cost;
    int cost2;
    int numberHeld=0;
-   cost = (int) ((float)GET_OBJ_COST(obj) * (float)SHOP_SELLPROFIT(shop_nr));
 
+   /* Foolhardy shopkeepers don't adjust object value - Nomikos 9-2-2025 */
+   if (!MOB_FLAGGED(keeper, MOB_FOOLHARDY))
+      cost = (int) ((float)GET_OBJ_COST(obj) * (float)SHOP_SELLPROFIT(shop_nr));
+   else 
+      return GET_OBJ_COST(obj);
+      
    if(IS_OBJ_STAT(obj,ITEM_DONATED))
       cost/=4;
    if(GET_OBJ_OSLOTS(obj)>0)
