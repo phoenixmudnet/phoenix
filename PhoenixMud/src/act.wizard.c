@@ -5393,15 +5393,12 @@ ACMD(do_show)
                {
                if ((k = GET_SKILL(vict,i)) > 0)
                   {
-                  if((j++)%2)
-                     sprintf(buf+strlen(buf),"%-21s %3ld%% %3d \r\n",
-                             spells[i].spell_name,k,
-                             GET_SKILL_LEARN(vict,i));
-                  else
-                     sprintf(buf+strlen(buf),"%-21s %3ld%% %3d ",
-                             spells[i].spell_name,k,
-                             GET_SKILL_LEARN(vict,i));
-                  }
+				  sprintf(buf+strlen(buf),"%-21s %3ld%s %3d %s",
+                          spells[i].spell_name,k,
+						  spells[i].is_spell == IS_SPELL ? " " : "%",
+                          GET_SKILL_LEARN(vict,i),
+					      (j++)%2 ? "\r\n" : "");
+				  }
                /*      break;  */
                }
             }
@@ -5466,10 +5463,11 @@ ACMD(do_show)
                {
                if ((k = GET_SKILL(vict,i)) > 0)
                   {
-                  if ((j++)%2)
-                     sprintf(buf,"%s%-21s %3ld%%     \r\n",buf,spells[i].spell_name,k);
-                  else
-                     sprintf(buf,"%s%-21s %3ld%%     ",buf,spells[i].spell_name,k);
+                  sprintf(buf+strlen(buf),"%-21s %3ld%s %3d %s",
+                          spells[i].spell_name,k,
+						  spells[i].is_spell == IS_SPELL ? " " : "%",
+                          GET_SKILL_LEARN(vict,i),
+					      (j++)%2 ? "\r\n" : "");
                   }
                /*      break;  */
                }
