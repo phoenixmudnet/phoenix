@@ -2089,7 +2089,28 @@ void find_replacement(void *go, struct script_data *sc, trig_data *trig,
                strcpy(str,"");
                }
             }
+         /* Some scripts don't return an actor field, so this allows the owner to be found - Nomikos 9-8-2025 */
+		 else if (!str_cmp(field, "owner"))
+		    {
+            obj_data *tObj = o;
 
+            /* If the object is in one ore more containers, find the outermost container */
+            if (tObj->in_obj != NULL)
+               {
+        		while (tObj->in_obj)
+                   tObj = tObj->in_obj;
+     		   }
+
+            /* If the object is carried, that is the owner */
+            if (tObj->carried_by != NULL)
+               sprintf(str,"%c%ld", UID_CHAR, GET_ID(tObj->carried_by));
+            /* If the object is worn, that is the owner */
+            else if (tObj->worn_by != NULL)
+               sprintf(str,"%c%ld", UID_CHAR, GET_ID(tObj->worn_by));
+            /* Otherwise, it doesn't have an owner (on ground or in container on ground) */
+            else
+			   strcpy(str, "");
+			}
          else if (!str_cmp(field, "val0"))
             sprintf(str, "%ld", GET_OBJ_VAL(o, 0));
          else if (!str_cmp(field, "val1"))
