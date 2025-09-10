@@ -1286,8 +1286,7 @@ char *make_prompt(struct descriptor_data *d)
 			   num_explored++;
 		    }
 
-		 length+=sprintf(prompt+length, "%d/%dR ", zone->name,
-			             num_explored, zone->num_rooms);
+		 length+=sprintf(prompt+length, "%d/%dR ", num_explored, zone->num_rooms);
       }
 
       if (PRF2_FLAGGED(d->character, PRF2_DISPTIME))
