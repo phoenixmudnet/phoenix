@@ -1272,7 +1272,8 @@ char *make_prompt(struct descriptor_data *d)
 		     (int) (GET_EXP_FOR_CH(d->character)
 		    	- GET_EXP(d->character))); 
 
-      if (PRF2_FLAGGED(d->character, PRF2_DISPEXPLORED) &&
+      /* Added current/total rooms explored to prompt - Nomikos 9-10-2025 */
+      if (PRF2_FLAGGED(d->character, PRF2_DISPEXPLORED) && !FIGHTING(d->character) &&
 		 IN_ROOM(d->character) >= 0 && IN_ROOM(d->character) < EXPLORED_TOP_VNUM) 
       {
 		 struct zone_data *zone = &zone_table[world[IN_ROOM(d->character)].zone];
