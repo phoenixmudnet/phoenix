@@ -495,6 +495,7 @@ const char *preference2_bits[] = {
    "!MUS",
    "MORTAL",
    "NO_NEWBIE",
+   "D_EXPLORED",
    "\n"
 };
 
