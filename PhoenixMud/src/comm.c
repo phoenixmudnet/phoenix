@@ -1218,14 +1218,14 @@ char *make_prompt(struct descriptor_data *d)
    static char color[10];
    long hit1=0,hit2=0,percent=0; 
    int length=0;
-  /* Note, prompt is truncated at MAX_PROMPT_LENGTH chars (structs.h )*/
+   /* Note, prompt is truncated at MAX_PROMPT_LENGTH chars (structs.h )*/
 
-  /* reversed these top 2 if checks so that page_string() would work in */ 
-  /* the editor */ 
+   /* reversed these top 2 if checks so that page_string() would work in */ 
+   /* the editor */ 
    if (d->showstr_count) 
-      { 
-      length=sprintf(prompt, "\r[ Return to continue, (q)uit, (r)efresh, (b)ack, or page number (%d/%d) ]", d->showstr_page, d->showstr_count); 
-      } 
+   { 
+      length=sprintf(prompt, "\r\n[ Return to continue, (q)uit, (r)efresh, (b)ack, or page number (%d/%d) ]", d->showstr_page, d->showstr_count); 
+   } 
    else if (d->str) 
       strcpy(prompt, "] "); 
    else if ((STATE(d)==CON_PLAYING)&&!IS_NPC(d->character))
@@ -1233,103 +1233,122 @@ char *make_prompt(struct descriptor_data *d)
       *prompt = '\0'; 
  
       if (GET_INVIS_LEV(d->character)) 
-	 length+=sprintf(prompt, "i%d ", GET_INVIS_LEV(d->character));
+	     length+=sprintf(prompt, "i%d ", GET_INVIS_LEV(d->character));
 
       if (PRF2_FLAGGED(d->character, PRF2_DISPMAX)) 
-	 {  
-	 if (PRF_FLAGGED(d->character, PRF_DISPHP)) 
-	    length+=sprintf(prompt+length, "%d/%dH ", GET_HIT(d->character), 
-		    GET_MAX_HIT(d->character)); 
+	  {  
+	     if (PRF_FLAGGED(d->character, PRF_DISPHP)) 
+	        length+=sprintf(prompt+length, "%d/%dH ", GET_HIT(d->character), 
+		       GET_MAX_HIT(d->character)); 
  
-	 if (PRF_FLAGGED(d->character, PRF_DISPMANA)) 
-	    length+=sprintf(prompt+length, "%d/%dM ",GET_MANA(d->character), 
-		    GET_MAX_MANA(d->character)); 
+	    if (PRF_FLAGGED(d->character, PRF_DISPMANA)) 
+	       length+=sprintf(prompt+length, "%d/%dM ",GET_MANA(d->character), 
+		       GET_MAX_MANA(d->character)); 
  
-	 if (PRF_FLAGGED(d->character, PRF_DISPMOVE)) 
-	    length+=sprintf(prompt+length, "%d/%dV ",GET_MOVE(d->character),
-		    GET_MAX_MOVE(d->character)); 
-	 }
+	    if (PRF_FLAGGED(d->character, PRF_DISPMOVE)) 
+	       length+=sprintf(prompt+length, "%d/%dV ",GET_MOVE(d->character),
+		       GET_MAX_MOVE(d->character)); 
+	  }
       else
-	 { 
-	 if (PRF_FLAGGED(d->character, PRF_DISPHP)) 
-	    length+=sprintf(prompt+length, "%dH ", GET_HIT(d->character)); 
+	  { 
+	    if (PRF_FLAGGED(d->character, PRF_DISPHP)) 
+	       length+=sprintf(prompt+length, "%dH ", GET_HIT(d->character)); 
  
-	 if (PRF_FLAGGED(d->character, PRF_DISPMANA)) 
-	    length+=sprintf(prompt+length, "%dM ", GET_MANA(d->character)); 
+	    if (PRF_FLAGGED(d->character, PRF_DISPMANA)) 
+	       length+=sprintf(prompt+length, "%dM ", GET_MANA(d->character)); 
  
-	 if (PRF_FLAGGED(d->character, PRF_DISPMOVE)) 
-	    length+=sprintf(prompt+length, "%dV ", GET_MOVE(d->character)); 
+	    if (PRF_FLAGGED(d->character, PRF_DISPMOVE)) 
+	       length+=sprintf(prompt+length, "%dV ", GET_MOVE(d->character)); 
 	 } 
-      if (PRF2_FLAGGED(d->character, PRF2_DISPALIGN)&&!FIGHTING(d->character)) 
-	 length+=sprintf(prompt+length, "%dA ", GET_ALIGNMENT(d->character)); 
+      
+     if (PRF2_FLAGGED(d->character, PRF2_DISPALIGN)&&!FIGHTING(d->character)) 
+	     length+=sprintf(prompt+length, "%dA ", GET_ALIGNMENT(d->character)); 
  
       if (PRF2_FLAGGED(d->character, PRF2_DISPGOLD)&&!FIGHTING(d->character)) 
-	 length+=sprintf(prompt+length, "%dG ",(int) GET_GOLD(d->character)); 
+	     length+=sprintf(prompt+length, "%dG ",(int) GET_GOLD(d->character)); 
  
       if (PRF2_FLAGGED(d->character, PRF2_DISPEXP)) 
-	 length+=sprintf(prompt+length, "%dX ", 
-		 (int) (GET_EXP_FOR_CH(d->character)
-			- GET_EXP(d->character))); 
+	     length+=sprintf(prompt+length, "%dX ", 
+		     (int) (GET_EXP_FOR_CH(d->character)
+		    	- GET_EXP(d->character))); 
+
+      if (PRF2_FLAGGED(d->character, PRF2_DISPEXPLORED) &&
+		 IN_ROOM(d->character) >= 0 && IN_ROOM(d->character) < EXPLORED_TOP_VNUM) 
+      {
+		 struct zone_data *zone = &zone_table[world[IN_ROOM(d->character)].zone];
+		 int znum = zone->number;
+
+         int num_explored = 0;
+		 int rnum;
+         for (rnum = 100 * znum; rnum < 100 * (znum + 1); rnum++) {
+			int b = d->character->player_specials->explored_vnums[rnum / 8];
+			if (b & (1 << (rnum % 8)))
+			   num_explored++;
+		    }
+
+		 length+=sprintf(prompt+length, "%d/%dR ", zone->name,
+			             num_explored, zone->num_rooms);
+      }
 
       if (PRF2_FLAGGED(d->character, PRF2_DISPTIME))
-         {
+      {
          char *disptime = get_buffer(64);
          time_t mytime = time(0);
          strftime(disptime, 20, "%H:%M:%S EST", localtime(&mytime)); 
 
          length+=sprintf(prompt+length, "(%s) ", disptime);
          release_buffer(disptime);
-         } 
+      } 
 
       if (PRF2_FLAGGED(d->character, PRF2_DISPDATE)) 
-         {
+      {
          char *dispdate = get_buffer(64);
          time_t mytime = time(0);
          strftime(dispdate, 20, "%a %b %d, %Y", localtime(&mytime));
          
          length+=sprintf(prompt+length, "%s ", dispdate);
          release_buffer(dispdate);
-         }
+      }
 
-/*** Standard fighting prompts Anduin ****/ 
+      /*** Standard fighting prompts Anduin ****/ 
       if(d->character->char_specials.fighting) 
-	 { 
-	 if (GET_MAX_HIT(d->character) > 0) 
-	    { 
-	    hit2=GET_MAX_HIT(d->character); 
-	    hit1=GET_HIT(d->character); 
-	    percent = (int)(10 * ((float)hit1 / (float)hit2))+1; 
-	    }
-	 else 
-	    percent=0;/*if MAX_HIT is < 0 (HUH?!?!?!) */ 
+	  { 
+	  if (GET_MAX_HIT(d->character) > 0) 
+	     { 
+	     hit2=GET_MAX_HIT(d->character); 
+	     hit1=GET_HIT(d->character); 
+	     percent = (int)(10 * ((float)hit1 / (float)hit2))+1; 
+	     }
+	  else 
+	     percent=0;/*if MAX_HIT is < 0 (HUH?!?!?!) */ 
  
-	 if(percent<0) percent = 0; 
-	 if(percent>11) percent= 11;
-	 switch(percent)
-	    {
+	  if(percent<0) percent = 0; 
+	  if(percent>11) percent= 11;
+	  switch(percent)
+	  {
 	     case 0:
-		strcpy(color,CCBLU(d->character,C_NRM));
-		break;
+		    strcpy(color,CCBLU(d->character,C_NRM));
+		    break;
 	     case 1:
 	     case 2:
-		strcpy(color,CCRED(d->character,C_NRM));
-		break;
+		    strcpy(color,CCRED(d->character,C_NRM));
+		    break;
 	     case 3:
 	     case 4:
-		strcpy(color,CCMAG(d->character,C_NRM));
-		break;
+		    strcpy(color,CCMAG(d->character,C_NRM));
+		    break;
 	     case 5:
 	     case 6:
-		strcpy(color,CCYEL(d->character,C_NRM));
-		break;
+		    strcpy(color,CCYEL(d->character,C_NRM));
+		    break;
 	     case 7:
 	     case 8:
-		strcpy(color,CCCYN(d->character,C_NRM));
-		break;
+		    strcpy(color,CCCYN(d->character,C_NRM));
+		    break;
 	     default:
-		color[0]='\0';
-		break;
-	    }
+		    color[0]='\0';
+		    break;
+	 }
 	 length+=sprintf(prompt+length,"[You: %s%s%s]",color,
 			 wound_types[percent],CCNRM(d->character,C_NRM)); 
               
