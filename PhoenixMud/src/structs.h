@@ -424,6 +424,7 @@
 #define PRF2_NOMUSIC    (1 << 19) /* Can't hear music channel           */
 #define PRF2_MORTAL     (1 << 20) /* For imms.  Can they take damage?   */
 #define PRF2_NONEWBIE   (1 << 21) /* Can't hera newbie channel          */
+#define PRF2_DISPEXPLORED (1<<22) /* display explored in current zone   */
 /*** 2 Extra sets of 32 flags with pref2 and pref3  ****/
 
 /* Updated to match Phoenix */
