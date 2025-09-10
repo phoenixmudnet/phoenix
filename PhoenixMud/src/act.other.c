@@ -1252,8 +1252,8 @@ ACMD(do_wimpy)
 ACMD(do_display)
    {
    size_t i;
-   char *usage = "Usage: prompt { { H | M | V | A | G | X | T } | all | none }\r\n";
-   char *immusage = "Usage: prompt { { H | M | V | A | G | X | T | 1 | 2 } | all | none }\r\n";
+   char *usage = "Usage: prompt { { H | M | V | A | G | X | T | E } | all | none }\r\n";
+   char *immusage = "Usage: prompt { { H | M | V | A | G | X | T | E | 1 | 2 } | all | none }\r\n";
 
    if (IS_NPC(ch))
       {
@@ -1272,8 +1272,9 @@ ACMD(do_display)
       }
    if ((!str_cmp(argument, "on")) || (!str_cmp(argument, "all")))
       {
-      SET_BIT(PRF_FLAGS(ch), PRF_DISPHP | PRF_DISPMANA | PRF_DISPMOVE );
-      SET_BIT(PRF2_FLAGS(ch), PRF2_DISPGOLD | PRF2_DISPEXP | PRF2_DISPALIGN | PRF2_DISPMAX);
+      SET_BIT(PRF_FLAGS(ch), PRF_DISPHP | PRF_DISPMANA | PRF_DISPMOVE);
+      SET_BIT(PRF2_FLAGS(ch), PRF2_DISPGOLD | PRF2_DISPEXP | PRF2_DISPALIGN |
+		                      PRF2_DISPMAX | PRF2_DISPEXPLORED);
       }
    else
       {
@@ -1302,6 +1303,9 @@ ACMD(do_display)
             break;
          case 'x':
             SET_BIT(PRF2_FLAGS(ch), PRF2_DISPEXP);
+            break;
+		 case 'e':
+            SET_BIT(PRF2_FLAGS(ch), PRF2_DISPEXPLORED);
             break;
          case 't':
             SET_BIT(PRF2_FLAGS(ch), PRF2_DISPMAX);
