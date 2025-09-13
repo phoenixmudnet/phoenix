@@ -2343,6 +2343,7 @@ ACMD(do_stat)
    struct obj_data *object;
    struct char_file_u tmp_store;
    int tmp;
+   room_rnum loco, locd;
    char *buf1=get_buffer(MAX_INPUT_LENGTH);
    char *buf2=get_buffer(MAX_INPUT_LENGTH);
 
@@ -2359,7 +2360,20 @@ ACMD(do_stat)
       }
    else if (is_abbrev(buf1, "room"))
       {
-      do_stat_room(ch);
+      if (!*buf2)
+         do_stat_room(ch);
+      else
+         {
+         if ((locd = find_target_room(ch, buf2)) < 0)
+            send_to_char(ch,"Could not find that room/name\r\n");   
+         else
+            {
+            loco = IN_ROOM(ch);
+            IN_ROOM(ch) = locd;
+            do_stat_room(ch);
+            IN_ROOM(ch) = loco;
+            }
+         }
       }
    else if (is_abbrev(buf1, "mob"))
       {
