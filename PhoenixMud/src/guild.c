@@ -255,12 +255,14 @@ void list_skills(struct char_data * ch, int type)
   for (t = IS_SPELL; t <= IS_SKILL; t++)
     {
     if (type_spell && (t == IS_SPELL))
-      strcat(buf2, "You know of the following spells:\r\n");
+      sprintf(buf2+strlen(buf2), "You know of the following spells:\r\n");
     else
       continue;
         
     if (type_skill && (t == IS_SKILL))
-      strcat(buf2, "You know of the following skills:\r\n");
+      sprintf(buf2+strlen(buf2), "You know of the following skills:\r\n");
+	else
+	  continue;
 
     for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
       {
