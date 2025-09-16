@@ -609,7 +609,7 @@ ACMD(do_practice)
 	  if (is_abbrev(arg, "skills"))
 	     list_skills(ch, IS_SKILL);
       else if (is_abbrev(arg, "spells"))
-	     list_skills(ch, IS_SPELLS);
+	     list_skills(ch, IS_SPELL);
 	  else
          send_to_char(ch, "You can only practice skills in your guild.\r\n");
 	  }
