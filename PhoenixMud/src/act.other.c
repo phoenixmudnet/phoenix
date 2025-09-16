@@ -70,7 +70,7 @@ void Crash_count_items(struct obj_data * obj, long *nitems);
 int Crash_check_norents_equipped(struct char_data * ch);
 int Crash_check_norents(struct obj_data * obj,struct char_data *ch);
 void write_aliases(struct char_data *ch); /* Alias mod */
-void list_skills(struct char_data * ch);
+void list_skills(struct char_data * ch, int type);
 void appear(struct char_data * ch);
 void perform_immort_vis(struct char_data *ch);
 int  skill_roll(struct char_data *ch, int skill_num, int penalty);
