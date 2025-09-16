@@ -251,7 +251,7 @@ void list_skills(struct char_data * ch, int type)
   if (type == IS_UNUSED)
     type_spell = type_skill = 1;
 
-  buf2 = '\0';
+  strcpy(buf2, "");
   for (t = IS_SPELL; t <= IS_SKILL; t++)
     {
     if (type_spell && (t == IS_SPELL))
