@@ -238,54 +238,74 @@ void what_does_gm_know(int guild_nr, struct char_data * ch,int learn)
   release_buffer(buf2);
   }
 
-void list_skills(struct char_data * ch)
+void list_skills(struct char_data * ch, int type)
   {
-  int i, sortpos,lvl;
+  int i, t, sortpos, lvl, type_skill = 0, type_spell = 0;
   char *buf = get_buffer(MAX_STRING_LENGTH);
   char *buf2 = get_buffer(32750);
 
-  strcpy(buf2, "You know of the following spells:\r\n");
+  if (type == IS_SPELL)
+    type_spell = 1;
+  if (type == IS_SKILL)
+    type_skill = 1;
+  if (type == IS_UNUSED)
+    type_spell = type_skill = 1;
 
-
-  for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
+  buf2 = '\0';
+  for (t = IS_SPELL; t <= IS_SKILL; t++)
     {
-    i = spell_sort_info[sortpos];
-    if (spells[i].is_spell==IS_SPELL)
-      {
-      if (GET_LEVEL(ch) >= (lvl=min_level(ch,i)))
-        {
-        sprintf(buf, "%-30s Spell Level: %d", spells[i].spell_name,
-                GET_SKILL(ch, i));
-        str_add_spaces(buf,50);
-        sprintf(buf+strlen(buf)," Level: %3d ",
-                lvl);
+    if (type_spell && (t == IS_SPELL))
+      strcat(buf2, "You know of the following spells:\r\n");
+    else
+      continue;
+        
+    if (type_skill && (t == IS_SKILL))
+      strcat(buf2, "You know of the following skills:\r\n");
 
-        strcat(buf2, buf);
-        if((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=10))
-          strcat(buf2,"Completely Knowledgable\r\n");
-        else if((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>=95))
-          strcat(buf2,"Completely Knowledgable\r\n");
-        else if(GET_SKILL_LEARN(ch,i)==100)
-          strcat(buf2,"&YReady To Practice&n\r\n");
-        else if(GET_SKILL_LEARN(ch,i) > 0) 
-	      {
-	        strcat(buf2,"[");
-	        for (int ii = 20; ii <= 100; ii += 20) 
+    for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
+      {
+      i = spell_sort_info[sortpos];
+      if (spells[i].is_spell == t)
+        {
+        if (GET_LEVEL(ch) >= (lvl=min_level(ch,i)))
+          {
+          if (t == IS_SPELL)
+            sprintf(buf, "%-30s Spell Level: %d", spells[i].spell_name,
+                    GET_SKILL(ch, i));
+          else
+            sprintf(buf, "%-30s %s", spells[i].spell_name,
+                    how_good(GET_SKILL(ch, i)));
+
+          str_add_spaces(buf,50);
+          sprintf(buf+strlen(buf), " Level: %3d ", lvl);
+
+          strcat(buf2, buf);
+          if (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=10)) ||
+              ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>=95)))
+            strcat(buf2,"Completely Knowledgable\r\n");
+          else if (GET_SKILL_LEARN(ch,i)==100)
+            strcat(buf2,"&YReady To Practice&n\r\n");
+          else if (GET_SKILL_LEARN(ch,i) > 0) 
 	        {
-	          if (ii <= GET_SKILL_LEARN(ch,i))
-	            strcat(buf2,"*");
-	          else
-	            strcat(buf2,"-");
+	          strcat(buf2,"[");
+	          for (int ii = 20; ii <= 100; ii += 20) 
+	          {
+	            if (ii <= GET_SKILL_LEARN(ch,i))
+	              strcat(buf2,"*");
+	            else
+	              strcat(buf2,"-");
+	          }
+	        strcat(buf2,"]\r\n");
 	        }
-	      strcat(buf2,"]\r\n");
-	      }
-        else
-          strcat(buf2,"\r\n");
+          else
+            strcat(buf2,"\r\n");
         }
+      if (type_spell && type_skill)
+        strcat(buf2,"\r\n");
       }
     }
-
-  strcat(buf2, "\r\nYou know of the following skills:\r\n");
+    
+  /*strcat(buf2, "\r\nYou know of the following skills:\r\n");
 
   for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
     {
@@ -323,6 +343,7 @@ void list_skills(struct char_data * ch)
         }
       }
     }
+  */
   release_buffer(buf);
   if(ch->desc)
     page_string(ch->desc, buf2, TRUE,"");
