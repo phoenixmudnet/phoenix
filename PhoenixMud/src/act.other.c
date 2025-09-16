@@ -605,11 +605,18 @@ ACMD(do_practice)
    one_argument(argument, arg);
 
    if (*arg)
-      send_to_char(ch, "You can only practice skills in your guild.\r\n");
+      {
+	  if (is_abbrev(arg, "skills"))
+	     list_skills(ch, IS_SKILL);
+      else if (is_abbrev(arg, "spells"))
+	     list_skills(ch, IS_SPELLS);
+	  else
+         send_to_char(ch, "You can only practice skills in your guild.\r\n");
+	  }
    else if (IS_NPC(ch))
       send_to_char(ch, "You practice your mob skills and feel pretty confident in yourself.\r\n");
    else
-      list_skills(ch);
+      list_skills(ch, IS_UNUSED);
    release_buffer(arg);
    }
 
