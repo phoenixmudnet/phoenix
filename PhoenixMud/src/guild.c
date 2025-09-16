@@ -299,12 +299,12 @@ void list_skills(struct char_data * ch, int type)
 	        }
           else
             strcat(buf2,"\r\n");
-        }
+          }
       if (type_spell && type_skill)
         strcat(buf2,"\r\n");
+        }
       }
-    }
-    
+	}
   /*strcat(buf2, "\r\nYou know of the following skills:\r\n");
 
   for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
