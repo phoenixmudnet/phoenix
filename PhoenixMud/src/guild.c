@@ -238,6 +238,8 @@ void what_does_gm_know(int guild_nr, struct char_data * ch,int learn)
   release_buffer(buf2);
   }
 
+/* List current skills, spells, or both (default). 
+   Added ability to see skills or spells -Nomikos 9-17-2025 */
 void list_skills(struct char_data * ch, int type)
   {
   int i, t, sortpos, lvl, type_skill = 0, type_spell = 0;
@@ -284,6 +286,7 @@ void list_skills(struct char_data * ch, int type)
             strcat(buf2,"Completely Knowledgable\r\n");
           else if (GET_SKILL_LEARN(ch,i)==100)
             strcat(buf2,"&YReady To Practice&n\r\n");
+		  /* Added skill progross - Nomikos 6-28-25 */
           else if (GET_SKILL_LEARN(ch,i) > 0) 
 	          {
 	          strcat(buf2,"[");
@@ -303,46 +306,8 @@ void list_skills(struct char_data * ch, int type)
       }
     if (type_spell && type_skill)
       strcat(buf2,"\r\n");
-	  }
-  /*strcat(buf2, "\r\nYou know of the following skills:\r\n");
+	}
 
-  for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
-    {
-    i = spell_sort_info[sortpos];
-    if (spells[i].is_spell==IS_SKILL)
-      {
-      if (GET_LEVEL(ch) >= (lvl=min_level(ch,i)))
-        {
-        sprintf(buf, "%-30s %s", spells[i].spell_name,
-                how_good(GET_SKILL(ch, i)));
-        str_add_spaces(buf,50);
-        sprintf(buf+strlen(buf)," Level: %3d ",
-                lvl);
-        strcat(buf2, buf);
-        if((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=10))
-          strcat(buf2,"Completely Knowledgable\r\n");
-        else if((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>=95))
-          strcat(buf2,"Completely Knowledgable\r\n");
-        else if(GET_SKILL_LEARN(ch,i)==100)
-          strcat(buf2,"&YReady To Practice&n\r\n");
-        else if(GET_SKILL_LEARN(ch,i) > 0) 
-	      {
-	        strcat(buf2,"[");
-	        for (int ii = 20; ii <= 100; ii += 20) 
-	        {
-	          if (ii <= GET_SKILL_LEARN(ch,i))
-	            strcat(buf2,"*");
-	          else
-	            strcat(buf2,"-");
-	        }
-	      strcat(buf2,"]\r\n");
-	      }
-        else
-          strcat(buf2,"\r\n");
-        }
-      }
-    }
-  */
   release_buffer(buf);
   if(ch->desc)
     page_string(ch->desc, buf2, TRUE,"");
