@@ -593,11 +593,8 @@ ACMD(do_hide)
    }
 
 
-
-
-
-
-
+/* Away from guildmasters, shows current skills and spells.
+   Added ability to see either skills or spells - Nomikos 9-17-2025 */
 ACMD(do_practice)
    {
    char *arg=get_buffer(MAX_INPUT_LENGTH);
