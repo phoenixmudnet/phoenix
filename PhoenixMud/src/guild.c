@@ -246,9 +246,9 @@ void list_skills(struct char_data * ch, int type)
 
   if (type == IS_SPELL)
     type_spell = 1;
-  if (type == IS_SKILL)
+  else if (type == IS_SKILL)
     type_skill = 1;
-  if (type == IS_UNUSED)
+  else
     type_spell = type_skill = 1;
 
   strcpy(buf2, "");
@@ -256,13 +256,10 @@ void list_skills(struct char_data * ch, int type)
     {
     if (type_spell && (t == IS_SPELL))
       sprintf(buf2+strlen(buf2), "You know of the following spells:\r\n");
-    else
-      continue;
-        
-    if (type_skill && (t == IS_SKILL))
+    else if (type_skill && (t == IS_SKILL))
       sprintf(buf2+strlen(buf2), "You know of the following skills:\r\n");
-	else
-	  continue;
+	  else
+	    continue;
 
     for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
       {
@@ -288,25 +285,25 @@ void list_skills(struct char_data * ch, int type)
           else if (GET_SKILL_LEARN(ch,i)==100)
             strcat(buf2,"&YReady To Practice&n\r\n");
           else if (GET_SKILL_LEARN(ch,i) > 0) 
-	        {
+	          {
 	          strcat(buf2,"[");
 	          for (int ii = 20; ii <= 100; ii += 20) 
-	          {
+	            {
 	            if (ii <= GET_SKILL_LEARN(ch,i))
 	              strcat(buf2,"*");
 	            else
 	              strcat(buf2,"-");
+	            }
+	          strcat(buf2,"]\r\n");
 	          }
-	        strcat(buf2,"]\r\n");
-	        }
           else
             strcat(buf2,"\r\n");
           }
-      if (type_spell && type_skill)
-        strcat(buf2,"\r\n");
+        if (type_spell && type_skill)
+          strcat(buf2,"\r\n");
         }
       }
-	}
+	  }
   /*strcat(buf2, "\r\nYou know of the following skills:\r\n");
 
   for (sortpos = 1; sortpos < MAX_SPELLS; sortpos++)
