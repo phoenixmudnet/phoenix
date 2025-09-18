@@ -780,6 +780,10 @@ int get_filename(char *orig_name, char *filename, int mode)
 	  prefix = "plrobjs";
 	  suffix = "reimb";
 	  break;
+       case COMMS_FILE:
+	  prefix = "plrcomms";
+	  suffix = "comms";
+	  break;
        default: 
 	  release_buffer(name);
 	  return 0; 
