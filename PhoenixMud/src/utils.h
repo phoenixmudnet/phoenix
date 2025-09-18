@@ -148,6 +148,7 @@ void	update_pos(struct char_data *victim);
 #define SCRIPT_VARS_FILE 3
 #define NEW_OBJ_FILES    4
 #define REIMB_FILE       5
+#define COMMS_FILE    6
 
 /* breadth-first searching */
 #define BFS_ERROR		-1
