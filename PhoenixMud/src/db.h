@@ -124,6 +124,7 @@ extern room_rnum top_of_world;
 #define GRAFFITI_LOG    LOGDIR"graffiti"
 #define UPLOAD_LOG      LOGDIR"upload"
 #define SHOP_LOG        LOGDIR"player_shop"
+#define COMMS_LOG       LOGDIR"comms"
 
 #define CHANGES_FILE    "../src/workdocs/Changes" /*change log          */
 
