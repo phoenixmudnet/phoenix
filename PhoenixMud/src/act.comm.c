@@ -2017,7 +2017,7 @@ void write_comms(struct char_data *ch, char *msg, bool to_char)
    FILE *fl; 
    char *fileName = get_buffer(SMALL_BUFSIZE); 
 
-   get_filename(GET_NAME(ch), fileName, COMMS_FILE)
+   get_filename(GET_NAME(ch), fileName, COMMS_FILE);
 
    if (!(fl = fopen(fileName, "a")))
    {
