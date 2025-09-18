@@ -56,6 +56,8 @@ void id_obj_to_char(struct char_data *ch, struct obj_data *obj);
 /* commune code from incabolus */
 int ignoring(struct char_data *ch, struct char_data *vict);
 
+void write_comms(struct char_data *ch, char *msg, bool to_char);
+
 ACMD(do_commune)
    {
    bool is_mort = FALSE;
@@ -195,23 +197,34 @@ ACMD(do_gsay)
    else
       {
       char *buf = get_buffer(MAX_STRING_LENGTH);
+      char *buf2 = get_buffer(MAX_STRING_LENGTH);
       if (ch->master)
          k = ch->master;
       else
          k = ch;
 
+      sprintf(buf2, "%s tells the group, '&W%s&n'", GET_NAME(ch), argument);
       sprintf(buf, "$n tells the group, '&W%s&n'", argument);
 
       if (AFF_FLAGGED(k, AFF_GROUP) && (k != ch))
          act(buf, FALSE, ch, 0, k, TO_VICT | TO_SLEEP);
       for (f = k->followers; f; f = f->next)
          if (AFF_FLAGGED(f->follower, AFF_GROUP) && (f->follower != ch))
+            {
             act(buf, FALSE, ch, 0, f->follower, TO_VICT | TO_SLEEP);
+            write_comms(ch, buf2, FALSE);
+            }
 
       if (PRF_FLAGGED(ch, PRF_NOREPEAT))
          send_to_char(ch, "%s", OK);
       else
-         send_to_char(ch, "You tell the group, '&W%s&n'\r\n", argument);
+         {
+         sprintf(buf, "You tell the group, '&W%s&n'\r\n", argument);
+         send_to_char(ch, buf);
+
+         write_comms(ch, buf, TRUE);
+         }
+      release_buffer(buf2);
       release_buffer(buf);
       }
 
@@ -786,6 +799,10 @@ ACMD(do_gen_comm)
          sprintf(buf1, "%sYou %s, '%s'", (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
                  com_msgs[subcmd][1], argument);
       act(buf1, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
+
+      /* Log the communication to the player's comms log */
+      write_comms(ch, buf1, TRUE);
+
       release_buffer(buf1);
       }
 
@@ -829,6 +846,9 @@ ACMD(do_gen_comm)
          act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
          if (COLOR_LEV(tch) >= C_NRM)
             send_to_char(i->character, "%s", KNRM);
+
+         /* Write the comms to each player's comms log and the world comms log */
+         write_comms(tch, bug, FALSE);
          }
       }
    release_buffer(buf);
@@ -1991,3 +2011,31 @@ ACMD(do_newbie)
     }
   }
 }
+
+void write_comms(struct char_data *ch, char *msg, bool to_char) 
+{ 
+   FILE *fl; 
+
+   if (!(fl = fopen(get_filename(GET_NAME(ch), FileName, COMMS_FILE), "a")))
+   {
+      perror("SYSERR: Cannot open player comms log.");
+      return;
+   }
+   
+   fprintf(fl, "%s\r\n", msg); 
+
+   fclose(fl);
+   
+   if (!to_char)
+   {
+      if (!(fl = fopen(COMMS_LOG, "a")))
+      {
+         perror("SYSERR: Cannot open comms log.");
+         return;
+      }
+   
+      fprintf(fl, "%s\r\n", msg); 
+
+      fclose(fl);
+   }
+} 
