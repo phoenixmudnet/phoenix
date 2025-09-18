@@ -848,7 +848,7 @@ ACMD(do_gen_comm)
             send_to_char(i->character, "%s", KNRM);
 
          /* Write the comms to each player's comms log and the world comms log */
-         write_comms(tch, bug, FALSE);
+         write_comms(tch, buf, FALSE);
          }
       }
    release_buffer(buf);
@@ -2015,15 +2015,20 @@ ACMD(do_newbie)
 void write_comms(struct char_data *ch, char *msg, bool to_char) 
 { 
    FILE *fl; 
+   char *fileName = get_buffer(SMALL_BUFSIZE); 
 
-   if (!(fl = fopen(get_filename(GET_NAME(ch), FileName, COMMS_FILE), "a")))
+   get_filename(GET_NAME(ch), fileName, COMMS_FILE)
+
+   if (!(fl = fopen(fileName, "a")))
    {
       perror("SYSERR: Cannot open player comms log.");
+	  release_buffer(fileName);
       return;
    }
-   
-   fprintf(fl, "%s\r\n", msg); 
 
+   release_buffer(fileName);
+	
+   fprintf(fl, "%s\r\n", msg); 
    fclose(fl);
    
    if (!to_char)
@@ -2035,7 +2040,6 @@ void write_comms(struct char_data *ch, char *msg, bool to_char)
       }
    
       fprintf(fl, "%s\r\n", msg); 
-
       fclose(fl);
    }
 } 
