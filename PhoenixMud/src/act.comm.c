@@ -205,14 +205,19 @@ ACMD(do_gsay)
 
       sprintf(buf2, "%s tells the group, '&W%s&n'", GET_NAME(ch), argument);
       sprintf(buf, "$n tells the group, '&W%s&n'", argument);
+      write_comms(ch, buf2, FALSE);
 
       if (AFF_FLAGGED(k, AFF_GROUP) && (k != ch))
+         {
          act(buf, FALSE, ch, 0, k, TO_VICT | TO_SLEEP);
+         write_comms(k, buf2, TRUE);
+         }
+
       for (f = k->followers; f; f = f->next)
          if (AFF_FLAGGED(f->follower, AFF_GROUP) && (f->follower != ch))
             {
             act(buf, FALSE, ch, 0, f->follower, TO_VICT | TO_SLEEP);
-            write_comms(ch, buf2, FALSE);
+            write_comms(f->follower, buf2, TRUE);
             }
 
       if (PRF_FLAGGED(ch, PRF_NOREPEAT))
@@ -810,6 +815,9 @@ ACMD(do_gen_comm)
    sprintf(buf, "%s$n %ss, '%s'", (subcmd==SCMD_MUSIC)?"[MUSIC] ":"",
            com_msgs[subcmd][1], argument);
 
+   /* Write to general comms log once */
+   write_comms(ch, buf, FALSE);
+   
    /* now send all the strings out */
    for (i = descriptor_list; i; i = i->next)
       {
@@ -848,7 +856,7 @@ ACMD(do_gen_comm)
             send_to_char(i->character, "%s", KNRM);
 
          /* Write the comms to each player's comms log and the world comms log */
-         write_comms(tch, buf, FALSE);
+         write_comms(tch, buf, TRUE);
          }
       }
    release_buffer(buf);
@@ -2015,23 +2023,26 @@ ACMD(do_newbie)
 void write_comms(struct char_data *ch, char *msg, bool to_char) 
 { 
    FILE *fl; 
-   char *fileName = get_buffer(SMALL_BUFSIZE); 
-
-   get_filename(GET_NAME(ch), fileName, COMMS_FILE);
-
-   if (!(fl = fopen(fileName, "a")))
-   {
-      perror("SYSERR: Cannot open player comms log.");
-	  release_buffer(fileName);
-      return;
-   }
-
-   release_buffer(fileName);
-	
-   fprintf(fl, "%s\r\n", msg); 
-   fclose(fl);
    
-   if (!to_char)
+   strip_color(msg);
+   
+   if (to_char)
+   {
+      char *fileName = get_buffer(SMALL_BUFSIZE); 
+      get_filename(GET_NAME(ch), fileName, COMMS_FILE);
+      if (!(fl = fopen(fileName, "a")))
+      {
+         perror("SYSERR: Cannot open player comms log.");
+	      release_buffer(fileName);
+         return;
+      }
+
+      release_buffer(fileName);
+	
+      fprintf(fl, "%s\r\n", msg); 
+      fclose(fl);
+   }
+   else
    {
       if (!(fl = fopen(COMMS_LOG, "a")))
       {
