@@ -812,12 +812,15 @@ ACMD(do_gen_comm)
       }
 
    buf = get_buffer(MAX_STRING_LENGTH);
+   
+   /* Write to general comms log once */
+   sprintf(buf, "%s%s %ss, '%s'", GET_NAME(ch), (subcmd==SCMD_MUSIC)?"[MUSIC] ":"",
+           com_msgs[subcmd][1], argument);
+   write_comms(ch, buf, FALSE);
+
    sprintf(buf, "%s$n %ss, '%s'", (subcmd==SCMD_MUSIC)?"[MUSIC] ":"",
            com_msgs[subcmd][1], argument);
 
-   /* Write to general comms log once */
-   write_comms(ch, buf, FALSE);
-   
    /* now send all the strings out */
    for (i = descriptor_list; i; i = i->next)
       {
@@ -2023,12 +2026,10 @@ ACMD(do_newbie)
 void write_comms(struct char_data *ch, char *msg, bool to_char) 
 { 
    FILE *fl; 
-   
-   strip_color(msg);
-   
+
    if (to_char)
    {
-      char *fileName = get_buffer(SMALL_BUFSIZE); 
+      char *fileName = get_buffer(SMALL_BUFSIZE);
       get_filename(GET_NAME(ch), fileName, COMMS_FILE);
       if (!(fl = fopen(fileName, "a")))
       {
@@ -2037,10 +2038,9 @@ void write_comms(struct char_data *ch, char *msg, bool to_char)
          return;
       }
 
-      release_buffer(fileName);
-	
       fprintf(fl, "%s\r\n", msg); 
       fclose(fl);
+      release_buffer(fileName);
    }
    else
    {
