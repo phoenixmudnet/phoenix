@@ -2040,20 +2040,24 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
    /* Check destination, character file, victim file, or world file - NO NPCs! */
    if (IS_SET(type, TO_CHAR))
       {
-	  if (IS_NPC(ch))
+	  if (ch && IS_NPC(ch))
 		 return;
       else
          ch_file = ch;
 	  }
    else if (IS_SET(type, TO_VICT))
       {
-	  if (IS_NPC(vict))
+	  if (vict && IS_NPC(vict))
 		 return;
       else
          ch_file = vict;
 	  }
    else
+      {
+	  if ((ch && IS_NPC(ch)) || (vict && IS_NPC(vict)))
+		  return;
 	  ch_file = NULL;
+	  }
 
    /* Get rid of the color (usually) */
    proc_color(msg, C_OFF);
