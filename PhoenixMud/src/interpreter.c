@@ -157,6 +157,7 @@ ACMD(do_csay);
 ACMD(do_color);
 ACMD(do_commands);
 ACMD(do_commune);
+ACMD(do_commsearch);
 ACMD(do_consider);
 ACMD(do_control_battle);
 ACMD(do_credits);
@@ -550,6 +551,7 @@ const struct command_info cmd_info[] = {
 	{"color", POS_DEAD, do_color, 0, 0},
 	{"commands", POS_DEAD, do_commands, 0, SCMD_COMMANDS},
 	{"commune", POS_DEAD, do_commune, 0, 0},
+	{"commsearch", POS_DEAD, do_commsearch, 1, SCMD_LOGSEARCH},
 	{"compact", POS_DEAD, do_gen_tog, 0, SCMD_COMPACT},
 	{"cost", POS_STANDING, do_not_here, 0, 0},
 	{"count", POS_STANDING, do_item_count, 0, 0},
@@ -952,6 +954,7 @@ const struct command_info cmd_info[] = {
 	{"vgodfight", POS_DEAD, do_gen_vfile, LVL_GOD, SCMD_V_GODFIGHT},
 	{"vhelp", POS_DEAD, do_gen_vfile, 108, SCMD_V_HELP},
 	{"videas", POS_DEAD, do_gen_vfile, 108, SCMD_V_IDEAS},
+	{"viewcomms", POS_DEAD, do_commsearch, 1, SCMD_VIEWLOG},
 	{"viewlog", POS_DEAD, do_logsearch, 108, SCMD_VIEWLOG},
 	{"vlastcmd", POS_DEAD, do_gen_vfile, LVL_ADMIN, SCMD_V_LASTCMD},
 	{"vlevels", POS_DEAD, do_gen_vfile, 108, SCMD_V_LEVELS},
