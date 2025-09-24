@@ -675,7 +675,7 @@ char	*str_dup(const char *source);
 
 
 #define PERS(ch, vict) (CAN_SEE(vict, ch) ? GET_NAME(ch) : ((GET_LEVEL(ch) < LVL_IMMORT) \
-    ? "someone" : (IS_NPC(ch) ? "someone" : "An immortal")))
+    ? "someone" : (IS_NPC(ch) ? "someone" : "an immortal")))
 
 #define OBJS(obj, vict) (CAN_SEE_OBJ((vict), (obj)) ? \
   (obj)->short_description  : "something")
