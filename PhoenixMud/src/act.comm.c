@@ -53,23 +53,24 @@ extern struct queue_event *auction_event;
 void mprog_speech_trigger(char *txt, struct char_data *mob);
 void do_auction_update(void);
 void id_obj_to_char(struct char_data *ch, struct obj_data *obj);
-/* commune code from incabolus */
+/* internal functions */
+void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int type);
 int ignoring(struct char_data *ch, struct char_data *vict);
+/* external functions */
+void proc_color(char *inbuf, int color);
+char *str_str(char *cs, char *ct);
 
-void write_comms(struct char_data *ch, char *msg, bool to_char);
+/* commune code from incabolus */
 
 ACMD(do_commune)
    {
    bool is_mort = FALSE;
    struct descriptor_data *i;
-   char *buf = get_buffer(MAX_STRING_LENGTH);
-   char *buf2 = get_buffer(MAX_STRING_LENGTH);
+   char *buf;
 
    if(PLR_FLAGGED(ch,PLR_NOCOMMUNE) && GET_LEVEL(ch) < LVL_IMMORT)
      {
      send_to_char(ch,"You can't commune with the gods.\r\n");
-     release_buffer(buf);     
-     release_buffer(buf2);
      return;
      }
 
@@ -83,18 +84,24 @@ ACMD(do_commune)
       }
    else
       {
-      send_to_char(ch,"You commune, '&M%s&n'\r\n",argument);
+	  buf = get_buffer(MAX_STRING_LENGTH);
+	  
+	  sprintf(buf, "You commune, '&M%s&n'\r\n", argument); 
+      send_to_char(ch, "%s", buf);
+	  write_comms(ch, 0, buf, TO_CHAR);
 
       if (GET_LEVEL(ch) < LVL_IMMORT)
          {
-         sprintf(buf,"%s beseeches the gods, '&M%s&n'",GET_NAME(ch),argument);
+		 sprintf(buf,"%s beseeches the gods, '&M%s&n'",GET_NAME(ch),argument);
+		 write_comms(0, 0, buf, TO_NOTVICT);
+
          is_mort = TRUE;
          }
       else
          {
-         sprintf(buf,"%s shouts down from above, '&M%s&n'",GET_NAME(ch),
-                 argument);
-         sprintf(buf2,"A god shouts down from above, '&M%s&n'",argument);
+         sprintf(buf,"%s shouts down from above, '&M%s&n'", GET_NAME(ch), argument);
+		 write_comms(0, 0, buf, TO_NOTVICT);
+
          is_mort = FALSE;
          }
 
@@ -102,23 +109,30 @@ ACMD(do_commune)
          {
 
          if (is_mort)
+		    {
             if ((STATE(i)==CON_PLAYING) && (i != ch->desc) &&
                     (GET_LEVEL(i->character) >= LVL_IMMORT))
+			   {
+			   sprintf(buf,"$n beseeches the gods, '&M%s&n'",GET_NAME(ch),argument);
                act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
-
-         if (!is_mort)
+			   write_comms(ch, i->character, buf, TO_VICT);
+			   }
+			}
+         else
+		    {
             if ((STATE(i)==CON_PLAYING) && i != ch->desc)
                {
                if(!IS_NPC(ch) && GET_LEVEL(i->character)<GET_INVIS_LEV(ch))
-                  act(buf2, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
+				  sprintf(buf,"A god shouts down from above, '&M%s&n'", argument);
                else
-                  act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
+				  sprintf(buf,"$n shouts down from above, '&M%s&n'", GET_NAME(ch), argument);
+               act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
+			   write_comms(ch, i->character, buf, TO_VICT);
                }
+            }
          }
+      release_buffer(buf);
       }
-
-   release_buffer(buf);
-   release_buffer(buf2);
    }
 
 
@@ -149,18 +163,27 @@ ACMD(do_say)
       send_to_char(ch,"Yes, but WHAT do you want to say?\r\n");
    else
       {
-	do_april_fools_drunk(ch, argument);
+	  do_april_fools_drunk(ch, argument);
 
       char *buf = get_buffer(MAX_STRING_LENGTH);
       sprintf(buf, "$n says, '&W%s&n'", argument);
+
+	  if (!IS_NPC(ch))
+	     write_comms(ch, 0, buf, TO_NOTVICT);
+
+	  for (struct char_data *to = world[IN_ROOM(ch)].people; to; to = to->next_in_room)
+	     {
+		 //if (to != ch)
+   	   	    write_comms(ch, to, buf, TO_VICT);
+	     }
+
       MOBTrigger = FALSE;
       act(buf, FALSE, ch, 0, 0, TO_ROOM|DG_NO_TRIG);
-      if (!IS_NPC(ch)&&PRF_FLAGGED(ch, PRF_NOREPEAT))
-         send_to_char(ch,"%s", OK);
-      else
-         {
-         send_to_char(ch,"You say, '&W%s&n'\r\n", argument);
-         }
+
+      send_to_char(ch,"You say, '&W%s&n'\r\n", argument);
+	  sprintf(buf, "You say, '&W%s&n'", argument);
+      write_comms(ch, 0, buf, TO_CHAR);
+
       release_buffer(buf);
 
       /* trigger check */
@@ -197,39 +220,31 @@ ACMD(do_gsay)
    else
       {
       char *buf = get_buffer(MAX_STRING_LENGTH);
-      char *buf2 = get_buffer(MAX_STRING_LENGTH);
       if (ch->master)
          k = ch->master;
       else
          k = ch;
 
-      sprintf(buf2, "%s tells the group, '&W%s&n'", GET_NAME(ch), argument);
       sprintf(buf, "$n tells the group, '&W%s&n'", argument);
-      write_comms(ch, buf2, FALSE);
+      write_comms(0, 0, buf, TO_NOTVICT);
 
       if (AFF_FLAGGED(k, AFF_GROUP) && (k != ch))
          {
          act(buf, FALSE, ch, 0, k, TO_VICT | TO_SLEEP);
-         write_comms(k, buf2, TRUE);
+         write_comms(ch, k, buf, TO_VICT);
          }
 
       for (f = k->followers; f; f = f->next)
          if (AFF_FLAGGED(f->follower, AFF_GROUP) && (f->follower != ch))
             {
             act(buf, FALSE, ch, 0, f->follower, TO_VICT | TO_SLEEP);
-            write_comms(f->follower, buf2, TRUE);
+            write_comms(ch, f->follower, buf, TO_VICT);
             }
 
-      if (PRF_FLAGGED(ch, PRF_NOREPEAT))
-         send_to_char(ch, "%s", OK);
-      else
-         {
-         sprintf(buf, "You tell the group, '&W%s&n'\r\n", argument);
-         send_to_char(ch, buf);
+      send_to_char(ch, "You tell the group, '&W%s&n'\r\n", argument);
+      sprintf(buf, "You tell the group, '%s'\r\n", argument);
+      write_comms(ch, 0, buf, TO_CHAR);
 
-         write_comms(ch, buf, TRUE);
-         }
-      release_buffer(buf2);
       release_buffer(buf);
       }
 
@@ -239,34 +254,23 @@ ACMD(do_gsay)
 void perform_tell(struct char_data *ch, struct char_data *vict, char *arg)
    {
    char *buf = get_buffer(MAX_STRING_LENGTH);
-   char *buf2 = get_buffer(MAX_STRING_LENGTH);
-   sprintf(buf, "%s%s tells you, '%s'%s",CCRED(vict, C_NRM), 
-           CAP(strdup(GET_NAME(ch))), arg, CCNRM(vict, C_NRM));
-   sprintf(buf2, "%sAn immortal tells you, '%s'%s",CCRED(vict, C_NRM), arg,
-           CCNRM(vict, C_NRM));
+
+   sprintf(buf, "$n tells $N, '%s'", arg);
+   write_comms(ch, vict, buf, TO_NOTVICT);
+   sprintf(buf, "%s$n tells you, '%s'%s", CCRED(vict, C_NRM), arg, CCNRM(vict, C_NRM));
+
    if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT)) {
-      if (GET_LEVEL(ch) >= LVL_IMMORT && !CAN_SEE(vict, ch))
-      act(buf2, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
-      else
       act(buf, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
+      write_comms(ch, vict, buf, TO_VICT);
       }
 
-   if (!IS_NPC(ch)&&PRF_FLAGGED(ch, PRF_NOREPEAT))
-      send_to_char(ch, "%s", OK);
-   else
-      {
-      sprintf(buf, "%sYou tell $N, '%s'%s",CCRED(ch, C_CMP), arg,
-              CCNRM(ch, C_CMP));
-      sprintf(buf2, "%sYou tell an immortal, '%s'%s",CCRED(ch, C_CMP), arg,
-              CCNRM(ch, C_CMP));
-      if  (GET_LEVEL(vict) >= LVL_IMMORT && !CAN_SEE(ch, vict))
-      act(buf2, FALSE, ch, 0, vict, TO_CHAR | TO_SLEEP);
-      else
-      act(buf, FALSE, ch, 0, vict, TO_CHAR | TO_SLEEP);
-      }
+   sprintf(buf, "%sYou tell $N, '%s'%s",CCRED(ch, C_CMP), arg, CCNRM(ch, C_CMP));
+   act(buf, FALSE, ch, 0, vict, TO_CHAR | TO_SLEEP);
+   write_comms(ch, vict, buf, TO_CHAR);
+
    if(!IS_NPC(vict) && !(IS_NPC(ch) && GET_LEVEL(vict)<LVL_IMMORT))
       GET_LAST_TELL(vict) = IS_NPC(ch)?GET_ID(ch):GET_IDNUM(ch);
-   release_buffer(buf2);
+
    release_buffer(buf);
    }
    
@@ -437,16 +441,22 @@ ACMD(do_spec_comm)
       {
       sprintf(buf, "$n %s you, '%s'", action_plur, buf2);
       if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT))
+	     {
          act(buf, FALSE, ch, 0, vict, TO_VICT);
+		 write_comms(ch, vict, buf, TO_VICT);
+		 }
 
-      if (!IS_NPC(ch)&&PRF_FLAGGED(ch, PRF_NOREPEAT))
-         send_to_char(ch, "%s", OK);
-      else
-         {
-         send_to_char(ch, "You %s %s, '%s'\r\n", action_sing,
-                      GET_NAME(vict), buf2);
-         }
+      sprintf(buf, "$n %s $N, '%s'", action_plur, buf2);
+      write_comms(ch, vict, buf, FALSE);
+
+      send_to_char(ch, "You %s %s, '%s'\r\n", action_sing,
+                   GET_NAME(vict), buf2);
+      sprintf(buf, "You %s $N, '%s'", action_sing, buf2);
+	  write_comms(ch, vict, buf, TO_CHAR);
+
       act(action_others, FALSE, ch, 0, vict, TO_NOTVICT);
+	  //write_comms(ch, vict, action_others, TO_NOTVICT);
+	  
       if(vict)
          {
          speech_mtrigger(vict, buf2);
@@ -599,43 +609,45 @@ ACMD(do_page)
    if(!IS_NPC(ch)&&PLR_FLAGGED(ch, PLR_NOSHOUT))
       send_to_char(ch, "You can only commune with the gods!\r\n");
    else if (IS_NPC(ch))
-      send_to_char(ch,"Monsters can't page.. go away.\r\n");
+      send_to_char(ch, "Monsters can't page.. go away.\r\n");
    else if (!*arg)
       send_to_char(ch, "Whom do you wish to page?\r\n");
    else
       {
       char *buf = get_buffer(MAX_STRING_LENGTH);
 
-      sprintf(buf, "\007\007*$n* %s\r\n", buf2);
+      sprintf(buf, "\007\007*$n* %s", buf2);
+	  write_comms(ch, 0, buf, TO_NOTVICT);
+
       if (!str_cmp(arg, "all"))
          {
          if (GET_LEVEL(ch) > LVL_DGOD)
             {
             for (d = descriptor_list; d; d = d->next)
-               if ((STATE(d)==CON_PLAYING)&& d->character)
+               if ((STATE(d)==CON_PLAYING) && d->character)
+			      {
                   act(buf, FALSE, ch, 0, d->character, TO_VICT);
+				  write_comms(ch, d->character, buf, TO_VICT);
+				  }
             }
          else
             send_to_char(ch, "You will never be godly enough to do that!\r\n");
-         release_buffer(arg);
-         release_buffer(buf2);
-         release_buffer(buf);
 
-         return;
          }
-      if ((vict = get_player_vis(ch, arg, FIND_CHAR_WORLD)) != NULL)
+      else if ((vict = get_player_vis(ch, arg, FIND_CHAR_WORLD)) != NULL)
          {
          if(GET_LEVEL(ch)<LVL_GOD && !PRF2_FLAGGED(vict,PRF2_PAGE_OK))
             send_to_char(ch, "They do not wish to be paged!\r\n");
          else
             {
             if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT))
+			   {
                act(buf, FALSE, ch, 0, vict, TO_VICT);
+			   write_comms(ch, vict, buf, TO_VICT);
+			   }
 
-            if (PRF_FLAGGED(ch, PRF_NOREPEAT))
-               send_to_char(ch, "%s", OK);
-            else
-               act(buf, FALSE, ch, 0, vict, TO_CHAR);
+            act(buf, FALSE, ch, 0, vict, TO_CHAR);
+			write_comms(ch, vict, buf, TO_CHAR);
             }
          }
       else
@@ -791,43 +803,35 @@ ACMD(do_gen_comm)
    do_april_fools_drunk(ch, argument);
 
    /* first, set up strings to be given to the communicator */
-   if (!IS_NPC(ch)&&PRF_FLAGGED(ch, PRF_NOREPEAT))
-      send_to_char(ch, "%s", OK);
-   else
-      {
-      char *buf1 = get_buffer(MAX_STRING_LENGTH);
-      if (COLOR_LEV(ch) >= C_CMP) 
-         sprintf(buf1, "%s%sYou %s, '%s'%s", color_on,
-                 (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", com_msgs[subcmd][1],
-                 argument, KNRM);
-      else
-         sprintf(buf1, "%sYou %s, '%s'", (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
-                 com_msgs[subcmd][1], argument);
-      act(buf1, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
-
-      /* Log the communication to the player's comms log */
-      write_comms(ch, buf1, TRUE);
-
-      release_buffer(buf1);
-      }
-
    buf = get_buffer(MAX_STRING_LENGTH);
+   if (COLOR_LEV(ch) >= C_CMP) 
+      sprintf(buf, "%s%sYou %s, '%s'%s", color_on,
+              (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
+			  com_msgs[subcmd][1], argument, KNRM);
+   else
+      sprintf(buf, "%sYou %s, '%s'", 
+              (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
+              com_msgs[subcmd][1], argument);
+   act(buf, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
    
-   /* Write to general comms log once */
-   sprintf(buf, "%s%s %ss, '%s'", GET_NAME(ch), (subcmd==SCMD_MUSIC)?"[MUSIC] ":"",
-           com_msgs[subcmd][1], argument);
-   write_comms(ch, buf, FALSE);
+   /* Log the communication to the player's comms log */
+   write_comms(ch, 0, buf, TO_CHAR);
 
-   sprintf(buf, "%s$n %ss, '%s'", (subcmd==SCMD_MUSIC)?"[MUSIC] ":"",
+   sprintf(buf, "%s$n %ss, '%s'", 
+           (subcmd==SCMD_MUSIC)?"[MUSIC] ":"",
            com_msgs[subcmd][1], argument);
+
+   /* Write to general comms log once */
+   if (!IS_NPC(ch))
+      write_comms(ch, 0, buf, TO_NOTVICT);
 
    /* now send all the strings out */
    for (i = descriptor_list; i; i = i->next)
       {
       if(i->original)
-         tch=i->original;
+         tch = i->original;
       else
-         tch= i->character;
+         tch = i->character;
 
       if ((STATE(i)==CON_PLAYING) && (i != ch->desc) && tch &&
               i->character &&
@@ -858,8 +862,8 @@ ACMD(do_gen_comm)
          if (COLOR_LEV(tch) >= C_NRM)
             send_to_char(i->character, "%s", KNRM);
 
-         /* Write the comms to each player's comms log and the world comms log */
-         write_comms(tch, buf, TRUE);
+         /* Write the comms to each player's comms log */
+         write_comms(ch, tch, buf, TO_VICT);
          }
       }
    release_buffer(buf);
@@ -1671,38 +1675,43 @@ ACMD(do_qcomm)
       }
 
    if (!*argument)
-      {
-      buf = get_buffer(128);
-      strcpy(buf,CMD_NAME);
       send_to_char(ch, "%s?  Yes, fine, %s we must, but WHAT??\r\n",
-                   CAP(buf), CMD_NAME);
-      release_buffer(buf);
-      }
+                   CAP(strdup(CMD_NAME)), CMD_NAME);
    else
       {
-      buf = get_buffer(512);
-      if (!IS_NPC(ch)&&PRF_FLAGGED(ch, PRF_NOREPEAT))
-         send_to_char(ch,"%s", OK);
+      buf = get_buffer(MAX_STRING_LENGTH);
+
+      if (subcmd == SCMD_QSAY)
+	     {
+         sprintf(buf, "&WYou quest-say, '&C%s&W'&n", argument);
+		 write_comms(ch, 0, buf, TO_CHAR);
+		 }
       else
-         {
-         if (subcmd == SCMD_QSAY)
-            sprintf(buf, "&WYou quest-say, '&C%s&W'&n", argument);
-         else
-            strcpy(buf, argument);
-         act(buf, FALSE, ch, 0, argument, TO_CHAR | TO_SLEEP);
-         }
+	     {
+         sprintf(buf, "&WYou qecho, '&C%s&W'&n", argument);
+		 write_comms(ch, 0, buf, TO_CHAR);
+		 strcpy(buf, argument);
+		 }
+      act(buf, FALSE, ch, 0, argument, TO_CHAR | TO_SLEEP);
 
       if (subcmd == SCMD_QSAY)
          sprintf(buf, "&W$n quest-says, '&C%s&W'&n", argument);
       else
+		 {
+         sprintf(buf, "&W$n qechos, '&C%s&W'&n", argument);
+		 write_comms(ch, 0, buf, TO_NOTVICT);
          strcpy(buf, argument);
+		 }
 
       for (i = descriptor_list; i; i = i->next)
          if ((STATE(i)==CON_PLAYING) && (i != ch->desc) &&
                  (IS_NPC(i->character)||PRF_FLAGGED(i->character, PRF_QUEST)) &&
                  i->character && !(!IS_NPC(i->character) && 
                   ignoring(i->character, ch) && GET_LEVEL(i->character)<LVL_IMMORT))
+			{
             act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
+			write_comms(ch, i->character, buf, TO_VICT);
+			}
       release_buffer(buf);
       }
    }
@@ -1717,8 +1726,6 @@ ACMD(do_remortnet)
    char emote = FALSE;
    char any = FALSE;
    char *buf1;
-   char *buf2;
-   char *buf3;
 
    if (!IS_NPC(ch) && (GET_LEVEL(ch) < LVL_HERO && REMORT_LEVEL(ch) == 0))
       {
@@ -1789,7 +1796,7 @@ ACMD(do_remortnet)
 		  REMORT_LEVEL(d->character)>0) &&
                  PRF2_FLAGGED(d->original?d->original:d->character, PRF2_NOREMO) &&
                  CAN_SEE(ch, d->character))
-            {
+            { 
             if (!any)
                {
                send_to_char(ch, "Players offline:\r\n");
@@ -1828,7 +1835,7 @@ ACMD(do_remortnet)
       }
    if (!IS_NPC(ch) && PRF2_FLAGGED(ch, PRF2_NOREMO))
       {
-      send_to_char(ch ,"You aren't on remortnet!\r\n");
+      send_to_char(ch, "You aren't on remortnet!\r\n");
       return;
       }
    skip_spaces(&argument);
@@ -1839,14 +1846,10 @@ ACMD(do_remortnet)
       send_to_char(ch, "Don't bother the people like that!\r\n");
       return;
       }
-   buf1=get_buffer(512);
-   buf2=get_buffer(512);
-   buf3=get_buffer(512);
-   sprintf(buf1, "[Remort] %s: %s%s\r\n", GET_NAME(ch), emote ? "<--- " : "",
-           argument);
-   sprintf(buf2, "[Remort] Someone: %s%s\r\n", emote ? "<--- " : "", argument);
-   sprintf(buf3, "[Remort] An immortal: %s%s\r\n", emote ? "<--- " : "", argument);
 
+   buf1=get_buffer(MAX_STRING_LENGTH);
+   sprintf(buf1, "[Remort] $n: %s%s", emote ? "<--- " : "", argument);
+   write_comms(ch, 0, buf1, TO_NOTVICT);
 
    for (d = descriptor_list; d; d = d->next)
       {
@@ -1855,30 +1858,22 @@ ACMD(do_remortnet)
       else
          vict = d->character;
       if ((STATE(d)==CON_PLAYING) &&
-              ((GET_LEVEL(vict) > 100)||
-               REMORT_LEVEL(vict) > 0) &&
+              ((GET_LEVEL(vict) > 100)||REMORT_LEVEL(vict) > 0) &&
               (!PRF2_FLAGGED(vict, PRF2_NOREMO)) &&
-              (!PLR_FLAGGED(vict, PLR_WRITING | PLR_MAILING))
-              && (d != ch->desc || !(PRF_FLAGGED(vict, PRF_NOREPEAT))))
+              (!PLR_FLAGGED(vict, PLR_WRITING | PLR_MAILING)))
          {
          if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT))
             {
-            send_to_char(vict, CCYEL(vict, C_NRM));
-            if (!CAN_SEE(vict, ch) && GET_LEVEL(ch) >= LVL_IMMORT)
-               send_to_char(vict, "%s", buf3);
-            else if (!CAN_SEE(vict, ch))
-               send_to_char(vict, "%s", buf2);
-            else
-               send_to_char(vict, "%s", buf1);
-            send_to_char(vict, CCNRM(vict, C_NRM));
+		    send_to_char(vict, "%s", CCYEL(vict, C_NRM));
+			act(buf1, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
+			send_to_char(vict, "%s", CCNRM(vict, C_NRM));
+			write_comms(ch, vict, buf1, TO_VICT);
             }
          }
       }
 
-   release_buffer(buf2);
    release_buffer(buf1);
-   release_buffer(buf3);
-   if (IS_NPC(ch) || (!IS_NPC(ch) && PRF_FLAGGED(ch, PRF_NOREPEAT)))
+   if (IS_NPC(ch))
       send_to_char(ch, "%s", OK);
    }
 
@@ -1973,84 +1968,333 @@ int ignoring(struct char_data *ch, struct char_data *vict)
 
 extern struct descriptor_data *descriptor_list;
 
+/* Not currently implemented */
 ACMD(do_nonewbie)
-{
-  if (PRF2_FLAGGED(ch, PRF2_NONEWBIE)) {
-    REMOVE_BIT(PRF2_FLAGS(ch), PRF2_NONEWBIE);
-    send_to_char(ch, "You can now hear the newbie channel.\r\n");
-  } else {
-    SET_BIT(PRF2_FLAGS(ch), PRF2_NONEWBIE);
-    send_to_char(ch, "You will no longer hear the newbie channel.\r\n");
-  }
-}
+   {
+   if (PRF2_FLAGGED(ch, PRF2_NONEWBIE)) 
+      {
+      REMOVE_BIT(PRF2_FLAGS(ch), PRF2_NONEWBIE);
+      send_to_char(ch, "You can now hear the newbie channel.\r\n");
+      } 
+   else 
+      {
+      SET_BIT(PRF2_FLAGS(ch), PRF2_NONEWBIE);
+      send_to_char(ch, "You will no longer hear the newbie channel.\r\n");
+      }
+   }
 
+/* Not currently implemented */
 ACMD(do_newbie)
-{
-  if (IS_NPC(ch)) {
-    return;
-  }
-  if (PRF2_FLAGGED(ch, PRF2_NONEWBIE)) {
-    send_to_char(ch, "You aren't listening to the newbie channel.\r\n");
-    return;
-  }
-  if (!*argument) {
-    send_to_char(ch, "Usage: newbie <text>\r\n");
-    return;
-  }
-
-  char buf[1024];
-  sprintf(buf, "&C[Newbie] %s:%s&n\r\n", GET_NAME(ch), argument);
-
-  struct descriptor_data *i;
-  struct char_data *tch;
-  for (i = descriptor_list; i; i = i->next) {
-    if (i->original) {
-      tch = i->original;
-    } else {
-      tch = i->character;
-    }
-    if (STATE(i) == CON_PLAYING
-          && tch
-          && i->character
-          && !PLR_FLAGGED(tch, PLR_WRITING)
-	  && (!ROOM_FLAGGED(IN_ROOM(i->character), ROOM_SOUNDPROOF) || GET_LEVEL(ch)>=LVL_IMMORT)
-    ) {
-      if (!IS_NPC(tch) && ignoring(tch, ch) && GET_LEVEL(tch) < LVL_IMMORT) {
-	continue;
-      }
-      send_to_char(i->character, "%s", buf);
-    }
-  }
-}
-
-void write_comms(struct char_data *ch, char *msg, bool to_char) 
-{ 
-   FILE *fl; 
-
-   if (to_char)
    {
-      char *fileName = get_buffer(SMALL_BUFSIZE);
-      get_filename(GET_NAME(ch), fileName, COMMS_FILE);
-      if (!(fl = fopen(fileName, "a")))
+   char *buf;
+   struct descriptor_data *i;
+   struct char_data *tch;
+
+   if (IS_NPC(ch))
+      return;
+
+   if (PRF2_FLAGGED(ch, PRF2_NONEWBIE)) 
       {
-         perror("SYSERR: Cannot open player comms log.");
-	      release_buffer(fileName);
-         return;
+      send_to_char(ch, "You aren't listening to the newbie channel.\r\n");
+      return;
+      }
+   if (!*argument) 
+      {
+      send_to_char(ch, "Usage: newbie <text>\r\n");
+      return;
       }
 
-      fprintf(fl, "%s\r\n", msg); 
-      fclose(fl);
-      release_buffer(fileName);
+   buf = get_buffer(MAX_STRING_LENGTH);
+   sprintf(buf, "&C[Newbie] %s:%s&n\r\n", GET_NAME(ch), argument);
+   write_comms(0, 0, buf, TO_NOTVICT);
+
+   for (i = descriptor_list; i; i = i->next)
+      {
+      if (i->original)
+         tch = i->original;
+      else
+         tch = i->character;
+
+      if (STATE(i) == CON_PLAYING && tch && i->character && !PLR_FLAGGED(tch, PLR_WRITING) &&
+	           (!ROOM_FLAGGED(IN_ROOM(i->character), ROOM_SOUNDPROOF) || 
+			    GET_LEVEL(ch)>=LVL_IMMORT)) 
+	     {
+         if (!IS_NPC(tch) && ignoring(tch, ch) && GET_LEVEL(tch) < LVL_IMMORT)
+	        continue;
+
+         send_to_char(i->character, "%s", buf);
+		 write_comms(ch, i->character, buf, TO_VICT);
+         }
+      }
+   release_buffer(buf);
    }
+
+/* write_comms() logs most if not all communication types. - Nomikos 9/23/2025 */
+void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int type) 
+   { 
+   FILE *fl;
+   struct char_data *ch_file;
+   register char *i = NULL, *buf; 
+   char *lbuf;
+
+   /* Check destination, character file, victim file, or world file - NO NPCs! */
+   if (IS_SET(type, TO_CHAR))
+      {
+	  if (IS_NPC(ch))
+		 return;
+      else
+         ch_file = ch;
+	  }
+   else if (IS_SET(type, TO_VICT))
+      {
+	  if (IS_NPC(vict))
+		 return;
+      else
+         ch_file = vict;
+	  }
    else
-   {
-      if (!(fl = fopen(COMMS_LOG, "a")))
-      {
-         perror("SYSERR: Cannot open comms log.");
-         return;
-      }
+	  ch_file = NULL;
+
+   /* Get rid of the color (usually) */
+   proc_color(msg, C_OFF);
+
+   /* Mimic name processing in act() */
+   lbuf = get_buffer(MAX_STRING_LENGTH);
+   buf = lbuf; 
+ 
+   for (;;) 
+      { 
+      if (*msg == '$') 
+	     { 
+	     switch (*(++msg)) 
+	        { 
+	        case 'n':
+			   if (ch && vict)
+		          i = PERS(ch, vict); 
+			   else if (ch)
+				  i = GET_NAME(ch);
+			   else
+				  i = "NO_CHAR";
+		       break; 
+	        case 'N':
+			   if (ch && vict)
+   		          i = PERS(vict, ch);
+		       else if (vict)
+				  i = GET_NAME(vict);
+			   else
+				  i = "NO_VICT";
+			   break; 
+	        default: 
+		       i = "$";
+		       break; 
+	       }  
+	    while ((*buf = *(i++))) 
+	       buf++; 
+	    msg++; 
+	    } 
+     else if (!(*(buf++) = *(msg++))) 
+	    break; 
+     } 
+ 
+   *(--buf) = '\r'; 
+   *(++buf) = '\n'; 
+   *(++buf) = '\0'; 
    
-      fprintf(fl, "%s\r\n", msg); 
-      fclose(fl);
+   /* Write to the specified file */
+   if (ch_file != NULL)
+      {
+      char *fileName = get_buffer(SMALL_BUFSIZE);
+      get_filename(GET_NAME(ch_file), fileName, COMMS_FILE);
+      if (!(fl = fopen(fileName, "a")))
+         {
+         perror("SYSERR: Cannot open player comms log.");
+         }
+      else
+	     {
+         fprintf(fl, "%s", CAP(lbuf)); 
+         fclose(fl);
+		 }
+      release_buffer(fileName);
+      }
+   else
+      {
+      if (!(fl = fopen(COMMS_LOG, "a")))
+         {
+         perror("SYSERR: Cannot open comms log.");
+         }
+      else
+	     {
+         fprintf(fl, "%s", CAP(lbuf)); 
+         fclose(fl);
+		 }
+      }
+   release_buffer(lbuf);
+   } 
+
+
+/* viewlog and commsearch commands. Allows all below implementor to view and search their own
+   communication logs. Allows implementors and above to view the general comms log, view the
+   comms log of any player, or to search either the general comms log or a player's comms
+   log. -Nomikos 9/23/2025   */
+   
+/* The different options for this command are:
+   mortals: viewcomms
+            commsearch         ** gives usage screen
+            commsearch <searchstring>
+   imms:    viewcomms          ** shows general commslog
+            viewcomms <player>
+            commsearch         ** gives imm usage screen
+            commsearch <searchstring>  ** searches general commslog
+            commsearch <player>    ** tell imm they have to search for something if player found
+            commsearch <player> <searchstring>  
+*/
+ACMD(do_commsearch) 
+   {
+   unsigned long match = 0;
+   char *buf, *buf2, *searchstr = NULL;
+   FILE *fl = NULL;
+   
+   char *shname = get_buffer(MAX_INPUT_LENGTH);
+
+   if ((subcmd == SCMD_VIEWLOG))
+      {
+	  if (GET_LEVEL(ch) >= LVL_ADMIN)
+	     {
+	     /* imms: viewcomms <player> */
+	     searchstr = any_one_arg(argument, shname);
+	     if (*shname)
+	        {
+	        char *fileName = get_buffer(SMALL_BUFSIZE);
+	        get_filename(shname, fileName, COMMS_FILE);
+		    if (!(fl = fopen(fileName, "r")))
+			   {
+               send_to_char(ch, "Unable to find player \'%s\'.\r\n", shname);
+               }
+		    release_buffer(fileName);
+		    }
+	     else
+	        {
+		    if (!(fl = fopen(COMMS_LOG, "r")))
+               {
+			   send_to_char(ch, "Error: Unable to open the comms log.\r\n");
+               perror("SYSERR: imm viewcomms: Cannot open comms log.");
+               }
+		    }
+	     }
+      /* mortals: viewcomms */
+      else
+         {
+         char *fileName = get_buffer(SMALL_BUFSIZE);
+	     get_filename(GET_NAME(ch), fileName, COMMS_FILE);
+	     if (!(fl = fopen(fileName, "r")))
+   	        {
+			send_to_char(ch, "Unable to open your comms log. Tell an imm!\r\n");
+            perror("SYSERR: viewcomms: Cannot open player comms log.");
+            }
+	     release_buffer(fileName);
+		 }
+	  }
+   /* assume the rest are commsearch.
+      commsearch         ** gives usage screen, morts and imms */
+   else if (!*argument)
+      {
+	  if (GET_LEVEL(ch) < LVL_ADMIN)
+	     send_to_char(ch, "\r\n Usage: commsearch <searchstring>\r\n");
+	  else
+	     send_to_char(ch, "\r\n Usage: commsearch <player> <searchstring>, or"
+	                      "\r\n        commsearch <searchstring>\r\n");
+	  }
+   /* imms: commsearch <searchstring>  ** searches general commslog
+            commsearch <player>        ** tell imm they have to search for something if player found
+            commsearch <player> <searchstring> */
+   else if (GET_LEVEL(ch) >= LVL_ADMIN)
+      {
+	  searchstr = any_one_arg(argument, shname);
+	  if (*shname)
+	     {
+	     char *fileName = get_buffer(SMALL_BUFSIZE);
+		 
+	     get_filename(shname, fileName, COMMS_FILE);
+	     if (!(fl = fopen(fileName, "r")))
+   	        {
+	        if (!(fl = fopen(COMMS_LOG, "r")))
+               {
+			   send_to_char(ch, "Unable to open general comms log.\r\n");
+               perror("SYSERR: imm commsearch: Cannot open general comms log.");
+               }
+			else
+			   searchstr = argument;
+			}
+		 else
+		    {
+			if (searchstr && !*searchstr)
+			   {
+			   send_to_char(ch, "Player found, please specify a search string.\r\n");
+			   fclose(fl);
+			   fl = NULL;
+			   }
+			}
+         release_buffer(fileName);
+		 }
+	  else
+		 send_to_char(ch, "Please, at minimum, specify a search string.\r\n");
+	  }
+   /* mortals: commsearch <searchstring> */
+   else
+      {
+	  searchstr = argument;
+	  
+	  char *fileName = get_buffer(SMALL_BUFSIZE);
+	  get_filename(GET_NAME(ch), fileName, COMMS_FILE);
+	  if (!(fl = fopen(fileName, "r")))
+	     {
+		 send_to_char(ch, "Unable to open your comms log. Tell an imm!\r\n");
+         perror("SYSERR: commsearch: Cannot open player comms log.");
+		 }
+      release_buffer(fileName);
+	  }
+
+   release_buffer(shname);
+   
+   /* Handle error or file load failure */
+   if (!fl)
+      {
+	  return;
+	  }
+
+   buf = get_buffer(MAX_STRING_LENGTH);
+   buf2 = get_buffer(32750);
+   
+   if (searchstr)
+      skip_spaces(&searchstr);
+
+   /* view the comm log or search for the string */
+   for (;;)
+      {
+      get_line(fl, buf);
+
+      if (feof(fl))
+         break;
+
+      if (subcmd == SCMD_VIEWLOG || str_str(buf, searchstr))
+  	     {
+         sprintf(buf2+strlen(buf2), "[%ld] %s\r\n", ++match, buf);
+         if (strlen(buf2) > 32000)
+            {
+            sprintf(buf2+strlen(buf2), "***Too many results, refine your search.\r\n");
+            break;
+            }
+         }
+      }
+   if (!match)
+      send_to_char(ch, "No lines matched your criteria.\r\n");
+   else if (subcmd == SCMD_LOGSEARCH)
+      send_to_char(ch, "%sThe search phrase \'%s\' was matched %ld times.%s\r\n",
+                   NCYN, searchstr, match, NNRM);
+   fclose(fl);
+   if (ch->desc)
+      page_string(ch->desc,buf2,TRUE,"");
+
+   release_buffer(buf2);
+   release_buffer(buf);
    }
-} 
