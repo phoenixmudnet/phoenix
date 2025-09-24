@@ -86,8 +86,8 @@ ACMD(do_commune)
       {
 	  buf = get_buffer(MAX_STRING_LENGTH);
 	  
-	  sprintf(buf, "You commune, '&M%s&n'\r\n", argument); 
-      send_to_char(ch, "%s", buf);
+	  send_to_char(ch, "You commune, '&M%s&n'\r\n", argument);
+	  sprintf(buf, "You commune, '&M%s&n'", argument); 
 	  write_comms(ch, 0, buf, TO_CHAR);
 
       if (GET_LEVEL(ch) < LVL_IMMORT)
@@ -173,7 +173,7 @@ ACMD(do_say)
 
 	  for (struct char_data *to = world[IN_ROOM(ch)].people; to; to = to->next_in_room)
 	     {
-		 //if (to != ch)
+		 if (to != ch)
    	   	    write_comms(ch, to, buf, TO_VICT);
 	     }
 
@@ -1692,7 +1692,7 @@ ACMD(do_qcomm)
 		 write_comms(ch, 0, buf, TO_CHAR);
 		 strcpy(buf, argument);
 		 }
-      act(buf, FALSE, ch, 0, argument, TO_CHAR | TO_SLEEP);
+      act(buf, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
 
       if (subcmd == SCMD_QSAY)
          sprintf(buf, "&W$n quest-says, '&C%s&W'&n", argument);
@@ -2005,7 +2005,7 @@ ACMD(do_newbie)
       }
 
    buf = get_buffer(MAX_STRING_LENGTH);
-   sprintf(buf, "&C[Newbie] %s:%s&n\r\n", GET_NAME(ch), argument);
+   sprintf(buf, "&C[Newbie] %s:%s&n", GET_NAME(ch), argument);
    write_comms(0, 0, buf, TO_NOTVICT);
 
    for (i = descriptor_list; i; i = i->next)
@@ -2021,9 +2021,8 @@ ACMD(do_newbie)
 	     {
          if (!IS_NPC(tch) && ignoring(tch, ch) && GET_LEVEL(tch) < LVL_IMMORT)
 	        continue;
-
-         send_to_char(i->character, "%s", buf);
-		 write_comms(ch, i->character, buf, TO_VICT);
+         act(buf, FALSE, ch, 0, tch, TO_VICT | TO_SLEEP);
+		 write_comms(ch, tch, buf, TO_VICT);
          }
       }
    release_buffer(buf);
