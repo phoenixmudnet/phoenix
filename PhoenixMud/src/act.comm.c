@@ -2114,7 +2114,7 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
          }
       else
 	     {
-         fprintf(fl, "%s", CAP(lbuf)); 
+         fprintf(fl, "%lld %s", (long long)time(NULL), CAP(lbuf)); 
          fclose(fl);
 		 }
       release_buffer(fileName);
@@ -2127,7 +2127,7 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
          }
       else
 	     {
-         fprintf(fl, "%s", CAP(lbuf)); 
+         fprintf(fl, "%lld %s", (long long)time(NULL), CAP(lbuf)); 
          fclose(fl);
 		 }
       }
@@ -2154,8 +2154,9 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
 ACMD(do_commsearch) 
    {
    unsigned long match = 0;
-   char *buf, *buf2, *searchstr = NULL;
+   char *tempbuf, *buf, *buf2, *time_buf, *searchstr = NULL;
    FILE *fl = NULL;
+   time_t time_stamp = 0;
    
    char *shname = get_buffer(MAX_INPUT_LENGTH);
 
@@ -2265,8 +2266,9 @@ ACMD(do_commsearch)
 	  return;
 	  }
 
-   buf = get_buffer(MAX_STRING_LENGTH);
-   buf2 = get_buffer(32750);
+   tempbuf = buf = get_buffer(MAX_STRING_LENGTH);
+   buf2 = get_buffer(65500);
+   time_buf = get_buffer(256);
    
    if (searchstr)
       skip_spaces(&searchstr);
@@ -2276,13 +2278,20 @@ ACMD(do_commsearch)
       {
       get_line(fl, buf);
 
+      if (isdigit((int)*buf))
+	     {
+	     tempbuf = any_one_arg(buf, time_buf);
+		 time_stamp = atoll(time_buf);
+		 strftime(time_buf, 80, "%m-%d-%Y - %I:%M%p -", localtime(&time_stamp));
+		 }
+		 
       if (feof(fl))
          break;
 
       if (subcmd == SCMD_VIEWLOG || str_str(buf, searchstr))
   	     {
-         sprintf(buf2+strlen(buf2), "[%ld] %s\r\n", ++match, buf);
-         if (strlen(buf2) > 32000)
+         sprintf(buf2+strlen(buf2), "%ld. %s%s\r\n", ++match, time_buf, tempbuf);
+         if (strlen(buf2) > 64000)
             {
             sprintf(buf2+strlen(buf2), "***Too many results, refine your search.\r\n");
             break;
@@ -2298,6 +2307,7 @@ ACMD(do_commsearch)
    if (ch->desc)
       page_string(ch->desc,buf2,TRUE,"");
 
+   release_buffer(time_buf);
    release_buffer(buf2);
    release_buffer(buf);
    }
