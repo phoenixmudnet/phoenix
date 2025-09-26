@@ -2036,35 +2036,25 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
    register char *i = NULL, *buf; 
    char *lbuf;
 
-   /* Check destination, character file, victim file, or world file - NO NPCs! */
+   /* Mobs are annoying.. SUPER ANNOYING */
+   if ((ch && IS_NPC(ch)) || (vict && IS_NPC(vict)))
+	  return;
+
+   /* Check destination: character file, victim file, or world file */
    if (IS_SET(type, TO_CHAR))
-      {
-	  if (ch && IS_NPC(ch))
-		 return;
-      else
-         ch_file = ch;
-	  }
+      ch_file = ch;
    else if (IS_SET(type, TO_VICT))
-      {
-	  if (vict && IS_NPC(vict))
-		 return;
-      else
-         ch_file = vict;
-	  }
+      ch_file = vict;
    else
-      {
-	  if ((ch && IS_NPC(ch)) || (vict && IS_NPC(vict)))
-		  return;
 	  ch_file = NULL;
-	  }
 
    /* Get rid of the color (usually) */
    proc_color(msg, C_OFF);
 
-   /* Mimic name processing in act() */
    lbuf = get_buffer(MAX_STRING_LENGTH);
    buf = lbuf; 
- 
+
+   /* Mimic name processing in act(), but only for ch and vict */
    for (;;) 
       { 
       if (*msg == '$') 
@@ -2160,11 +2150,12 @@ ACMD(do_commsearch)
    
    char *shname = get_buffer(MAX_INPUT_LENGTH);
 
+   /* Parse through input and choose the correct commend and target */
    if ((subcmd == SCMD_VIEWLOG))
       {
+	  /* imms: viewcomms <player> */
 	  if (GET_LEVEL(ch) >= LVL_ADMIN)
 	     {
-	     /* imms: viewcomms <player> */
 	     searchstr = any_one_arg(argument, shname);
 	     if (*shname)
 	        {
@@ -2278,6 +2269,7 @@ ACMD(do_commsearch)
       {
       get_line(fl, buf);
 
+      /* If we have been saving time, add that to the output */
       if (isdigit((int)*buf))
 	     {
 	     tempbuf = any_one_arg(buf, time_buf);
