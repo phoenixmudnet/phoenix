@@ -43,6 +43,7 @@ extern int top_of_objt;
 extern int top_of_p_table;
 
 void read_line_ascii(FILE *fp, char *string, int len);
+void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int type);
 
 /* for chars */
 extern struct spell_info_type *spells;
@@ -1070,12 +1071,16 @@ ACMD (do_csay)
       }
    else
       {
-      send_to_char(ch,"&Y[%s] You: %s%s&n\r\n",GET_CLAN_NAME(ch),
-                   emote?"<--- ":"", argument);
+	  sprintf (buf1, "&Y[%s] You: %s%s&n", GET_CLAN_NAME(ch),
+               emote?"<--- ":"", argument);
+	  write_comms(ch, 0, buf1, TO_CHAR);
+      act(buf1, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
       }
 
-   sprintf (buf1,"&Y[%s] %s: %s%s&n\r\n",GET_CLAN_NAME(ch),GET_NAME(ch),
-            emote?"<--- ":"",argument);
+   sprintf (buf1,"&Y[%s] $n: %s%s&n", GET_CLAN_NAME(ch),
+            emote?"<--- ":"", argument);
+   write_comms(ch, 0, buf1, TO_NOTVICT);
+   
    for (i = descriptor_list; i; i = i->next)
       {
       if(i->original)
@@ -1092,7 +1097,8 @@ ACMD (do_csay)
          {
          if(IN_ROOM(vict)&&
                  !ROOM_FLAGGED(IN_ROOM(vict),ROOM_SOUNDPROOF))
-            send_to_char(vict,"%s", buf1);
+            act(buf1, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
+			write_comms(ch, vict, buf1, TO_VICT | TO_SLEEP);
          }
       }
    release_buffer(buf1);
