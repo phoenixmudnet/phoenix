@@ -816,7 +816,7 @@ ACMD(do_gen_comm)
    write_comms(ch, 0, buf, TO_CHAR);
    
    /* Write to general comms log once */
-   sprintf(buf, "%s%s$n %s, '%s'&n", color_on,
+   sprintf(buf, "%s%s$n %ss, '%s'&n", color_on,
            (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
 	       com_msgs[subcmd][1], argument);
    write_comms(ch, 0, buf, TO_NOTVICT);
