@@ -142,6 +142,7 @@ void write_player_index_file(void);
 void load_player_index_file(void);
 void proc_color(char*, int);
 int get_shop_item_count(struct player_shop*);
+void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int type);
 
 ACMD(do_echo)
    {
@@ -3926,19 +3927,20 @@ ACMD(do_wiznet)
    buf2=get_buffer(MAX_RAW_INPUT_LENGTH);
    if (level > LVL_IMMORT)
       {
-      sprintf(buf1, "[W] %s: <%d> %s%s\r\n", GET_NAME(ch), level,
+      sprintf(buf1, "&C[W] %s: <%d> %s%s&n", GET_NAME(ch), level,
               emote ? "<--- " : "", argument);
-      sprintf(buf2, "[W] Someone: <%d> %s%s\r\n", level,
+      sprintf(buf2, "&C[W] Someone: <%d> %s%s&n", level,
               emote ? "<--- " : "", argument);
       }
    else
       {
-      sprintf(buf1, "[W] %s: %s%s\r\n", GET_NAME(ch),
+      sprintf(buf1, "&C[W] %s: %s%s&n", GET_NAME(ch),
               emote ? "<--- " : "", argument);
-      sprintf(buf2, "[W] Someone: %s%s\r\n", emote ? "<--- " : "",
+      sprintf(buf2, "&C[W] Someone: %s%s&n", emote ? "<--- " : "",
               argument);
       }
-
+   /* Restricted to LVL_IMPL: can see who is talking */
+   write_comms(0, 0, buf1, TO_NOTVICT);
 
    for (d = descriptor_list; d; d = d->next)
       {
@@ -3951,12 +3953,16 @@ ACMD(do_wiznet)
               (!PLR_FLAGGED(vict, PLR_WRITING | PLR_MAILING))
               && (d != ch->desc || !(PRF_FLAGGED(vict, PRF_NOREPEAT))))
          {
-         send_to_char(vict,CCCYN(vict, C_NRM));
          if (CAN_SEE(vict, ch))
-            send_to_char(vict,"%s",buf1);
+		    {
+            act(buf1, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
+			write_comms(ch, vict, buf1, TO_VICT);
+			}
          else
-            send_to_char(vict,"%s",buf2);
-         send_to_char(vict,CCNRM(vict, C_NRM));
+		    {
+			act(buf2, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
+			write_comms(ch, vict, buf2, TO_VICT);
+			}
          }
       }
 
