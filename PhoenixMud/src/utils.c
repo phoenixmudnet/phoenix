@@ -118,6 +118,36 @@ char *CAP(char *txt)
   return (txt);
 }
 
+/* Capitalize the sentence, account for color escape codes - Nomi 9/29/25 */
+char *CAP_LINE(char *txt)
+{
+   int ii;
+   if (!txt || !*txt)
+	  return(txt);
+
+   /* Assumption:
+   ** 1. Color codes are either 4 or 8 characters long (not always true)
+   */
+   if (*txt == '\x1B')
+   {
+      if ((strlen(txt) > 4) && (*(txt + 4) == '\x1B'))
+         *(txt + 9) = UPPER(*(txt + 9));
+      else
+	     *(txt + 5) = UPPER(*(txt + 5));
+   }
+   else if (*txt == '&')
+   {
+	  /* cycle until there are no more '&' codes */
+	  for (ii = 2; (strlen(txt) <= ii) && (*(txt + ii) == '&'); ii += 2) 
+		 ;
+ 	  *(txt + ii) = UPPER(*(txt + ii));
+   }
+   else
+ 	  *txt = UPPER(*txt);
+  
+   return(txt);
+}
+
 
  
 #if BUFFER_MEMORY == FALSE
