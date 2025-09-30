@@ -86,20 +86,20 @@ ACMD(do_commune)
       {
 	  buf = get_buffer(MAX_STRING_LENGTH);
 	  
-	  sprintf(buf, "You commune, '%s%s%s'", NMAG, argument, NNRM);
+	  sprintf(buf, "You commune, '&M%s&n'", argument);
 	  act(buf, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
 	  write_comms(ch, 0, buf, TO_CHAR);
 
       if (GET_LEVEL(ch) < LVL_IMMORT)
          {
-		 sprintf(buf,"$n beseeches the gods, '%s%s%s'", NMAG, argument, NNRM);
+		 sprintf(buf,"$n beseeches the gods, '&M%s&n'", argument);
 		 write_comms(ch, 0, buf, TO_NOTVICT);
 
          is_mort = TRUE;
          }
       else
          {
-         sprintf(buf,"$n shouts down from above, '%s%s%s'", NMAG, argument, NNRM);
+         sprintf(buf,"$n shouts down from above, '&M%s&n'", argument);
 		 write_comms(ch, 0, buf, TO_NOTVICT);
 
          is_mort = FALSE;
@@ -113,8 +113,7 @@ ACMD(do_commune)
             if ((STATE(i)==CON_PLAYING) && (i != ch->desc) &&
                     (GET_LEVEL(i->character) >= LVL_IMMORT))
 			   {
-			   sprintf(buf,"$n beseeches the gods, '%s%s%s'",
-			           CCMAG(i->character, C_NRM), argument, CCNRM(i->character, C_NRM));
+			   sprintf(buf,"$n beseeches the gods, '&M%s&n'", argument);
                act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
 			   write_comms(ch, i->character, buf, TO_VICT);
 			   }
@@ -124,11 +123,9 @@ ACMD(do_commune)
             if ((STATE(i)==CON_PLAYING) && i != ch->desc)
                {
                if(!IS_NPC(ch) && GET_LEVEL(i->character)<GET_INVIS_LEV(ch))
-				  sprintf(buf,"A god shouts down from above, '%s%s%s'", 
-			              NMAG, argument, NNRM);
+				  sprintf(buf,"A god shouts down from above, '&M%s&n'", argument);
                else
-				  sprintf(buf,"$n shouts down from above, '%s%s%s'", 
-			              NMAG, argument, NNRM);
+				  sprintf(buf,"$n shouts down from above, '&M%s&n'", argument);
                act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
 			   write_comms(ch, i->character, buf, TO_VICT);
                }
@@ -169,7 +166,7 @@ ACMD(do_say)
 	  do_april_fools_drunk(ch, argument);
 
       char *buf = get_buffer(MAX_STRING_LENGTH);
-      sprintf(buf, "$n says, '%s%s%s'", KWHT, argument, KNRM);
+      sprintf(buf, "$n says, '&W%s&n'", argument);
 
 	  write_comms(ch, 0, buf, TO_NOTVICT);
 
@@ -182,7 +179,7 @@ ACMD(do_say)
       MOBTrigger = FALSE;
       act(buf, FALSE, ch, 0, 0, TO_ROOM|DG_NO_TRIG);
 
-	  sprintf(buf, "You say, '%s%s%s'", NWHT, argument, NNRM);
+	  sprintf(buf, "You say, '&W%s&n'", argument);
       act(buf, FALSE, ch, 0, 0, TO_CHAR);
       write_comms(ch, 0, buf, TO_CHAR);
 
@@ -227,7 +224,7 @@ ACMD(do_gsay)
       else
          k = ch;
 
-      sprintf(buf, "$n tells the group, '%s%s%s'", KWHT, argument, KNRM);
+      sprintf(buf, "$n tells the group, '&W%s&n'", argument);
       write_comms(k, 0, buf, TO_NOTVICT);
 
       if (AFF_FLAGGED(k, AFF_GROUP) && (k != ch))
@@ -239,13 +236,12 @@ ACMD(do_gsay)
       for (f = k->followers; f; f = f->next)
          if (AFF_FLAGGED(f->follower, AFF_GROUP) && (f->follower != ch))
             {
-		    sprintf(buf, "$n tells the group, '%s%s%s'", 
-			        CCWHT(f->follower, C_NRM), argument, CCNRM(f->follower, C_NRM));
+		    sprintf(buf, "$n tells the group, '&W%s&n'", argument);
             act(buf, FALSE, ch, 0, f->follower, TO_VICT | TO_SLEEP);
             write_comms(ch, f->follower, buf, TO_VICT);
             }
 
-      sprintf(buf, "You tell the group, '%s%s%s'", NWHT, argument, NNRM);
+      sprintf(buf, "You tell the group, '&W%s&n'", argument);
       act(buf, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
       write_comms(ch, 0, buf, TO_CHAR);
 
@@ -259,17 +255,16 @@ void perform_tell(struct char_data *ch, struct char_data *vict, char *arg)
    {
    char *buf = get_buffer(MAX_STRING_LENGTH);
 
-   sprintf(buf, "%s%s tells %s, '%s'%s", KRED, GET_NAME(ch), GET_NAME(vict), arg, KNRM);
+   sprintf(buf, "&R$n tells &N, '%s'&n", arg);
    write_comms(ch, vict, buf, TO_NOTVICT);
-   sprintf(buf, "%s%s tells you, '%s'%s", CCRED(vict, C_NRM), 
-           CAP(strdup(PERS(ch,vict))), arg, CCNRM(vict, C_NRM));
+   sprintf(buf, "&R$n tells you, '%s'&n", arg);
 
    if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT)) {
       act(buf, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
       write_comms(ch, vict, buf, TO_VICT);
       }
 
-   sprintf(buf, "%sYou tell $N, '%s'%s", NRED, arg, NNRM);
+   sprintf(buf, "&RYou tell $N, '%s'&n", arg);
    act(buf, FALSE, ch, 0, vict, TO_CHAR | TO_SLEEP);
    write_comms(ch, vict, buf, TO_CHAR);
 
@@ -444,23 +439,21 @@ ACMD(do_spec_comm)
       send_to_char(ch, "You can't get your mouth close enough to your ear...\r\n");
    else
       {
-      sprintf(buf, "$n %s you, '%s'", action_plur, buf2);
+      sprintf(buf, "$n %s you, '&W%s&n'", action_plur, buf2);
       if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT))
 	     {
          act(buf, FALSE, ch, 0, vict, TO_VICT);
 		 write_comms(ch, vict, buf, TO_VICT);
 		 }
 
-      sprintf(buf, "$n %s $N, '%s'", action_plur, buf2);
-      write_comms(ch, vict, buf, FALSE);
+      sprintf(buf, "$n %s $N, '&W%s&n'", action_plur, buf2);
+      write_comms(ch, vict, buf, TO_NOTVICT);
 
-      send_to_char(ch, "You %s %s, '%s'\r\n", action_sing,
-                   GET_NAME(vict), buf2);
-      sprintf(buf, "You %s $N, '%s'", action_sing, buf2);
+      sprintf(buf, "You %s $N, '&W%s&n'", action_sing, buf2);
+	  act(buf, FALSE, ch, 0, vict, TO_CHAR);
 	  write_comms(ch, vict, buf, TO_CHAR);
 
       act(action_others, FALSE, ch, 0, vict, TO_NOTVICT);
-	  //write_comms(ch, vict, action_others, TO_NOTVICT);
 	  
       if(vict)
          {
@@ -699,37 +692,37 @@ ACMD(do_gen_comm)
          {"You cannot holler!!\r\n",
           "holler",
           "",
-          KYEL},
+          "&Y"},
 
          {"You cannot shout!!\r\n",
           "shout",
           "Turn off your noshout flag first!\r\n",
-          KYEL},
+          "&Y"},
 
          {"You cannot gossip!!\r\n",
           "gossip",
           "You aren't even on the channel!\r\n",
-          KYEL},
+          "&Y"},
 
          {"You cannot auction!!\r\n",
           "auction",
           "You aren't even on the channel!\r\n",
-          KMAG},
+          "&M"},
 
          {"You cannot congratulate!\r\n",
           "congrat",
           "You aren't even on the channel!\r\n",
-          KGRN},
+          "&G"},
 
          { "You cannot ooc!!\r\n",
            "ooc",
            "You aren't even on the channel!\r\n",
-           KWHT},
+           "&W"},
 
          { "Better get some vocal chords first!!\r\n",
            "sing",
            "You aren't even on the channel!\r\n",
-           KYEL}
+           "&y"}
       };
 
 
@@ -810,9 +803,9 @@ ACMD(do_gen_comm)
    /* first, set up strings to be given to the communicator */
    buf = get_buffer(MAX_STRING_LENGTH);
    if (COLOR_LEV(ch) >= C_CMP) 
-      sprintf(buf, "%s%sYou %s, '%s'%s", color_on,
+      sprintf(buf, "%s%sYou %s, '%s'&n", color_on,
               (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
-			  com_msgs[subcmd][1], argument, KNRM);
+			  com_msgs[subcmd][1], argument);
    else
       sprintf(buf, "%sYou %s, '%s'", 
               (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
@@ -823,9 +816,9 @@ ACMD(do_gen_comm)
    write_comms(ch, 0, buf, TO_CHAR);
    
    /* Write to general comms log once */
-   sprintf(buf, "%s%s$n %s, '%s'%s", color_on,
+   sprintf(buf, "%s%s$n %s, '%s'&n", color_on,
            (subcmd==SCMD_MUSIC)?"[MUSIC] ":"", 
-	       com_msgs[subcmd][1], argument, KNRM);
+	       com_msgs[subcmd][1], argument);
    write_comms(ch, 0, buf, TO_NOTVICT);
 
    /* now send all the strings out */
@@ -859,25 +852,10 @@ ACMD(do_gen_comm)
          if (!IS_NPC(tch) && ignoring(tch, ch) && GET_LEVEL(tch)<LVL_IMMORT)
             continue;
 
-         if (COLOR_LEV(tch) >= C_CMP)
-		    {
-            if (!strcmp(com_msgs[subcmd][3], KYEL))
-		       color_on = CCYEL(tch, C_NRM);
-		    else if (!strcmp(com_msgs[subcmd][3], KGRN))
-			   color_on = CCGRN(tch, C_NRM);
-		    else if (!strcmp(com_msgs[subcmd][3], KWHT))
-			   color_on = CCWHT(tch, C_NRM);
-		    else if (!strcmp(com_msgs[subcmd][3], KMAG))
-			   color_on = CCMAG(tch, C_NRM);
-		    else
-			   color_on = CCNRM(tch, C_NRM);
-			}
-		 else
-			color_on = CCNRM(tch, C_NRM);
-
-	     sprintf(buf, "%s%s$n %ss, '%s'%s", 
-		         color_on, (subcmd==SCMD_MUSIC)?"[MUSIC] ":"",
-                 com_msgs[subcmd][1], argument, CCNRM(tch, C_NRM));
+	     sprintf(buf, "%s%s$n %ss, '%s'&n", 
+		         (COLOR_LEV(tch) >= C_CMP) ? color_on : "", 
+				 (subcmd == SCMD_MUSIC) ? "[MUSIC] " : "",
+                 com_msgs[subcmd][1], argument);
          act(buf, FALSE, ch, 0, i->character, TO_VICT | TO_SLEEP);
 
          /* Write the comms to each player's comms log */
@@ -1869,7 +1847,11 @@ ACMD(do_remortnet)
       }
 
    buf1=get_buffer(MAX_STRING_LENGTH);
-   sprintf(buf1, "%s[Remort] $n: %s%s%s", KYEL, emote ? "<--- " : "", argument, KNRM);
+   sprintf(buf1, "&Y[Remort] You: %s%s&n", emote ? "<--- " : "", argument);
+   write_comms(ch, 0, buf1, TO_CHAR);
+   act(buf1, FALSE, ch, 0, 0, TO_CHAR | TO_SLEEP);
+   
+   sprintf(buf1, "&Y[Remort] $n: %s%s&n", emote ? "<--- " : "", argument);
    write_comms(ch, 0, buf1, TO_NOTVICT);
 
    for (d = descriptor_list; d; d = d->next)
@@ -1878,15 +1860,14 @@ ACMD(do_remortnet)
          vict = d->original;
       else
          vict = d->character;
-      if ((STATE(d)==CON_PLAYING) &&
+      if ((STATE(d)==CON_PLAYING) && (vict != ch) &&
               ((GET_LEVEL(vict) > 100)||REMORT_LEVEL(vict) > 0) &&
               (!PRF2_FLAGGED(vict, PRF2_NOREMO)) &&
               (!PLR_FLAGGED(vict, PLR_WRITING | PLR_MAILING)))
          {
          if (!(!IS_NPC(vict) && ignoring(vict, ch) && GET_LEVEL(vict)<LVL_IMMORT))
             {
-			sprintf(buf1, "%s[Remort] $n: %s%s%s", CCYEL(vict, C_NRM),
-			        emote ? "<--- " : "", argument, CCNRM(vict, C_NRM));
+			//sprintf(buf1, "&Y[Remort] $n: %s%s&n", emote ? "<--- " : "", argument);
 			act(buf1, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
 			write_comms(ch, vict, buf1, TO_VICT);
             }
@@ -2078,8 +2059,11 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
 	  to = vict;
 	  }
 
-   /* Get rid of the color (usually) */
-   //proc_color(msg, C_OFF);
+   /* Process color '&' codes into escape codes */
+   if (to)
+      proc_color(msg, (clr(to, C_NRM)));
+   else
+	  proc_color(msg, C_NRM);
 
    lbuf = get_buffer(MAX_STRING_LENGTH);
    buf = lbuf; 
@@ -2134,7 +2118,7 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
          }
       else
 	     {
-         fprintf(fl, "%lld %s", (long long)time(NULL), CAP(lbuf)); 
+         fprintf(fl, "%lld %s", (long long)time(NULL), CAP_LINE(lbuf)); 
          fclose(fl);
 		 }
       release_buffer(fileName);
@@ -2147,7 +2131,7 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
          }
       else
 	     {
-         fprintf(fl, "%lld %s", (long long)time(NULL), CAP(lbuf)); 
+         fprintf(fl, "%lld %s", (long long)time(NULL), CAP_LINE(lbuf)); 
          fclose(fl);
 		 }
       }
@@ -2173,8 +2157,8 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
 */
 ACMD(do_commsearch) 
    {
-   unsigned long match = 0;
-   char *tempbuf, *buf, *buf2, *time_buf, *searchstr = NULL;
+   unsigned long match = 0, start = 0, l = 0, s = 0, lines = 800;
+   char *bufptr, *buf, *buf2, *time_buf, *searchstr = NULL;
    FILE *fl = NULL;
    time_t time_stamp = 0;
    
@@ -2287,22 +2271,63 @@ ACMD(do_commsearch)
 	  return;
 	  }
 
-   tempbuf = buf = get_buffer(MAX_STRING_LENGTH);
+   bufptr = buf = get_buffer(MAX_STRING_LENGTH);
    buf2 = get_buffer(65500);
    time_buf = get_buffer(256);
    
    if (searchstr)
       skip_spaces(&searchstr);
 
+   /* Prep work for proper viewing */
+   if (subcmd == SCMD_VIEWLOG)
+      {
+      /* count lines */
+      do { l += get_line(fl, buf); } while (!feof(fl));
+      rewind(fl);
+
+      /* sync if necessary */
+      if (lines > l)
+	     l = 1;
+      else 
+         {
+	     start = (l - lines) + 1;
+	     for (l = 1; l < start; l++)
+		    get_line(fl, buf);
+         }
+      }
+   else
+      {
+	  do {
+		 l += get_line(fl, buf);
+		 if (str_str(buf, searchstr))
+			s++;
+	  } while (!feof(fl));
+	  rewind(fl);
+
+	  start = s;
+	  if (lines > s)
+	  	 l = 1;
+	  else
+ 	     {
+		 for (l = 1; lines < s; l++)
+		    {
+			get_line(fl, buf);
+			if (str_str(buf, searchstr))
+			   s--;
+			}
+		 }
+	  }
+
    /* view the comm log or search for the string */
-   for (;;)
+   /* Start at the right place */
+   for (; match < lines; l++)
       {
       get_line(fl, buf);
 
       /* If we have been saving time, add that to the output */
       if (isdigit((int)*buf))
 	     {
-	     tempbuf = any_one_arg(buf, time_buf);
+	     bufptr = any_one_arg(buf, time_buf);
 		 time_stamp = atoll(time_buf);
 		 strftime(time_buf, 80, "%m-%d-%Y - %I:%M%p -", localtime(&time_stamp));
 		 }
@@ -2312,14 +2337,17 @@ ACMD(do_commsearch)
 
       if (subcmd == SCMD_VIEWLOG || str_str(buf, searchstr))
   	     {
-         sprintf(buf2+strlen(buf2), "%ld. %s%s\r\n", ++match, time_buf, tempbuf);
+         sprintf(buf2+strlen(buf2), "%ld. %s%s\r\n", l, time_buf, bufptr);
          if (strlen(buf2) > 64000)
             {
             sprintf(buf2+strlen(buf2), "***Too many results, refine your search.\r\n");
             break;
             }
+		 match++;
          }
       }
+	  
+   /* Show results */
    if (!match)
       send_to_char(ch, "No lines matched your criteria.\r\n");
    else if (subcmd == SCMD_LOGSEARCH)
