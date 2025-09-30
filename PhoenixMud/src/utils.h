@@ -109,6 +109,7 @@ unsigned long circle_random(void);
 int MAX(int a, int b);
 int MIN(int a, int b);
 char *CAP(char *txt);
+char *CAP_LINE(char *txt);
 
 /* in act.informative.c */
 void	look_at_room(struct char_data *ch, int mode);
