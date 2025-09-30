@@ -2849,23 +2849,8 @@ void perform_act(char *orig, struct char_data *ch, struct obj_data *obj,
    *(++buf) = '\0'; 
  
    if (to->desc)
-   {
-	  /* Capitalize the sentence, account for color escape codes - Nomi 9/29/25 */
-	  /* Hope I didn't break anything. */
-	  if (*lbuf == '\x1B')
-	  {
-	     if ((strlen(lbuf) > 4) && (*(lbuf + 4) == '\x1B'))
-	        CAP(lbuf + 9);
-	     else
-		    CAP(lbuf + 5);
-	  }
-	  else if (*lbuf == '&')
-		  CAP(lbuf + 2);
-	  else
-		  CAP(lbuf);
-	  
-      SEND_TO_Q(to->desc,"%s", lbuf);
-   }
+      SEND_TO_Q(to->desc,"%s", CAP_LINE(lbuf));
+
    if (MOBTrigger)
       mprog_act_trigger(lbuf, to, ch, obj, vict_obj);
    if (IS_NPC(to) && dg_act_check)
