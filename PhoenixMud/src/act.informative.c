@@ -1504,24 +1504,18 @@ ACMD(do_score)
 	sprintf(buf,
 		"\n%s*****************************************************************************\r\n",
 		CCGRN(ch, C_SPR));
-
+ 
 	sprintf(buf_temp1, "%s %s", GET_NAME(ch), GET_TITLE(ch));
-	sprintf(buf + strlen(buf), "* %-41.41s Age: %d years old     Level ",
-		buf_temp1, GET_AGE(ch));
-	if (GET_LEVEL(ch) < 10)
-		sprintf(buf + strlen(buf), " %ld  *\r\n", (long)GET_LEVEL(ch));
-	else if (GET_LEVEL(ch) < 100)
-		sprintf(buf + strlen(buf), "%ld  *\r\n", (long)GET_LEVEL(ch));
-	else
-		sprintf(buf + strlen(buf), "%ld *\r\n", (long)GET_LEVEL(ch));
+	sprintf(buf_temp2, "Age: %3d years old   Level: %-3ld", GET_AGE(ch), (long)GET_LEVEL(ch));
+	sprintf(buf + strlen(buf), "* %-42.42s%-32.32s*\r\n", buf_temp1, buf_temp2);
 	strcat(buf,
 	       "*****************************************************************************\r\n");
-	sprintf(buf_temp1, "Hit Points  : %ld/(%ld)", (long)GET_HIT(ch),
+	sprintf(buf_temp1, "Hit Points    : %ld/(%ld)", (long)GET_HIT(ch),
 		(long)GET_MAX_HIT(ch));
 	sprintf(buf_temp2, "Class : %s", pc_class_types[(int)GET_CLASS(ch)]);
-	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", buf_temp1,
-		buf_temp2);
-	sprintf(buf_temp1, "Energy      : %ld/(%ld)", (long)GET_MANA(ch),
+	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", 
+	    buf_temp1, buf_temp2);
+	sprintf(buf_temp1, "Energy        : %ld/(%ld)", (long)GET_MANA(ch),
 		(long)GET_MAX_MANA(ch));
 
 	if (ch->player.race == RACE_HUMAN)
@@ -1557,7 +1551,7 @@ ACMD(do_score)
 	else if (ch->player.race == RACE_UNDEFINED)
 		sprintf(racebuf, "MOB");
 	else
-		sprintf(racebuf, "MOB");
+		sprintf(racebuf, "STINKBUG");
 
 	sprintf(buf_temp2, "Race  : %s", racebuf);
 	release_buffer(racebuf);
@@ -1565,29 +1559,26 @@ ACMD(do_score)
 	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", buf_temp1,
 		buf_temp2);
 
-	sprintf(buf_temp1, "Move Points : %ld/(%ld)", (long)GET_MOVE(ch),
+	sprintf(buf_temp1, "Move Points   : %ld/(%ld)", (long)GET_MOVE(ch),
 		(long)GET_MAX_MOVE(ch));
 	sprintf(buf_temp2, "Sex   : %s", genders[(int)GET_SEX(ch)]);
 	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", buf_temp1,
 		buf_temp2);
 
-	sprintf(buf_temp1, "Exp Points  : %ld", (long)GET_EXP(ch));
+	sprintf(buf_temp1, "Exp Points    : %s", commas(GET_EXP(ch)));
 	if (IS_NPC(ch)) {
 		strcpy(buf_temp2, "Exp to next level : You are a mob");
 	} else if (GET_LEVEL(ch) < LVL_IMMORT) {
-		sprintf(buf_temp2, "Exp to next level : %ld",
-			(GET_EXP_FOR_CH(ch) - GET_EXP(ch)));
+		sprintf(buf_temp2, "Exp to next level : %s",
+			commas(GET_EXP_FOR_CH(ch) - GET_EXP(ch)));
 	} else
 		strcpy(buf_temp2, "                                         ");
 	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", buf_temp1,
 		buf_temp2);
-
-	if (!IS_NPC(ch) && PRF_FLAGGED(ch, PRF_SUMMONABLE))
-		sprintf(buf_temp2, "Summonable : Yes");
-	else
-		sprintf(buf_temp2, "Summonable : No");
-	sprintf(buf + strlen(buf), "* Alignment   : %-20.20s%-40.40s*\r\n",
-		naturestr(GET_ALIGNMENT(ch)), buf_temp2);
+	sprintf(buf_temp1, "Quest Points  : %d", GET_QPOINTS(ch));
+	sprintf(buf_temp2, "Alignment: %s", naturestr(GET_ALIGNMENT(ch)));
+	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", buf_temp1,
+		buf_temp2);
 
 	strcat(buf,
 	       "*****************************************************************************\r\n");
@@ -1605,8 +1596,8 @@ ACMD(do_score)
 			buf_temp2);
 	}
 
-	sprintf(buf_temp1, "* Gold Held     : %ld", GET_GOLD(ch));
-	sprintf(buf_temp2, "Gold in Bank : %ld", GET_BANK_GOLD(ch));
+	sprintf(buf_temp1, "* Gold Held     : %s", commas(GET_GOLD(ch)));
+	sprintf(buf_temp2, "Gold in Bank : %s", commas(GET_BANK_GOLD(ch)));
 	sprintf(buf + strlen(buf), "%-36.36s%-40.40s*\r\n", buf_temp1,
 		buf_temp2);
 
@@ -1740,7 +1731,8 @@ ACMD(do_score)
 	       "*****************************************************************************\r\n");
 
 	sprintf(buf + strlen(buf),
-		"*   Please type \"attributes\" to view your stats.                            *\r\n");
+		"* Attributes: STR: %-2d    INT: %-2d    WIS: %-2d    DEX: %-2d   CON: %-2d    CHA: %-2d *\r\n",
+		GET_STR(ch), GET_INT(ch), GET_WIS(ch), GET_DEX(ch), GET_CON(ch), GET_CHA(ch));
 
 	sprintf(buf + strlen(buf),
 		"*****************************************************************************%s\r\n",
@@ -3555,6 +3547,10 @@ char *bonstr(int x)
 		return "Unbelievable";
 	else if ((x >= 51) && (x <= 60))
 		return "Astounding!";
+	else if ((x >= 61) && (x <= 99))
+		return "BEEFCAKE!!!";
+	else if (x >= 100)
+		return "Fernalicious";
 	else
 		return "I dunno! *BUG*";
 }
