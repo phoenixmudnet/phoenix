@@ -46,6 +46,7 @@ int     is_remort_level(struct char_data *ch, int remort_type);
 
 void check_weapon_weight(struct char_data *ch);
 int price_adjust (struct char_data * ch, struct char_data * vendor, int price);
+char *commas(long number);
 
 #if defined(__GNUC__)
 void   log(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
