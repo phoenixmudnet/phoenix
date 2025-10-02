@@ -1491,3 +1491,21 @@ int is_olc_set(struct char_data *ch, int zone)
     ;
 }
 
+/* Function to add commas to a number - Nomikos 10/2/2025 */
+char *commas(long number)
+{
+	char commabuf[50];
+    int exp = abs(number);
+
+    if (exp >= 1000000000)
+		sprintf(commabuf, "%s%d,%03d,%03d,%03d", number<0?"-":"", (exp/1000000000)%1000, (exp/1000000)%1000, (exp/1000)%1000, exp%1000);
+	else if (exp >= 1000000)
+		sprintf(commabuf, "%s%d,%03d,%03d", number<0?"-":"", (exp/1000000)%1000, (exp/1000)%1000, exp%1000);
+    else if (exp >= 1000)
+		sprintf(commabuf, "%s%d,%03d", number<0?"-":"", exp/1000, exp%1000);
+	else
+       sprintf(commabuf, "%d", number);
+   
+    return strdup(commabuf);
+}
+
