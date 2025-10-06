@@ -1496,6 +1496,7 @@ ACMD(do_gold)
 
 ACMD(do_score)
 {
+   int mod, hpadd = 0, manadd = 0, movadd = 0;
 	char *buf_temp1 = get_buffer(MAX_STRING_LENGTH);
 	char *buf_temp2 = get_buffer(MAX_STRING_LENGTH);
 	char *buf = get_buffer(MAX_STRING_LENGTH);
@@ -1510,13 +1511,49 @@ ACMD(do_score)
 	sprintf(buf + strlen(buf), "* %-42.42s%-32.32s*\r\n", buf_temp1, buf_temp2);
 	strcat(buf,
 	       "*****************************************************************************\r\n");
-	sprintf(buf_temp1, "Hit Points    : %ld/(%ld)", (long)GET_HIT(ch),
-		(long)GET_MAX_HIT(ch));
+   /* Find hitpoint, mana, and move modifiers, and add them up -Nomi 10/5/25 */
+     for (int i = 0; i < NUM_WEARS; i++)
+      {
+      if (GET_EQ(ch, i))
+         {
+         /* Cycle through all of the aff slots */
+         for (int j = 0; j < MAX_OBJ_AFFECT; j++)
+            {
+            mod = (int)GET_EQ(ch, i)->affected[j].modifier;
+            /* If the affect doesn't have a modifier, it isn't an affect */
+            if (mod == 0)
+               continue;
+
+            switch ((int)GET_EQ(ch, i)->affected[j].location)
+               {
+               case APPLY_HIT:
+                  hpadd += mod;
+                  break;
+               case APPLY_MANA:
+                  manadd += mod;
+                  break;
+               case APPLY_MOVE:
+                  movadd += mod;
+                  break;
+               default:
+                  continue;
+               }
+            }
+         }
+      }
+
+   if (hpadd)
+      sprintf(buf_temp2, "(%+d)", hpadd);
+	sprintf(buf_temp1, "Hit Points    : %ld/%ld%s", (long)GET_HIT(ch),
+		(long)GET_MAX_HIT(ch), (hpadd ? buf_temp2 : ""));
 	sprintf(buf_temp2, "Class : %s", pc_class_types[(int)GET_CLASS(ch)]);
 	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", 
 	    buf_temp1, buf_temp2);
-	sprintf(buf_temp1, "Energy        : %ld/(%ld)", (long)GET_MANA(ch),
-		(long)GET_MAX_MANA(ch));
+
+   if (manadd)
+      sprintf(buf_temp2, "(%+d)", manadd);
+	sprintf(buf_temp1, "Energy        : %ld/%ld%s", (long)GET_MANA(ch),
+		(long)GET_MAX_MANA(ch), (manadd ? buf_temp2 : ""));
 
 	if (ch->player.race == RACE_HUMAN)
 		sprintf(racebuf, "Human");
@@ -1555,12 +1592,13 @@ ACMD(do_score)
 
 	sprintf(buf_temp2, "Race  : %s", racebuf);
 	release_buffer(racebuf);
-
 	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", buf_temp1,
 		buf_temp2);
 
-	sprintf(buf_temp1, "Move Points   : %ld/(%ld)", (long)GET_MOVE(ch),
-		(long)GET_MAX_MOVE(ch));
+   if (movadd)
+      sprintf(buf_temp2, "(%+d)", movadd);
+	sprintf(buf_temp1, "Move Points   : %ld/%ld%s", (long)GET_MOVE(ch),
+		(long)GET_MAX_MOVE(ch), (movadd ? buf_temp2 : ""));
 	sprintf(buf_temp2, "Sex   : %s", genders[(int)GET_SEX(ch)]);
 	sprintf(buf + strlen(buf), "* %-34.34s%-40.40s*\r\n", buf_temp1,
 		buf_temp2);
