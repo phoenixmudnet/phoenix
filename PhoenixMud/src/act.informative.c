@@ -1861,58 +1861,179 @@ ACMD(do_equipment)
 #define VIS_AFF_FLAGS(loc) (((loc) == APPLY_NONE) || ((loc) == APPLY_AFF2) || \
                             ((loc) == APPLY_AFF3))
 
+/* Show affects from spells (same as before), removed level restrict on viewing affects,
+   Now can see equipment affects and race affects - Nomikos 10/5/2025*/
 ACMD(do_affects)
 {
-	struct affected_type *af;
-	int type = 1;
-	char *sname = get_buffer(256);
-	char *added_aff = get_buffer(MAX_STRING_LENGTH);
-	char *buf = get_buffer(MAX_STRING_LENGTH);
-	char *buf1 = get_buffer(MAX_STRING_LENGTH);
+   struct affected_type *af;
+	
+   int i, j, k, all = 0, type = 1;
+   int la=0, lb=0, lc=0, ld=0, le=0, lf=0, loc, mod;
+   char *sname, *added_aff, *buf;
+   struct affected_type af_list[TOP_APPLY1_NUM] = { 0 };
 
-	if (AFF2_FLAGGED(ch, AFF2_FLYING)) {
-		send_to_char(ch, "You are flying.\r\n");
-	} else if (AFF_FLAGGED(ch, AFF_FLY)) {
-		send_to_char(ch, "You can fly.\r\n");
-	}
-	send_to_char(ch, "You carry these affections: \r\n");
-	for (af = ch->affected; af; af = af->next) {
-		strcpy(sname, spells[af->type].spell_name);
-		strcat(sname, ":");
-		if (GET_LEVEL(ch) >= 25) {
-			send_to_char(ch,
-				     "   %s%-22s%s    affects %s%s%s by %s%ld%s for %s%d%s hours\r\n",
-				     CCCYN(ch, C_NRM), (type ? sname : ""),
-				     CCNRM(ch, C_NRM), CCCYN(ch, C_NRM),
-				     ((GET_LEVEL(ch) >= 40
-				       && !VIS_AFF_FLAGS(af->
-							 location)) ?
-				      apply_types[(int)af->
-						  location] : "Something"),
-				     CCNRM(ch, C_NRM), CCCYN(ch, C_NRM),
-				     af->modifier, CCNRM(ch, C_NRM), CCCYN(ch,
-									   C_NRM),
-				     af->duration, CCNRM(ch, C_NRM));
-			if (GET_LEVEL(ch) >= 55
-			    && (af->bitvector
-				&& (!af->next
-				    || af->next->bitvector != af->bitvector))) {
-				sprintbit(af->bitvector,
-					  WHICH_BITS(af->location), added_aff);
-				send_to_char(ch, "%35sadds %s%s\r\n",
-					     CCCYN(ch, C_NRM), added_aff,
-					     CCNRM(ch, C_NRM));
-			}
-		} else if (type) {
-			send_to_char(ch, "   %s%-25s%s\r\n", CCCYN(ch, C_NRM),
-				     sname, CCNRM(ch, C_NRM));
-		}
-		type = af->next ? (af->next->type != af->type) : 1;
-	}
-	release_buffer(buf1);
-	release_buffer(buf);
-	release_buffer(added_aff);
-	release_buffer(sname);
+   /* Re-order charisma because it's in a stupid place */
+   int order[TOP_APPLY1_NUM] = 
+       {0,1,2,3,4,5,25,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26,30,31,27,28,29};
+
+   /* Check and see if we want to see everything each armor applies */
+   skip_spaces(&argument);
+   if (argument && is_abbrev(argument, "all"))
+      all = 1;
+
+   /* Initialize our affects array that will sum up our affects */
+   for (k = 0; k < TOP_APPLY1_NUM; k++)
+      af_list[k].location = k;
+
+   buf = get_buffer(MAX_STRING_LENGTH);
+   added_aff = get_buffer(MAX_STRING_LENGTH);
+   sname = get_buffer(256);
+
+   sprintf(buf, "Your equipment gives:\r\n%29s", " ");
+
+   /* Cycle through our armor and each affect slot in the armor */
+   for (i = 0; i < NUM_WEARS; i++)
+      {
+      if (GET_EQ(ch, i))
+         {
+         sprintf(sname, "%-22s", CAP(strdup(GET_EQ(ch, i)->short_description)));
+
+         /* Cycle through all of the aff slots */
+         for (j = 0; j < MAX_OBJ_AFFECT; j++)
+            {
+            mod = (int)GET_EQ(ch, i)->affected[j].modifier;
+            /* If the affect doesn't have a modifier, it isn't an affect */
+            if (mod == 0)
+               continue;
+
+            loc = (int)GET_EQ(ch, i)->affected[j].location;
+
+            /* This helps us group the affects later */
+            if ((loc > la) && ((loc < 7) || (loc == 25)))        lb = loc;
+            else if ((loc > lb) && (loc < 12))                   lb = loc;
+            else if ((loc > lc) && (loc < 17))                   lc = loc;
+            else if ((loc > ld) && (loc < 20))                   ld = loc;
+            else if ((loc > le) && ((loc < 27) || (loc == 31)))  le = loc;
+            else if ((loc > lf) && (loc < 30))                   lf = loc;
+
+            /* Add the modifier to the correct affect */
+            if ((loc < 27) || (loc > 29))
+               af_list[loc].modifier += mod;
+            else
+               af_list[loc].modifier |= mod;
+
+            /* If we want to see which armor has what stat, we do that here */
+            if (all)
+               {
+               if ((loc < 27) || (loc > 29))
+                  send_to_char(ch, "%-28s adds &C%+d&n to &C%s&n.\r\n",  
+                     (!j ? sname : ""), mod, apply_types[loc]);
+               else
+                  {
+                  /* If it's a resist, suscept, or immune */
+                  sprintbit2(mod, immunity_names, added_aff, 0);
+                  send_to_char(ch, "%-28s gives &C%s %s&n.\r\n",  (!j ? sname : ""),
+                      apply_types[loc], added_aff);
+                  }
+               }
+            }
+         /* If it has status affects, then show us those */
+         if (GET_EQ(ch, i)->obj_flags.bitvector)
+            {
+            sprintbit2(GET_EQ(ch, i)->obj_flags.bitvector, 
+                 WHICH_BITS(GET_EQ(ch, i)->affected[0].location), added_aff, 0);
+            if (all)
+               send_to_char(ch, "%-28s gives &C%s&n.\r\n", " ", added_aff);
+            sprintf(buf+strlen(buf), "&C%s&n, ", added_aff);
+            }
+         }
+      }
+   sprintf(buf+strlen(buf), "\r\n%29s", " ");
+
+   /* Now show us the affects, and have them grouped together */
+   for (k = 0; k < TOP_APPLY1_NUM; k++)
+      if (af_list[order[k]].modifier != 0)
+         {
+         if ((order[k] < 27) || (order[k] > 29))
+            sprintf(buf+strlen(buf), "&C%+ld %s&n, ", af_list[order[k]].modifier,
+                 apply_types[(int)af_list[order[k]].location]);
+         else
+            {
+            sprintbit2(af_list[order[k]].modifier, immunity_names, added_aff, 0);
+            sprintf(buf+strlen(buf), "&C%s %s&n, ", 
+                 apply_types[(int)af_list[order[k]].location], added_aff);
+            }
+         /* affect grouping */
+         if (order[k] == la || order[k] == lb || order[k] == lc || 
+             order[k] == ld || order[k] == le || order[k] == lf)
+            sprintf(buf+strlen(buf), "\r\n%29s", " ");
+         }
+
+   /* If we don't have any equipment affects, don't show anything */
+   if (strlen(buf) > 85)
+      send_to_char(ch, "%s\r\n", buf);
+
+   /* List out affects imbued by race */
+   sprintf(buf, "Race imbued affects:\r\n");
+   if(trait_info[GET_RACE(ch)].auto_sneak)
+      sprintf(buf+strlen(buf), "%29sYou can &Csneak&n.\r\n", " ");
+   if(trait_info[GET_RACE(ch)].infravision)
+      sprintf(buf+strlen(buf), "%29sYou have &Cinfravision&n.\r\n", " ");
+   if(trait_info[GET_RACE(ch)].can_fly)
+      sprintf(buf+strlen(buf), "%29sYou can &Cfly&n.\r\n", " ");
+   if(trait_info[GET_RACE(ch)].can_swim)
+      sprintf(buf+strlen(buf), "%29sYou can &Cbreathe water&n.\r\n", " ");
+   if(GET_RACE(ch)==RACE_SPRITE)
+      sprintf(buf+strlen(buf), "%29sYou can &Cdetect invisibility&n.\r\n", " ");
+   if(!IS_NPC(ch))
+      {
+      if (trait_info[GET_RACE(ch)].immune)
+         {
+         sprintbit2(trait_info[GET_RACE(ch)].immune, immunity_names,added_aff,0);
+         sprintf(buf+strlen(buf), "%29sImmunity to &C%s&n.\r\n", " ", added_aff);
+         }
+      if (trait_info[GET_RACE(ch)].resist)
+         {
+         sprintbit2(trait_info[GET_RACE(ch)].resist,immunity_names,added_aff,0);
+         sprintf(buf+strlen(buf), "%29sResistant to &C%s&n.\r\n", " ", added_aff);
+         }
+      if (trait_info[GET_RACE(ch)].susceptible)
+         {
+         sprintbit2(trait_info[GET_RACE(ch)].susceptible,immunity_names,added_aff,0);
+         sprintf(buf+strlen(buf), "%29sSusceptible to &C%s&n.\r\n", " ", added_aff);
+         }
+      }
+
+   /* If we don't have race skills, don't show anything */
+   if (strlen(buf) > 22)
+      send_to_char(ch, "%s", buf);
+
+   if (AFF2_FLAGGED(ch, AFF2_FLYING))
+      send_to_char(ch, "You are flying.\r\n");
+   else if (AFF_FLAGGED(ch, AFF_FLY))
+      send_to_char(ch, "You can fly.\r\n");
+
+   /* List out affects from spells */
+   send_to_char(ch, "You carry these affections: \r\n");
+   for (af = ch->affected; af; af = af->next) 
+      {
+      strcpy(sname, spells[af->type].spell_name);
+      strcat(sname, ":");
+      send_to_char(ch, "   &C%-22s&n    affects &C%s&n by &C%ld&n for &C%d&n hours\r\n",
+              (type ? sname : ""), (!VIS_AFF_FLAGS(af->location) ? 
+              apply_types[(int)af->location] : "Something"), af->modifier, af->duration);
+      if (af->bitvector && (!af->next || af->next->bitvector != af->bitvector))
+         {
+         sprintbit(af->bitvector, WHICH_BITS(af->location), added_aff);
+         send_to_char(ch, "%35sadds %s&n\r\n", "&C", added_aff);
+         } 
+
+      type = af->next ? (af->next->type != af->type) : 1;
+      }
+
+   release_buffer(buf);
+   release_buffer(added_aff);
+   release_buffer(sname);
 }
 
 ACMD(do_time)
