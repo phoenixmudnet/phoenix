@@ -121,24 +121,25 @@ char *CAP(char *txt)
 /* Capitalize the sentence, account for color escape codes - Nomi 9/29/25 */
 char *CAP_LINE(char *txt)
 {
-   int ii;
+   int ii, glen; /* Who da F is glen???? */ 
+
    if (!txt || !*txt)
 	  return(txt);
 
-   /* Assumption:
-   ** 1. Color codes are either 4 or 8 characters long (not always true)
-   */
+   glen = strlen(txt);
+
    if (*txt == '\x1B')
    {
-      if ((strlen(txt) > 4) && (*(txt + 4) == '\x1B'))
-         *(txt + 9) = UPPER(*(txt + 9));
-      else
-	     *(txt + 5) = UPPER(*(txt + 5));
+      /* Try another method to get past color codes */
+      for (ii = 1; (ii <= glen) && (!isalpha(*(txt+ii))); ii++)
+         ;
+      ii++; /* get past the m */
+      *(txt + ii) = UPPER(*(txt + ii));
    }
    else if (*txt == '&')
    {
 	  /* cycle until there are no more '&' codes */
-	  for (ii = 2; (strlen(txt) <= ii) && (*(txt + ii) == '&'); ii += 2) 
+	  for (ii = 2; (ii <= glen) && (*(txt + ii) == '&'); ii += 2) 
 		 ;
  	  *(txt + ii) = UPPER(*(txt + ii));
    }
