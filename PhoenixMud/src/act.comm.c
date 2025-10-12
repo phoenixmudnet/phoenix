@@ -2157,7 +2157,7 @@ void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int ty
 */
 ACMD(do_commsearch) 
    {
-   unsigned long match = 0, start = 0, l = 0, s = 0, lines = 800;
+   unsigned long match = 0, start = 0, l = 0, s = 0, lines = 600;
    char *bufptr, *buf, *buf2, *time_buf, *searchstr = NULL;
    FILE *fl = NULL;
    time_t time_stamp = 0;
