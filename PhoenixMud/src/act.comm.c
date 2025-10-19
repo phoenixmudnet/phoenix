@@ -1653,7 +1653,7 @@ void do_auction_update(void)
 ACMD(do_qcomm)
    {
    struct descriptor_data *i;
-   char *buf;
+   char *buf, *tname;
 
    if (!IS_NPC(ch)&&!PRF_FLAGGED(ch, PRF_QUEST))
       {
@@ -1671,8 +1671,12 @@ ACMD(do_qcomm)
       }
 
    if (!*argument)
+      {
+	  tname = CAP(strdup(CMD_NAME));
       send_to_char(ch, "%s?  Yes, fine, %s we must, but WHAT??\r\n",
-                   CAP(strdup(CMD_NAME)), CMD_NAME);
+                   tname, CMD_NAME);
+	  free(tname);
+	  }
    else
       {
       buf = get_buffer(MAX_STRING_LENGTH);
