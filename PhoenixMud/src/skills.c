@@ -989,8 +989,8 @@ ACMD(do_disarm)
       send_to_char(ch,"You are not proficient with disarm!\r\n");
       if(!FIGHTING(vict))
          {
-         send_to_char(ch,"%s notices your petty attempt and attacks!\r\n",
-                   CAP(GET_NAME(vict)));
+         act("$N notices your petty attempt and attacks!",
+             FALSE, ch, 0, vict, TO_CHAR);
          hit(vict, ch, TYPE_UNDEFINED);
          }
       return;
