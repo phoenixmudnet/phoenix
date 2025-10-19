@@ -1907,7 +1907,7 @@ ACMD(do_affects)
 	
    int i, j, k, all = 0, type = 1;
    int la=0, lb=0, lc=0, ld=0, le=0, lf=0, loc, mod;
-   char *sname, *added_aff, *buf;
+   char *sname, *tname, *added_aff, *buf;
    struct affected_type af_list[TOP_APPLY1_NUM] = { 0 };
 
    /* Re-order charisma because it's in a stupid place */
@@ -1934,7 +1934,9 @@ ACMD(do_affects)
       {
       if (GET_EQ(ch, i))
          {
-         sprintf(sname, "%-22s", CAP(strdup(GET_EQ(ch, i)->short_description)));
+	     tname = strdup(GET_EQ(ch, i)->short_description);
+         sprintf(sname, "%-22s", CAP(tname));
+	     free(tname);
 
          /* Cycle through all of the aff slots */
          for (j = 0; j < MAX_OBJ_AFFECT; j++)
