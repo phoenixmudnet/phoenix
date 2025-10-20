@@ -2336,6 +2336,7 @@ ACMD(do_graffiti)
 extern int top_of_p_table;
 extern struct player_index_element *player_table;
 extern char *wizlist;
+extern char *herolist;
 
 int strlen_nospace(char *string)
 {
@@ -2357,6 +2358,10 @@ const char *imm_name_strings[] = {
   "Seraph",
   "ArchAngels",
   "Ambassadors",
+  "Demi-Gods",
+  "Avatars",
+  "Angels",
+  "Heroes"
 };
 
 typedef struct _imm_map {
@@ -2409,24 +2414,24 @@ void print_imms(char *buf, int min, int max, int string_index)
   buf2[0] = '\x0';
 
   int c = 0;
-  for (i = 0; i <= top_of_p_table; i++) {
+  for (i = 0; i < 1024; i++) {
     if (mapping[i].level >= min && mapping[i].level <= max) {
       strcpy(buf3, mapping[i].name); /* A single imm name. */
       buf3[0] = toupper(buf3[0]);
       if (++c < count) {
-	for (j = 0; j < 12-strlen(mapping[i].name); j++) {
-	  strcat(buf3, " ");
-	}
+        for (j = 0; j < 12-strlen(mapping[i].name); j++) {
+          strcat(buf3, " ");
+        }
       }
       if (strlen(buf2) + strlen(buf3) >= 80) {
-	for (j = 0; j < 40 - strlen(buf2)/2; j++) {
-	  strcat(buf, " ");
-	}
-	strcat(buf, buf2);
-	strcat(buf, "\r\n");
-	strcpy(buf2, buf3);
+        for (j = 0; j < 40 - strlen(buf2)/2; j++) {
+          strcat(buf, " ");
+        }
+        strcat(buf, buf2);
+        strcat(buf, "\r\n");
+        strcpy(buf2, buf3);
       } else {
-	strcat(buf2, buf3);
+        strcat(buf2, buf3);
       }
     }
   }
@@ -2441,6 +2446,9 @@ void print_imms(char *buf, int min, int max, int string_index)
 
 void update_wizlist(void)
 {
+  char *tname = get_buffer(SMALL_BUFSIZE);
+  int tlevel = 0;
+
   FILE *fp = fopen(WIZLIST_FILE, "w");
   if (!fp) {
     log("SYSERR: Could not open text/wizlist for writing.");
@@ -2460,20 +2468,26 @@ void update_wizlist(void)
   nMaps = 0;
   while (fgets(buf, 1024, fo)) {//1
     prune_crlf(buf);
-    strcpy(mapping[nMaps].name, buf);
+    strcpy(tname, buf);
     fgets(buf, 1024, fo);// 2
     fgets(buf, 1024, fo);// 3
     strtok(buf, " ");
-    mapping[nMaps].level = atoi(strtok(NULL, " "));
-    nMaps++;
+    tlevel = atoi(strtok(NULL, " "));
+    /* Only count heroes and above - Nomikos 10/19/2025 */
+    if (tlevel >= LVL_HERO) {
+      strcpy(mapping[nMaps].name, tname);
+      mapping[nMaps].level = tlevel;
+      nMaps++;
+    }
     fgets(buf, 1024, fo);// 4
     fgets(buf, 1024, fo);// 5
   }
   fclose(fo);
+  release_buffer(tname);
 
   sprintf(buf,
 "****************************************************************************\r\n"
-"* Here is a list of PhoenixMUD Immortals.  They are the builder's and      *\r\n"
+"* Here is a list of PhoenixMUD Immortals.  They are the builders and       *\r\n"
 "* shapers of this great world.  If you see one on, do not be shy, they     *\r\n"
 "* are usually a friendly bunch!  They should be treated with respect,      *\r\n"
 "* for their hard work keeps this game running!                             *\r\n"
@@ -2504,6 +2518,38 @@ void update_wizlist(void)
   if (wizlist) {
     free(wizlist);
     wizlist = strdup(buf);
+  }
+
+  fputs(buf, fp);
+  fclose(fp);
+
+  fp = fopen(HEROLIST_FILE, "w");
+  if (!fp) {
+    log("SYSERR: Could not open text/herolist for writing.");
+    return;
+  }
+
+  sprintf(buf,
+"****************************************************************************\r\n"
+"* Here is a list of PhoenixMUD Heroes.  They have done the work, fought    *\r\n"
+"* the battles, and conquered the tests.  If you see one on, do not be      *\r\n"
+"* shy, they are usually a friendly bunch!  They should be treated with     *\r\n"
+"* respect and awe for their dedication to PhoenixMUD!                      *\r\n"
+"****************************************************************************\r\n"
+"\r\n");
+
+  print_imms(buf2, LVL_WANKER, LVL_WANKER, 10);
+  strcat(buf, buf2);
+  print_imms(buf2, LVL_AVATAR, LVL_AVATAR, 11);
+  strcat(buf, buf2);
+  print_imms(buf2, LVL_ANGEL, LVL_ANGEL, 12);
+  strcat(buf, buf2);
+  print_imms(buf2, LVL_HERO, LVL_HERO, 13);
+  strcat(buf, buf2);
+
+  if (herolist) {
+    free(herolist);
+    herolist = strdup(buf);
   }
 
   fputs(buf, fp);
