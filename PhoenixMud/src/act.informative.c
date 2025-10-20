@@ -50,6 +50,7 @@ extern char *motd;
 extern char *imotd;
 extern char *wizlist;
 extern char *immlist;
+extern char *herolist;
 extern char *policies;
 extern char *teams;
 extern char *handbook;
@@ -2873,6 +2874,9 @@ ACMD(do_gen_ps)
 		break;
 	case SCMD_IMMLIST:
 		page_string(ch->desc, wizlist, FALSE, "");
+		break;
+	case SCMD_HEROLIST:
+		page_string(ch->desc, herolist, FALSE, "");
 		break;
 	case SCMD_HANDBOOK:
 		page_string(ch->desc, handbook, FALSE, "");
