@@ -97,6 +97,7 @@ struct alias_data {
 #define SCMD_AREAS	12
 #define SCMD_TEAMS	13
 #define SCMD_MARRIAGES  14
+#define SCMD_HEROLIST 15
 
 /* do_spell_help */
 #define SCMD_SPELLS	1
