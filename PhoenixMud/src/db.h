@@ -61,6 +61,7 @@ extern room_rnum top_of_world;
 #define TEAMS_FILE	"text/teams"	/* for TEAMS			*/
 #define WIZLIST_FILE	"text/wizlist"	/* for WIZLIST			*/
 #define IMMLIST_FILE	"text/immlist"	/* for IMMLIST			*/
+#define HEROLIST_FILE "text/herolist" /* For HEROLIST */
 #define BACKGROUND_FILE	"text/background" /* for the background story	*/
 #define POLICIES_FILE	"text/policies"	/* player policies/rules	*/
 #define MARRIAGES_FILE  "text/marriages"  /* Marriage rules file        */
