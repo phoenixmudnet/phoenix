@@ -86,6 +86,7 @@ char *help = NULL;  /* help screen    */
 char *info = NULL;  /* info page    */
 char *wizlist = NULL;  /* list of higher gods   */
 char *immlist = NULL;  /* list of peon gods   */
+char *herolist = NULL; /* list of wankers   */
 char *background = NULL; /* background story   */
 char *handbook = NULL;  /* handbook for new immortals  */
 char *teams = NULL;  /* teams page   */
@@ -244,6 +245,8 @@ ACMD(do_reboot)
       file_to_string_alloc(WIZLIST_FILE, &wizlist);
    else if (!str_cmp(arg, "immlist"))
       file_to_string_alloc(IMMLIST_FILE, &immlist);
+   else if (!str_cmp(arg, "herolist"))
+      file_to_string_alloc(HEROLIST_FILE, &herolist);
    else if (!str_cmp(arg, "news"))
       file_to_string_alloc(NEWS_FILE, &news);
    else if (!str_cmp(arg, "credits"))
@@ -380,6 +383,7 @@ void boot_db(void)
    file_to_string_alloc(TEAMS_FILE, &teams);
    file_to_string_alloc(WIZLIST_FILE, &wizlist);
    file_to_string_alloc(IMMLIST_FILE, &immlist);
+   file_to_string_alloc(HEROLIST_FILE, &herolist);
    file_to_string_alloc(POLICIES_FILE, &policies);
    file_to_string_alloc(MARRIAGES_FILE, &marriages);
    file_to_string_alloc(HANDBOOK_FILE, &handbook);
