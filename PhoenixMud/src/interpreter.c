@@ -640,6 +640,7 @@ const struct command_info cmd_info[] = {
 	{"hcontrol", POS_DEAD, do_hcontrol, LVL_ADMIN, 0},
 	{"heal", POS_STANDING, do_not_here, 0, 0},
 	{"helpcheck", POS_DEAD, do_helpcheck, LVL_SERP, 0},
+   {"herolist", POS_DEAD, do_gen_ps, 0, SCMD_HEROLIST},
 	{"hide", POS_CHANT, do_hide, 1, 0},
 	{"hit", POS_FIGHTING, do_hit, 0, SCMD_HIT},
 	{"hold", POS_CHANT, do_grab, 1, 0},
