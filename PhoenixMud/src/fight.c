@@ -3518,7 +3518,6 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
    {
    struct obj_data *wielded;
    int w_type, victim_ac, calc_thaco, dam=0, diceroll;
-   char *buf=get_buffer(100);
    int prof,skl_lvl;
 
    if (!ok_damage_shopkeeper(ch, victim))
@@ -3563,7 +3562,6 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
       {
       if (FIGHTING(ch) && FIGHTING(ch) == victim)
          stop_fighting(ch);
-      release_buffer(buf);
       return;
       }
 
@@ -3643,7 +3641,6 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
                remember(victim, ch);
             }
          }
-      release_buffer(buf);
       return;
       }
    else if (((diceroll > 1) && AWAKE(victim)) &&
@@ -3652,7 +3649,8 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
       if(!IS_NPC(ch))
          improve_skill(ch,prof,PROF_FAIL);
       /* mounted attack - nomikos 10/18/02 */
-      if (RIDING(ch) && (GET_SKILL(ch, SKILL_MOUNTED_ATTACK) > 0) && SCR_SKILLCHECK(ch, SKILL_MOUNTED_ATTACK))
+      if (!IS_NPC(ch) && RIDING(ch) && (GET_SKILL(ch, SKILL_MOUNTED_ATTACK) > 0) && 
+          SCR_SKILLCHECK(ch, SKILL_MOUNTED_ATTACK))
          improve_skill(ch, SKILL_MOUNTED_ATTACK, PROF_FAIL);
       if (type == SKILL_BACKSTAB)
          dam = damage(ch, victim, 0, SKILL_BACKSTAB,IMM_PIERCE);
@@ -3668,7 +3666,8 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
       if(!IS_NPC(ch))
          improve_skill(ch,prof,PROF_PASS);
       /* mounted attack - nomikos 10/18/02 */
-      if (RIDING(ch) && (GET_SKILL(ch, SKILL_MOUNTED_ATTACK) > 0) && SCR_SKILLCHECK(ch, SKILL_MOUNTED_ATTACK))
+      if (!IS_NPC(ch) && RIDING(ch) && (GET_SKILL(ch, SKILL_MOUNTED_ATTACK) > 0) && 
+          SCR_SKILLCHECK(ch, SKILL_MOUNTED_ATTACK))
          improve_skill(ch, SKILL_MOUNTED_ATTACK, PROF_PASS);
       /* okay, we know the guy has been hit.  now calculate damage. */
       dam = str_app[STRENGTH_APPLY_INDEX(ch)].todam;
@@ -3754,7 +3753,6 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
    if(dam>0)
       hitprcnt_mtrigger(victim);
 
-   release_buffer(buf);
    }
 
 
