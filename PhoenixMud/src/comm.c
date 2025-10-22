@@ -857,10 +857,15 @@ void game_loop(int mother_desc)
 	   /* Reset the idle timer & pull char back from void if necessary*/
 	    d->character->char_specials.timer = 0; 
 	    if (STATE(d)==CON_PLAYING &&
-		GET_WAS_IN(d->character) != NOWHERE) 
+           GET_WAS_IN(d->character) != NOWHERE) 
 	       { 
-	       if (IN_ROOM(d->character) != NOWHERE) 
-		  char_from_room(d->character); 
+	       if (IN_ROOM(d->character) != NOWHERE)
+		      {
+              /* Send players home that try to camp a zone - Nomikos 10/22/2025 */
+              if (zone_table[world[GET_WAS_IN(d->character)].zone].age == 0)
+                 GET_WAS_IN(d->character) = real_room(GET_HOME(d->character));
+              char_from_room(d->character);
+              }
 	       char_to_room(d->character, GET_WAS_IN(d->character)); 
 	       GET_WAS_IN(d->character) = NOWHERE; 
 	       act("$n has returned.", TRUE, d->character, 0, 0, TO_ROOM); 
