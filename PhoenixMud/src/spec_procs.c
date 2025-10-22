@@ -1555,11 +1555,8 @@ SPECIAL(repair_guy)
 
    if (CMD_IS("steal"))
       {
-      char *argm = get_buffer(MAX_INPUT_LENGTH);
-      sprintf(argm, "shout %s", MSG_NO_STEAL_HERE);
       do_action(keeper, GET_NAME(ch), cmd_slap, 0);
-      command_interpreter(keeper, argm);
-      release_buffer(argm);
+      do_gen_comm(keeper, MSG_NO_STEAL_HERE, 0, SCMD_SHOUT);
       return (TRUE);
       }
 
@@ -1737,7 +1734,7 @@ SPECIAL(repair_guy)
 	  
       /* Send message. */
       if (*buf)
-         do_tell(keeper, buf, cmd_tell, 0);
+         do_tell(keeper, buf, 0, 0);
 	  
       release_buffer(buf);
       return (TRUE);
@@ -1851,11 +1848,8 @@ SPECIAL(recharge_guy)
 
    if (CMD_IS("steal"))
       {
-      char *argm = get_buffer(MAX_INPUT_LENGTH);
-      sprintf(argm, "$N shouts '%s'", MSG_NO_STEAL_HERE);
       do_action(keeper, GET_NAME(ch), cmd_slap, 0);
-      act(argm, FALSE, ch, 0, keeper, TO_CHAR);
-      release_buffer(argm);
+      do_gen_comm(keeper, MSG_NO_STEAL_HERE, 0, SCMD_SHOUT);
       return (TRUE);
       }
    if (CMD_IS("recharge"))
