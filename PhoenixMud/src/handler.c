@@ -2464,7 +2464,7 @@ void mount_char(struct char_data *ch, struct char_data *mount)
 
    /* mounted attack - nomikos 10/17/02 */
    affect_from_char(ch,SKILL_MOUNTED_ATTACK);          
-   if (SCR_SKILLCHECK(ch, SKILL_MOUNTED_ATTACK) && GET_SKILL(ch, SKILL_MOUNTED_ATTACK)>0)
+   if (!IS_NPC(ch) && SCR_SKILLCHECK(ch, SKILL_MOUNTED_ATTACK) && GET_SKILL(ch, SKILL_MOUNTED_ATTACK)>0)
       {
       af.type = SKILL_MOUNTED_ATTACK;
       af.duration = -1; /* always affected when riding */
