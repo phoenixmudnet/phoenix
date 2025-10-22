@@ -2113,6 +2113,9 @@ int perform_dupe_check(struct descriptor_data *d)
 	STATE(d) = CON_PLAYING;
 	switch (mode) {
 	case RECON:
+		/* Send players home that try to camp a zone - Nomikos 10/22/2025 */
+        if (zone_table[world[d->character->in_room].zone].age == 0)
+           IN_ROOM(d->character) = real_room(GET_HOME(d->character));
 		SEND_TO_Q(d, "Reconnecting.\r\n");
 		act("$n has reconnected.", TRUE, d->character, 0, 0, TO_ROOM);
 		mudlogf(NRM, MAX(LVL_IMMORT, GET_INVIS_LEV(d->character)), TRUE,
