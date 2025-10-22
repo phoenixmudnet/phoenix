@@ -989,8 +989,8 @@ ACMD(do_disarm)
       send_to_char(ch,"You are not proficient with disarm!\r\n");
       if(!FIGHTING(vict))
          {
-         act("$N notices your petty attempt and attacks!",
-             FALSE, ch, 0, vict, TO_CHAR);
+         send_to_char(ch,"%s notices your petty attempt and attacks!\r\n",
+                   CAP(GET_NAME(vict)));
          hit(vict, ch, TYPE_UNDEFINED);
          }
       return;
@@ -2774,14 +2774,14 @@ ACMD(do_tame)
    else if (!IS_NPC(vict) && !PRF_FLAGGED(vict, PRF_SUMMONABLE))
       send_to_char(ch,"You fail because SUMMON protection is on!\r\n");
    else if (AFF_FLAGGED(vict, AFF_SANCTUARY))
-      send_to_char(ch,"Your vict is protected by sanctuary!\r\n");
+      send_to_char(ch,"Your victim is protected by sanctuary!\r\n");
    else if (AFF_FLAGGED(ch, AFF_CHARM))
       send_to_char(ch,"You can't have any followers of your own!\r\n");
    else if (MOB_FLAGGED(vict, MOB_NOCHARM))
       send_to_char(ch,"You can't seem to communicate to this beast!\r\n");
    else if (AFF_FLAGGED(vict, AFF_CHARM) || GET_LEVEL(ch) < GET_LEVEL(vict))
       send_to_char(ch,"You fail.\r\n");
-   else if (!pk_allowed && !IS_NPC(vict))
+   else if (!pk_allowed && !IS_NPC(vict) && GET_LEVEL(ch) < LVL_IMMORT)
       send_to_char(ch,"You fail - shouldn't be doing it anyway.\r\n");
    else if (circle_follow(vict, ch))
       send_to_char(ch,"Sorry, following in circles can not be allowed.\r\n");
