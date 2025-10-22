@@ -46,6 +46,7 @@ void perform_tell(struct char_data *ch, struct char_data *vict, char *arg);
 ACMD(do_action);
 ACMD(do_echo);
 ACMD(do_say);
+ACMD(do_gen_comm);
 char *fname(char *namelist);
 void sort_keeper_objs(struct char_data * keeper, int shop_nr);
 int save_shop_nonnative(shop_rnum shop_num, struct char_data *keeper);
@@ -1242,11 +1243,8 @@ SPECIAL(shop_keeper)
 
    if (CMD_IS("steal"))
       {
-      char *argm = get_buffer(MAX_INPUT_LENGTH);
-      sprintf(argm, "$N shouts '%s'", MSG_NO_STEAL_HERE);
       do_action(keeper, GET_NAME(ch), cmd_slap, 0);
-      act(argm, FALSE, ch, 0, keeper, TO_CHAR);
-      release_buffer(argm);
+      do_gen_comm(keeper, MSG_NO_STEAL_HERE, 0, SCMD_SHOUT);
       return (TRUE);
       }
    else if (CMD_IS("tame"))
