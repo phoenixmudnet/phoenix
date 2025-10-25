@@ -50,6 +50,8 @@ void extract_obj(struct obj_data * obj); /* handler.c */
 pid_t getpid(void);
 void Crash_rentsave(struct char_data *ch, int cost);
 void Crash_count_items(struct obj_data * obj, long *nitems);
+void Crash_extract_norents_from_equipped(struct char_data * ch);
+void Crash_extract_norents(struct obj_data * obj);
 
 
 
@@ -475,11 +477,18 @@ void gain_condition(struct char_data * ch, int condition, int value)
 
    }
 
-void check_idling(struct char_data * ch)
+void check_idling(struct char_data *ch)
    {
    if (ch->char_specials.timer > idle_void)
       {
-      if (GET_WAS_IN(ch) == NOWHERE && IN_ROOM(ch) != NOWHERE)
+      /* Moved immortal check here, allows imms to be seen as AFK - Nomi 10/25/25*/
+      if (GET_LEVEL(ch) >= idle_max_level)
+         {
+         if (!IS_SET(PRF2_FLAGS(ch), PRF2_AFK))
+            send_to_char(ch,"You have been idle, and are now AFK.\r\n");
+         SET_BIT(PRF2_FLAGS(ch), PRF2_AFK);
+         }
+      else if (GET_WAS_IN(ch) == NOWHERE && IN_ROOM(ch) != NOWHERE)
          {
          GET_WAS_IN(ch) = IN_ROOM(ch);
          if (FIGHTING(ch))
@@ -492,7 +501,7 @@ void check_idling(struct char_data * ch)
          save_char(ch, GET_WAS_IN(ch));
          Crash_crashsave(ch);
          affect_from_char(ch,SKILL_RAGE);
-	 SET_BIT(PRF2_FLAGS(ch), PRF2_AFK);
+         SET_BIT(PRF2_FLAGS(ch), PRF2_AFK);
          char_from_room(ch);
          char_to_room(ch, 1);
          }
@@ -504,9 +513,9 @@ void check_idling(struct char_data * ch)
          char_to_room(ch, GET_WAS_IN(ch));
          sprintf(buf, "%s force-rented and extracted (idle).", GET_NAME(ch));
          mudlog(buf, CMP, LVL_DGOD, TRUE);
-
-	 Crash_extract_norents_from_equipped(ch);
-	 Crash_extract_norents(ch->carrying);
+         
+         Crash_extract_norents_from_equipped(ch);
+         Crash_extract_norents(ch->carrying);
 
          if (ch->desc)
             {
@@ -544,8 +553,7 @@ void point_update(void)
          {
          update_char_objects(i);
          ++i->char_specials.timer;
-         if (GET_LEVEL(i) < idle_max_level)
-            check_idling(i);
+         check_idling(i);
          GET_LEARN_TIC(i)=0;
 
          }
