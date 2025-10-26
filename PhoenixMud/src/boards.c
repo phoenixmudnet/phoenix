@@ -28,6 +28,7 @@
 extern struct room_data *world;
 extern struct descriptor_data *descriptor_list;
 extern struct command_info cmd_info[];
+extern char *str_str(char *cs, char *ct);
 
 void Board_display_msg(int board_type, struct char_data *ch, char *arg);
 void Board_show_board(int board_type, struct char_data *ch, char *arg);
@@ -37,6 +38,7 @@ void Board_load_board(int board_type);
 void Board_reset_board(int board_num);
 void Board_write_message(int board_type, struct char_data *ch, char *arg);
 void Board_check(struct char_data *ch);
+void Board_search(struct char_data *ch, char *arg);
 int can_see_board(int board_num,struct char_data *ch);
 /*
 format: vnum, read lvl, write lvl, remove lvl, filename, 0 at end  
@@ -84,7 +86,7 @@ fields[] =
       { "remove" } ,
       { "list" } ,
       { "switch" } ,
-      { "store" } ,
+      { "search" } ,
       { "check" } ,
       { "\n" }
    };
@@ -101,7 +103,7 @@ options[] =
       { "  Usage: board remove <message number> *" } ,
       { "  Usage: board list                    *" } ,
       { "  Usage: board switch <board number>   *" } ,
-      { "  Usage: board store   (disabled)      *" } ,
+      { "  Usage: board search <search string>  *" } ,
       { "  Usage: board check                   *" } ,
       { "\n" }
    };
@@ -341,8 +343,7 @@ ACMD(do_board)
       send_to_char(ch,  "(%d) The %s\r\n", choice + 1, names[choice].name);
       break;
    case 6:
-      send_to_char(ch,"Sorry, that function is incomplete.\r\n");
-      send_to_char(ch,"Type: BOARD by itself to show other options.\r\n");
+      Board_search(ch, command);
       break;
    case 7:
       Board_check(ch);
@@ -709,7 +710,10 @@ void Board_load_board(int board_type)
 
    if (!(fl = fopen(FILENAME(board_type), "rb")))
       {
-      perror("SYSERR: Error reading board");
+      char *emsg = get_buffer(SMALL_BUFSIZE);
+      sprintf(emsg, "SYSERR: Error reading %s", FILENAME(board_type));
+      perror(emsg);
+      release_buffer(emsg);
       return;
       }
 
@@ -814,7 +818,7 @@ void Board_check(struct char_data *ch)
            } else {
              strcpy(buf2, header);
            }
-           sprintf(buf + strlen(buf), "%-2d -- %-2d %s\r\n", j + 1, num_of_msgs[j], buf2);
+           sprintf(buf + strlen(buf), "%-2d -- %-3d %s\r\n", j + 1, num_of_msgs[j], buf2);
         }
       }
    }
@@ -844,3 +848,45 @@ int can_see_board(int board_num,struct char_data *ch)
    return see_test;
    }
 
+/* Added board search function - Nomikos 10/25/2025 */
+void Board_search(struct char_data *ch, char *arg)
+   {
+   int j, k;
+   char *buf;
+
+   if (!arg || !*arg)
+      {
+      send_to_char(ch, "Usage: board search <search string>\r\n");
+      return;
+      }
+
+   buf = get_buffer(MAX_STRING_LENGTH);
+
+   send_to_char(ch, "\r\nMessages matching '%s'.\r\n", arg);
+   send_to_char(ch,"-----------------------------------\r\n");
+
+   for(j = 0; j < NUM_OF_BOARDS; j++)
+      {
+      if(can_see_board(j, ch) && GET_LEVEL(ch) >= READ_LVL(j))
+         {
+         if(num_of_msgs[j] > 0)
+            {
+            for (k = 0; k < num_of_msgs[j]; k++)
+               {
+               char *header = msg_index[j][k].heading;
+               if (!header) 
+                  {
+                  log("SYSERR: STATUS-NonFatal Type-board DESC- board code failed at MSG_HEADING(board_type)\r\n");
+                  release_buffer(buf);
+                  return;
+                  }
+               if (str_str(header, arg) || str_str(msg_storage[MSG_SLOTNUM(j, k)], arg))
+                  sprintf(buf + strlen(buf), "%-2d -- %-3d %s\r\n", j + 1, k + 1, header);
+               }
+            }
+         }
+      }
+   page_string(ch->desc, buf, TRUE,"");
+   release_buffer(buf);
+   return;
+   }
