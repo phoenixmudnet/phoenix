@@ -55,11 +55,6 @@ void	Board_save_board(int board_type);
 void	Board_load_board(int board_type);
 void	Board_reset_board(int board_num);
 void	Board_write_message(int board_type, struct char_data *ch, char *arg);
-
-
-
-
-
-
-
+void  Board_check(struct char_data *ch);
+void  Board_search(struct char_data *ch, char *arg);
 
