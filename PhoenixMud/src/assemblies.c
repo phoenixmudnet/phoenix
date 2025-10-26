@@ -56,7 +56,10 @@ void assemblyBootAssemblies( void )
    while( !feof( pFile ) )
       {
       lLineCount += get_line( pFile, szLine );
-      half_chop( szLine, szTag, szLine );
+      char *szTemp = get_buffer(MAX_STRING_LENGTH);
+      half_chop( szTemp, szTag, szLine );
+      strcpy(szLine, szTemp);
+      release_buffer(szTemp);
 
       if( *szTag == '\0' )
          continue;
