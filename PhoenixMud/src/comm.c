@@ -1296,24 +1296,15 @@ char *make_prompt(struct descriptor_data *d)
 		 length+=sprintf(prompt+length, "%d/%dR ", num_explored, zone->num_rooms);
       }
 
+      time_t current_time = time(0);
       if (PRF2_FLAGGED(d->character, PRF2_DISPTIME))
       {
-         char *disptime = get_buffer(64);
-         time_t mytime = time(0);
-         strftime(disptime, 20, "%H:%M:%S EST", localtime(&mytime)); 
-
-         length+=sprintf(prompt+length, "(%s) ", disptime);
-         release_buffer(disptime);
+         length += strftime(prompt+length, 20, "(%H:%M:%S UTC) ", gmtime(&current_time)); 
       } 
 
       if (PRF2_FLAGGED(d->character, PRF2_DISPDATE)) 
       {
-         char *dispdate = get_buffer(64);
-         time_t mytime = time(0);
-         strftime(dispdate, 20, "%a %b %d, %Y", localtime(&mytime));
-         
-         length+=sprintf(prompt+length, "%s ", dispdate);
-         release_buffer(dispdate);
+         length += strftime(prompt+length, 20, "%a %b %d, %Y ", gmtime(&current_time));
       }
 
       /*** Standard fighting prompts Anduin ****/ 
