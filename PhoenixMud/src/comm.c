@@ -2029,6 +2029,12 @@ void handle_iac(struct descriptor_data *d) {
                ptr--;
                break;
             case DONT:
+               if (opt == TELOPT_SGA) {
+                  // If a client asks us to suppress go ahead, we refuse. We
+                  // could add a flag to each descriptor to allow this, but
+                  // realistically no client will ever ask for it.
+                  SEND_TO_Q(d, "%c%c%c", IAC, WONT, TELOPT_SGA);
+               }
 
                memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
                ptr--;
