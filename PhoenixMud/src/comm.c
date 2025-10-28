@@ -1222,18 +1222,17 @@ char *make_prompt(struct descriptor_data *d)
 { 
    static char prompt[MAX_PROMPT_LENGTH+1];
    static char color[10];
-   long hit1=0,hit2=0,percent=0; 
-   int length=0;
-   /* Note, prompt is truncated at MAX_PROMPT_LENGTH chars (structs.h )*/
 
-   /* reversed these top 2 if checks so that page_string() would work in */ 
-   /* the editor */ 
+   long hit1=0,hit2=0,percent=0; 
+
+   size_t length=0;
+
    if (d->showstr_count) 
    { 
-      length=sprintf(prompt, "\r\n[ Return to continue, (q)uit, (r)efresh, (b)ack, or page number (%d/%d) ]", d->showstr_page, d->showstr_count); 
+      length=sprintf(prompt, "\r\n[ Return to continue, (q)uit, (r)efresh, (b)ack, or page number (%d/%d) ]%c%c", d->showstr_page, d->showstr_count, IAC, GA); 
    } 
    else if (d->str) 
-      strcpy(prompt, "] "); 
+      sprintf(prompt, "] %c%c", IAC, GA); 
    else if ((STATE(d)==CON_PLAYING)&&!IS_NPC(d->character))
       { 
       *prompt = '\0'; 
@@ -1433,7 +1432,8 @@ char *make_prompt(struct descriptor_data *d)
 	 length+=sprintf(prompt+length," [Enemy: %s%s%s]",color,
 			 wound_types[percent],CCNRM(d->character,C_NRM)); 
 	 } 
-      strcat(prompt, "> "); 
+
+      sprintf(prompt+length, "> %c%c", IAC, GA); 
       } 
    else if(STATE(d)==CON_PLAYING&&IS_NPC(d->character))	/* switched prompt */
       {
@@ -1443,10 +1443,11 @@ char *make_prompt(struct descriptor_data *d)
       
       length+=sprintf(prompt+length, "%d/%dM ",GET_MANA(d->character), 
 		      GET_MAX_MANA(d->character)); 
-      strcat(prompt, "> "); 
+      sprintf(prompt+length, "> %c%c", IAC, GA); 
       }
    else
       *prompt='\0';
+
    if(strlen(prompt) > MAX_PROMPT_LENGTH-4)
       {
       mudlogf(CMP,LVL_IMMORT,TRUE,"%s's prompt is HUGE: %s",
