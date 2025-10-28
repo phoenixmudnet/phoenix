@@ -860,13 +860,14 @@ void game_loop(int mother_desc)
            GET_WAS_IN(d->character) != NOWHERE) 
 	       { 
 	       if (IN_ROOM(d->character) != NOWHERE)
-		      {
-              /* Send players home that try to camp a zone - Nomikos 10/22/2025 */
-              if (zone_table[world[GET_WAS_IN(d->character)].zone].age == 0)
-                 GET_WAS_IN(d->character) = real_room(GET_HOME(d->character));
-              char_from_room(d->character);
-              }
-	       char_to_room(d->character, GET_WAS_IN(d->character)); 
+             char_from_room(d->character);
+
+          /* Send players home that try to camp a zone - Nomikos 10/22/2025 */
+          if ((GET_LEVEL(d->character) < LVL_IMMORT) &&
+              Z_FLAGGED(GET_WAS_IN(d->character), Z_IDLE)) 
+             char_to_room(d->character, real_room(GET_HOME(d->character)));
+          else
+             char_to_room(d->character, GET_WAS_IN(d->character));
 	       GET_WAS_IN(d->character) = NOWHERE; 
 	       act("$n has returned.", TRUE, d->character, 0, 0, TO_ROOM); 
 	       } 
