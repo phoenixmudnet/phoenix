@@ -3847,7 +3847,7 @@ char *scrol(int y, int x, struct char_data *ch)
 
 char *region(int y1, int y2, struct char_data *ch)
 {
-	sprintf(specbuf, "\e[?7h\e[%d;%dr", y1, y2 + SIZE - 24);
+	sprintf(specbuf, "\e[%d;%dr", y1, y2 + SIZE - 24);
 	return specbuf;
 }
 

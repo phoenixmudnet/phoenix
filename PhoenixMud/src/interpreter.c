@@ -2546,7 +2546,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			echo_on(d);
 			SEND_TO_Q(d, "\r\nDone.\r\n");
 			/* clear the screen */
-			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
+			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			if (port != 4999)
 				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 			STATE(d) = CON_MENU;
@@ -2897,7 +2897,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		break;
 
 	case CON_RMOTD:	/* read CR after printing motd   */
-		SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
+		SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 		if (port != 4999)
 			SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 		STATE(d) = CON_MENU;
@@ -2911,7 +2911,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			break;
 
 		case '1':
-			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
+			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			reset_char(d->character);
 			read_aliases(d->character);	/* Alias mod */
 			if (PLR_FLAGGED(d->character, PLR_INVSTART))
@@ -3181,7 +3181,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		if (strncmp(CRYPT(argu, GET_PASSWD(d->character)),
 			    GET_PASSWD(d->character), MAX_PWD_LENGTH)) {
 			echo_on(d);
-			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
+			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			SEND_TO_Q(d, "\r\nIncorrect password.\r\n");
 			if (port != 4999)
 				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
@@ -3198,7 +3198,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		echo_on(d);
 		if (strncmp(CRYPT(argu, GET_PASSWD(d->character)),
 			    GET_PASSWD(d->character), MAX_PWD_LENGTH)) {
-			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
+			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			SEND_TO_Q(d, "\r\nIncorrect password.\r\n");
 			if (port != 4999)
 				SEND_TO_Q(d, "%s", MENU);
@@ -3239,7 +3239,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			STATE(d) = CON_CLOSE;
 			return;
 		} else {
-			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
+			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			SEND_TO_Q(d, "\r\nCharacter not deleted.\r\n");
 			if (port != 4999)
 				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
