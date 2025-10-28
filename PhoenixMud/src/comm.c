@@ -1211,248 +1211,196 @@ void echo_on(struct descriptor_data *d)
    ; 
  
    SEND_TO_Q(d, "%s", on_string); 
-} 
- 
- 
-char *make_prompt(struct descriptor_data *d) 
-{ 
-   static char prompt[MAX_PROMPT_LENGTH+1];
-   static char color[10];
+}
 
-   long hit1=0,hit2=0,percent=0; 
+// Maps hit point percentages to a scale of 0 to 11
+// 0 means dead (less than -10 hitpoints)
+// 1 means less than 10%, which includes negative hitpoints down to -10
+// 2 means less than 20%, and so on.
+// 11 means full health (equal to or greater than max hitpoints)
+// This maps to the wound_types array in fight.c
+int map_hp(int hit, int maxhit) {
+   if (maxhit <= 0)
+      return 0;
 
-   size_t length=0;
+   if (hit < 0)
+      return 1;
 
-   if (d->showstr_count) 
-   { 
-      length=sprintf(prompt, "\r\n[ Return to continue, (q)uit, (r)efresh, (b)ack, or page number (%d/%d) ]%c%c", d->showstr_page, d->showstr_count, IAC, GA); 
-   } 
-   else if (d->str) 
-      sprintf(prompt, "] %c%c", IAC, GA); 
-   else if ((STATE(d)==CON_PLAYING)&&!IS_NPC(d->character))
-      { 
-      *prompt = '\0'; 
- 
-      if (GET_INVIS_LEV(d->character)) 
-	     length+=sprintf(prompt, "i%d ", GET_INVIS_LEV(d->character));
+   if (hit >= maxhit)
+      return 11;
+  
+   int percent = (hit * 10 + maxhit) / maxhit;
 
-      if (PRF2_FLAGGED(d->character, PRF2_DISPMAX)) 
-	  {  
-	     if (PRF_FLAGGED(d->character, PRF_DISPHP)) 
-	        length+=sprintf(prompt+length, "%d/%dH ", GET_HIT(d->character), 
-		       GET_MAX_HIT(d->character)); 
- 
-	    if (PRF_FLAGGED(d->character, PRF_DISPMANA)) 
-	       length+=sprintf(prompt+length, "%d/%dM ",GET_MANA(d->character), 
-		       GET_MAX_MANA(d->character)); 
- 
-	    if (PRF_FLAGGED(d->character, PRF_DISPMOVE)) 
-	       length+=sprintf(prompt+length, "%d/%dV ",GET_MOVE(d->character),
-		       GET_MAX_MOVE(d->character)); 
-	  }
-      else
-	  { 
-	    if (PRF_FLAGGED(d->character, PRF_DISPHP)) 
-	       length+=sprintf(prompt+length, "%dH ", GET_HIT(d->character)); 
- 
-	    if (PRF_FLAGGED(d->character, PRF_DISPMANA)) 
-	       length+=sprintf(prompt+length, "%dM ", GET_MANA(d->character)); 
- 
-	    if (PRF_FLAGGED(d->character, PRF_DISPMOVE)) 
-	       length+=sprintf(prompt+length, "%dV ", GET_MOVE(d->character)); 
-	 } 
-      
-     if (PRF2_FLAGGED(d->character, PRF2_DISPALIGN)&&!FIGHTING(d->character)) 
-	     length+=sprintf(prompt+length, "%dA ", GET_ALIGNMENT(d->character)); 
- 
-      if (PRF2_FLAGGED(d->character, PRF2_DISPGOLD)&&!FIGHTING(d->character)) 
-	     length+=sprintf(prompt+length, "%dG ",(int) GET_GOLD(d->character)); 
- 
-      if (PRF2_FLAGGED(d->character, PRF2_DISPEXP)) 
-	     length+=sprintf(prompt+length, "%dX ", 
-		     (int) (GET_EXP_FOR_CH(d->character)
-		    	- GET_EXP(d->character))); 
+   return percent;
+}
 
-      /* Added current/total rooms explored to prompt - Nomikos 9-10-2025 */
-      if (PRF2_FLAGGED(d->character, PRF2_DISPEXPLORED) && !FIGHTING(d->character) &&
-		 IN_ROOM(d->character) >= 0 && IN_ROOM(d->character) < EXPLORED_TOP_VNUM) 
+// Generates just the combat portion of the prompt, e.g. "[You: Average]", "[Enemy: BLEEDING!]"
+// ch is the character for whom the prompt is being generated, used to manage colors
+// tag is the label to use in the prompt, e.g. "You", "Enemy"
+// hit is the current hit points of the character being represented
+// maxhit is the maximum hit points of the character being represented
+char* generate_fight_prompt(struct char_data *ch, char* tag, int hit, int maxhit) {
+   int percent = map_hp(hit, maxhit);
+
+   // "BLEEDING!" and "Excellent" are the longest at 9 characters.
+   // Turning on a color takes 9 characters
+   // Clearing the color takes 4 characters.
+   // So we need 22 characters for the longest prompt, or 23 with null terminator.
+   // Using 32 here because it's a nice round number.
+   static char prompt[32];
+
+   const char *prompt_colors[] = {
+      NBLU, // <= -10
+      NRED, // < 10%
+      NRED, // < 20%
+      NMAG, // < 30%
+      NMAG, // < 40%
+      NYEL, // < 50%
+      NYEL, // < 60%
+      NCYN, // < 70%
+      NCYN, // < 80%
+      KNUL, // < 90%
+      KNUL, // < 100%
+      KNUL, // 100%
+   };
+
+   snprintf(
+      prompt, 
+      sizeof(prompt),
+      "[%s: %s%s%s]", 
+      tag,
+      prompt_colors[percent],
+      wound_types[percent], 
+      NNRM
+   );
+
+   return prompt;
+}
+
+char *make_prompt(struct descriptor_data *d)
+{
+   static char prompt[MAX_PROMPT_LENGTH + 1];
+
+   if (d->showstr_count) // paging through a long text
+   {
+      sprintf(prompt, "\r\n[ Return to continue, (q)uit, (r)efresh, (b)ack, or page number (%d/%d) ]%c%c", d->showstr_page, d->showstr_count, IAC, GA);
+   }
+   else if (d->str) // in a string editor
+   {
+      sprintf(prompt, "] %c%c", IAC, GA);
+   }
+   else if ((STATE(d) == CON_PLAYING) && !IS_NPC(d->character)) // Connected player
+   {
+      size_t length = 0;
+      *prompt = '\0';
+
+      if (GET_INVIS_LEV(d->character))
+         length += sprintf(prompt, "i%d ", GET_INVIS_LEV(d->character));
+
+      if (PRF2_FLAGGED(d->character, PRF2_DISPMAX))
       {
-		 struct zone_data *zone = &zone_table[world[IN_ROOM(d->character)].zone];
-		 int znum = zone->number;
+         if (PRF_FLAGGED(d->character, PRF_DISPHP))
+            length += sprintf(prompt + length, "%d/%dH ", GET_HIT(d->character), GET_MAX_HIT(d->character));
 
-         int num_explored = 0;
-		 int rnum;
-         for (rnum = 100 * znum; rnum < 100 * (znum + 1); rnum++) {
-			int b = d->character->player_specials->explored_vnums[rnum / 8];
-			if (b & (1 << (rnum % 8)))
-			   num_explored++;
-		    }
+         if (PRF_FLAGGED(d->character, PRF_DISPMANA))
+            length += sprintf(prompt + length, "%d/%dM ", GET_MANA(d->character), GET_MAX_MANA(d->character));
 
-		 length+=sprintf(prompt+length, "%d/%dR ", num_explored, zone->num_rooms);
+         if (PRF_FLAGGED(d->character, PRF_DISPMOVE))
+            length += sprintf(prompt + length, "%d/%dV ", GET_MOVE(d->character), GET_MAX_MOVE(d->character));
       }
+      else
+      {
+         if (PRF_FLAGGED(d->character, PRF_DISPHP))
+            length += sprintf(prompt + length, "%dH ", GET_HIT(d->character));
+
+         if (PRF_FLAGGED(d->character, PRF_DISPMANA))
+            length += sprintf(prompt + length, "%dM ", GET_MANA(d->character));
+
+         if (PRF_FLAGGED(d->character, PRF_DISPMOVE))
+            length += sprintf(prompt + length, "%dV ", GET_MOVE(d->character));
+      }
+
+      if (!FIGHTING(d->character)) {
+
+         if (PRF2_FLAGGED(d->character, PRF2_DISPALIGN))
+            length += sprintf(prompt + length, "%dA ", GET_ALIGNMENT(d->character));
+
+         if (PRF2_FLAGGED(d->character, PRF2_DISPGOLD))
+            length += sprintf(prompt + length, "%ldG ", GET_GOLD(d->character));
+
+         /* Added current/total rooms explored to prompt - Nomikos 9-10-2025 */
+         if (PRF2_FLAGGED(d->character, PRF2_DISPEXPLORED) &&
+            IN_ROOM(d->character) >= 0 && IN_ROOM(d->character) < EXPLORED_TOP_VNUM)
+         {
+            struct zone_data *zone = &zone_table[world[IN_ROOM(d->character)].zone];
+            int znum = zone->number;
+
+            int num_explored = 0;
+            int rnum;
+            for (rnum = 100 * znum; rnum < 100 * (znum + 1); rnum++)
+            {
+               int b = d->character->player_specials->explored_vnums[rnum / 8];
+               if (b & (1 << (rnum % 8)))
+                  num_explored++;
+            }
+
+            length += sprintf(prompt + length, "%d/%dR ", num_explored, zone->num_rooms);
+         }
+      }
+
+      if (PRF2_FLAGGED(d->character, PRF2_DISPEXP)) 
+         length += sprintf(prompt + length, "%ldX ", GET_EXP_FOR_CH(d->character) - GET_EXP(d->character));
 
       time_t current_time = time(0);
       if (PRF2_FLAGGED(d->character, PRF2_DISPTIME))
       {
-         length += strftime(prompt+length, 20, "(%H:%M:%S UTC) ", gmtime(&current_time)); 
-      } 
-
-      if (PRF2_FLAGGED(d->character, PRF2_DISPDATE)) 
-      {
-         length += strftime(prompt+length, 20, "%a %b %d, %Y ", gmtime(&current_time));
+         length += strftime(prompt + length, 20, "(%H:%M:%S UTC) ", gmtime(&current_time));
       }
 
-      /*** Standard fighting prompts Anduin ****/ 
-      if(d->character->char_specials.fighting) 
-	  { 
-	  if (GET_MAX_HIT(d->character) > 0) 
-	     { 
-	     hit2=GET_MAX_HIT(d->character); 
-	     hit1=GET_HIT(d->character); 
-	     percent = (int)(10 * ((float)hit1 / (float)hit2))+1; 
-	     }
-	  else 
-	     percent=0;/*if MAX_HIT is < 0 (HUH?!?!?!) */ 
- 
-	  if(percent<0) percent = 0; 
-	  if(percent>11) percent= 11;
-	  switch(percent)
-	  {
-	     case 0:
-		    strcpy(color,CCBLU(d->character,C_NRM));
-		    break;
-	     case 1:
-	     case 2:
-		    strcpy(color,CCRED(d->character,C_NRM));
-		    break;
-	     case 3:
-	     case 4:
-		    strcpy(color,CCMAG(d->character,C_NRM));
-		    break;
-	     case 5:
-	     case 6:
-		    strcpy(color,CCYEL(d->character,C_NRM));
-		    break;
-	     case 7:
-	     case 8:
-		    strcpy(color,CCCYN(d->character,C_NRM));
-		    break;
-	     default:
-		    color[0]='\0';
-		    break;
-	 }
-	 length+=sprintf(prompt+length,"[You: %s%s%s]",color,
-			 wound_types[percent],CCNRM(d->character,C_NRM)); 
-              
-	 if((d->character->char_specials.fighting->char_specials.fighting)&&\
-	    (d->character->char_specials.fighting->char_specials.fighting\
-	     != d->character)) 
-	    {                        
-	    if (GET_MAX_HIT(d->character->char_specials.fighting->\
-			    char_specials.fighting) > 0) 
-	       { 
-	       hit2=GET_MAX_HIT(d->character->char_specials.fighting->\
-				char_specials.fighting); 
-	       hit1=GET_HIT(d->character->char_specials.fighting->\
-			    char_specials.fighting); 
-	       percent = (int)(10 * ((float)hit1 / (float)hit2))+1; 
-	       } 
-	    else 
-	       percent=0;/* if MAX_HIT is less then 0 (HUH?!?!) */ 
- 
-	    if(percent<0) percent = 0; 
-	    if(percent>11) percent= 11;
-	    switch(percent)
-	       {
-		case 0:
-		   strcpy(color,CCBLU(d->character,C_NRM));
-		   break;
-		case 1:
-		case 2:
-		   strcpy(color,CCRED(d->character,C_NRM));
-		   break;
-		case 3:
-		case 4:
-		   strcpy(color,CCMAG(d->character,C_NRM));
-		   break;
-		case 5:
-		case 6:
-		   strcpy(color,CCYEL(d->character,C_NRM));
-		   break;
-		case 7:
-		case 8:
-		   strcpy(color,CCCYN(d->character,C_NRM));
-		   break;
-		default:
-		   color[0]='\0';
-		   break;
-	       }
-	    length+=sprintf(prompt+length," [Tank: %s%s%s]",color,
-			    wound_types[percent],CCNRM(d->character,C_NRM));
-	    } 
-	 if (GET_MAX_HIT(d->character->char_specials.fighting) > 0) 
-	    { 
-	    hit2=GET_MAX_HIT(d->character->char_specials.fighting); 
-	    hit1=GET_HIT(d->character->char_specials.fighting); 
-	    percent = (int)(10 * ((float)hit1 / (float)hit2))+1; 
-	    } 
-	 else 
-	    percent=0;/* if MAX_HIT is less then 0 (HUH?!?!) */ 
-	 if(percent<0) percent = 0; 
-	 if(percent>11) percent= 11; 
-	 switch(percent)
-	    {
-	     case 0:
-		strcpy(color,CCBLU(d->character,C_NRM));
-		break;
-	     case 1:
-	     case 2:
-		strcpy(color,CCRED(d->character,C_NRM));
-		break;
-	     case 3:
-	     case 4:
-		strcpy(color,CCMAG(d->character,C_NRM));
-		break;
-	     case 5:
-	     case 6:
-		strcpy(color,CCYEL(d->character,C_NRM));
-		break;
-	     case 7:
-	     case 8:
-		strcpy(color,CCCYN(d->character,C_NRM));
-		break;
-	     default:
-		color[0]='\0';
-		break;
-	    }
-	 length+=sprintf(prompt+length," [Enemy: %s%s%s]",color,
-			 wound_types[percent],CCNRM(d->character,C_NRM)); 
-	 } 
-
-      sprintf(prompt+length, "> %c%c", IAC, GA); 
-      } 
-   else if(STATE(d)==CON_PLAYING&&IS_NPC(d->character))	/* switched prompt */
+      if (PRF2_FLAGGED(d->character, PRF2_DISPDATE))
       {
-      length=sprintf(prompt,"%s ",GET_NAME(d->character));
-      length+=sprintf(prompt+length, "%d/%dH ", GET_HIT(d->character), 
-		      GET_MAX_HIT(d->character)); 
-      
-      length+=sprintf(prompt+length, "%d/%dM ",GET_MANA(d->character), 
-		      GET_MAX_MANA(d->character)); 
-      sprintf(prompt+length, "> %c%c", IAC, GA); 
+         length += strftime(prompt + length, 20, "%a %b %d, %Y ", gmtime(&current_time));
       }
+
+      struct char_data* opponent = FIGHTING(d->character);
+
+      if (opponent)
+      {
+         length += sprintf(prompt + length, "%s", generate_fight_prompt(d->character, "You", GET_HIT(d->character), GET_MAX_HIT(d->character)));
+
+         struct char_data* tank = FIGHTING(opponent);
+         if (tank && tank != d->character)
+         {
+            length += sprintf(prompt + length, " %s", generate_fight_prompt(d->character, "Tank", GET_HIT(tank), GET_MAX_HIT(tank)));
+         }
+
+         length += sprintf(prompt + length, " %s", generate_fight_prompt(d->character, "Enemy", GET_HIT(opponent), GET_MAX_HIT(opponent)));
+      }
+
+      sprintf(prompt + length, "> %c%c", IAC, GA);
+   }
+   else if (STATE(d) == CON_PLAYING && IS_NPC(d->character)) /* switched prompt */
+   {
+      size_t length = 0;
+      length = sprintf(prompt, "%s ", GET_NAME(d->character));
+      length += sprintf(prompt + length, "%d/%dH ", GET_HIT(d->character),
+                        GET_MAX_HIT(d->character));
+
+      length += sprintf(prompt + length, "%d/%dM ", GET_MANA(d->character),
+                        GET_MAX_MANA(d->character));
+      sprintf(prompt + length, "> %c%c", IAC, GA);
+   }
    else
-      *prompt='\0';
+      *prompt = '\0';
 
-   if(strlen(prompt) > MAX_PROMPT_LENGTH-4)
-      {
-      mudlogf(CMP,LVL_IMMORT,TRUE,"%s's prompt is HUGE: %s",
-	      GET_NAME(d->character),prompt);
-      }
+   if (strlen(prompt) > MAX_PROMPT_LENGTH - 4)
+   {
+      mudlogf(CMP, LVL_IMMORT, TRUE, "%s's prompt is HUGE: %s",
+              GET_NAME(d->character), prompt);
+   }
    return (prompt);
-} 
- 
- 
+}
+
 void write_to_q_d(char *txt, struct descriptor_data *d, int aliased)
 { 
    struct txt_block *newt; 
