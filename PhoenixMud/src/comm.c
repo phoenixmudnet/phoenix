@@ -1381,14 +1381,21 @@ char *make_prompt(struct descriptor_data *d)
    }
    else if (STATE(d) == CON_PLAYING && IS_NPC(d->character)) /* switched prompt */
    {
-      size_t length = 0;
-      length = sprintf(prompt, "%s ", GET_NAME(d->character));
-      length += sprintf(prompt + length, "%d/%dH ", GET_HIT(d->character),
-                        GET_MAX_HIT(d->character));
-
-      length += sprintf(prompt + length, "%d/%dM ", GET_MANA(d->character),
-                        GET_MAX_MANA(d->character));
-      sprintf(prompt + length, "> %c%c", IAC, GA);
+      sprintf(
+         prompt,
+         "%s %d/%dH %d/%dM %d/%dV %dA %ldG > %c%c",
+         GET_NAME(d->character),
+         GET_HIT(d->character),
+         GET_MAX_HIT(d->character),
+         GET_MANA(d->character),
+         GET_MAX_MANA(d->character),
+         GET_MOVE(d->character),
+         GET_MAX_MOVE(d->character),
+         GET_ALIGNMENT(d->character),
+         GET_GOLD(d->character),
+         IAC,
+         GA
+      );
    }
    else
       *prompt = '\0';
