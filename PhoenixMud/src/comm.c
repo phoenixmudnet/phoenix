@@ -38,11 +38,7 @@
 #include "dg_scripts.h"
 #include "spells.h"
  
-#ifdef HAVE_ARPA_TELNET_H 
 #include <arpa/telnet.h> 
-#else 
-#include "telnet.h" 
-#endif 
  
 #ifndef INVALID_SOCKET 
 #define INVALID_SOCKET -1 
