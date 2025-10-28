@@ -29,6 +29,8 @@
 #include "constants.h"
 #include "dg_scripts.h"
 
+#include <arpa/telnet.h> 
+
 /* 10/08/96, Echo - removed reference to titles[][] array
  *                  added exp_multipliers[] and exp_table[]
  * extern const struct title_type titles[NUM_CLASSES][LVL_IMPL + 1];
@@ -2223,7 +2225,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			    || reserved_word(buf)) {
 				SEND_TO_Q(d,
 					  "Invalid name, please try another.\r\n"
-					  "Name: ");
+					  "Name: %c%c", IAC, GA);
 				release_buffer(buf);
 				release_buffer(tmp_name);
 				return;
@@ -2249,7 +2251,7 @@ void nanny(struct descriptor_data *d, char *argu)
 								SEND_TO_Q(d,
 									  "Name already in use, please try another.\r\n");
 								SEND_TO_Q(d,
-									  "Name: ");
+									  "Name: %c%c", IAC, GA);
 								release_buffer
 								    (buf);
 								release_buffer
@@ -2270,8 +2272,8 @@ void nanny(struct descriptor_data *d, char *argu)
 					SEND_TO_Q(d, "%s", NAME_POLICY);
 					GET_PFILEPOS(d->character) = player_i;
 					SEND_TO_Q(d,
-						  "Did I get that right, %s (Y/N)? ",
-						  tmp_name);
+						  "Did I get that right, %s (Y/N)? %c%c",
+						  tmp_name, IAC, GA);
 					STATE(d) = CON_NAME_CNFRM;
 				} else {
 					/* undo it just in case they are set */
@@ -2283,7 +2285,7 @@ void nanny(struct descriptor_data *d, char *argu)
 						   PRF2_AFK);
 					/*      REMOVE_BIT(AFF_FLAGS(d->character), AFF_GROUP); */
 
-					SEND_TO_Q(d, "Password: ");
+					SEND_TO_Q(d, "Password: %c%c", IAC, GA);
 					echo_off(d);
 					d->idle_tics = 0;
 					STATE(d) = CON_PASSWORD;
@@ -2294,7 +2296,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				if (!Valid_Name(tmp_name)) {
 					SEND_TO_Q(d,
 						  "Invalid name, please try another.\r\n");
-					SEND_TO_Q(d, "Name: ");
+					SEND_TO_Q(d, "Name: %c%c", IAC, GA);
 					release_buffer(buf);
 					release_buffer(tmp_name);
 					return;
@@ -2310,7 +2312,7 @@ void nanny(struct descriptor_data *d, char *argu)
 						     name)) {
 							SEND_TO_Q(d,
 								  "Name already in use, please try another.\r\n");
-							SEND_TO_Q(d, "Name: ");
+							SEND_TO_Q(d, "Name: %c%c", IAC, GA);
 							release_buffer(buf);
 							release_buffer
 							    (tmp_name);
@@ -2322,8 +2324,8 @@ void nanny(struct descriptor_data *d, char *argu)
 				strcpy(d->character->player.name,
 				       CAP(tmp_name));
 				SEND_TO_Q(d, "%s", NAME_POLICY);
-				SEND_TO_Q(d, "Did I get that right, %s (Y/N)? ",
-					  tmp_name);
+				SEND_TO_Q(d, "Did I get that right, %s (Y/N)? %c%c",
+					  tmp_name, IAC, GA);
 				STATE(d) = CON_NAME_CNFRM;
 			}
 			release_buffer(buf);
@@ -2356,15 +2358,15 @@ void nanny(struct descriptor_data *d, char *argu)
 				  "\r\nIf you are new to PhoenixMud, we suggest using the most common home town\r\n");
 			SEND_TO_Q(d,
 				  "and the recommended stats for your race and class.\r\n");
-			SEND_TO_Q(d, "\r\nAre you new to PhoenixMud (Y/N)? ");
+			SEND_TO_Q(d, "\r\nAre you new to PhoenixMud (Y/N)? %c%c", IAC, GA);
 			STATE(d) = CON_FIRST_TIME;
 		} else if (*argu == 'n' || *argu == 'N') {
-			SEND_TO_Q(d, "Okay, what IS it, then? ");
+			SEND_TO_Q(d, "Okay, what IS it, then? %c%c", IAC, GA);
 			free(d->character->player.name);
 			d->character->player.name = NULL;
 			STATE(d) = CON_GET_NAME;
 		} else {
-			SEND_TO_Q(d, "Please type Yes or No: ");
+			SEND_TO_Q(d, "Please type Yes or No: %c%c", IAC, GA);
 		}
 		break;
 
@@ -2380,11 +2382,11 @@ void nanny(struct descriptor_data *d, char *argu)
 			d->first_time = 0;
 			break;
 		default:
-			SEND_TO_Q(d, "Please type Yes or No: ");
+			SEND_TO_Q(d, "Please type Yes or No: %c%c", IAC, GA);
 			return;
 		}
-		SEND_TO_Q(d, "Give me a password for %s: ",
-			  GET_PC_NAME(d->character));
+		SEND_TO_Q(d, "Give me a password for %s: %c%c",
+			  GET_PC_NAME(d->character), IAC, GA);
 		echo_off(d);
 		STATE(d) = CON_NEWPASSWD;
 		return;
@@ -2428,7 +2430,7 @@ void nanny(struct descriptor_data *d, char *argu)
 					STATE(d) = CON_CLOSE;
 				} else {
 					SEND_TO_Q(d,
-						  "Wrong password.\r\nPassword: ");
+						  "Wrong password.\r\nPassword: %c%c", IAC, GA);
 					echo_off(d);
 				}
 				return;
@@ -2495,7 +2497,7 @@ void nanny(struct descriptor_data *d, char *argu)
 					  CCNRM(d->character, C_SPR));
 				GET_BAD_PWS(d->character) = 0;
 			}
-			SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: ");
+			SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: %c%c", IAC, GA);
 			STATE(d) = CON_RMOTD;
 		}
 		break;
@@ -2505,14 +2507,14 @@ void nanny(struct descriptor_data *d, char *argu)
 		if (!*argu || strlen(argu) > MAX_PWD_LENGTH || strlen(argu) < 3
 		    || !str_cmp(argu, GET_PC_NAME(d->character))) {
 			SEND_TO_Q(d, "\r\nIllegal password.\r\n");
-			SEND_TO_Q(d, "Password: ");
+			SEND_TO_Q(d, "Password: %c%c", IAC, GA);
 			return;
 		}
 		strncpy(GET_PASSWD(d->character),
 			CRYPT(argu, GET_PC_NAME(d->character)), MAX_PWD_LENGTH);
 		*(GET_PASSWD(d->character) + MAX_PWD_LENGTH) = '\0';
 
-		SEND_TO_Q(d, "\r\nPlease retype password: ");
+		SEND_TO_Q(d, "\r\nPlease retype password: %c%c", IAC, GA);
 		if (STATE(d) == CON_NEWPASSWD)
 			STATE(d) = CON_CNFPASSWD;
 		else
@@ -2527,7 +2529,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		     GET_PASSWD(d->character), MAX_PWD_LENGTH)) {
 			SEND_TO_Q(d,
 				  "\r\nPasswords don't match... start over.\r\n");
-			SEND_TO_Q(d, "Password: ");
+			SEND_TO_Q(d, "Password: %c%c", IAC, GA);
 			if (STATE(d) == CON_CNFPASSWD)
 				STATE(d) = CON_NEWPASSWD;
 			else
@@ -2537,7 +2539,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		echo_on(d);
 
 		if (STATE(d) == CON_CNFPASSWD) {
-			SEND_TO_Q(d, "What is your sex (M/F)? ");
+			SEND_TO_Q(d, "What is your sex (M/F)? %c%c", IAC, GA);
 			STATE(d) = CON_QSEX;
 		} else {
 			save_char(d->character, NOWHERE);
@@ -2546,7 +2548,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			/* clear the screen */
 			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
 			if (port != 4999)
-				SEND_TO_Q(d, "%s", MENU);
+				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 			STATE(d) = CON_MENU;
 		}
 
@@ -2564,14 +2566,14 @@ void nanny(struct descriptor_data *d, char *argu)
 			break;
 		default:
 			SEND_TO_Q(d, "That is not a sex..\r\n"
-				  "What IS your sex? ");
+				  "What IS your sex? %c%c", IAC, GA);
 			return;
 			break;
 		}
 
 		/* 10/27/96, Echo - race menu added. See race.c for details. */
 		SEND_TO_Q(d, "%s", race_menu);
-		SEND_TO_Q(d, "%s", race_prompt);
+		SEND_TO_Q(d, "%s%c%c", race_prompt, IAC, GA);
 		STATE(d) = CON_QRACE;
 		break;
 
@@ -2605,7 +2607,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			} else
 				SEND_TO_Q(d, "\r\nThat's not a race.");
 			SEND_TO_Q(d, "%s", race_menu);
-			SEND_TO_Q(d, "%s", race_prompt);
+			SEND_TO_Q(d, "%s%c%c", race_prompt, IAC, GA);
 			return;
 		} else
 			GET_RACE(d->character) = load_result;
@@ -2617,7 +2619,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		for (i = 0; i < CLASS_KENSAI; i++)
 			if (LEGAL_CLASS[(int)GET_RACE(d->character)][i])
 				SEND_TO_Q(d, "%s", class_menu_choices[i]);
-		SEND_TO_Q(d, "   or [q] to go back to the race menu.\r\n");
+		SEND_TO_Q(d, "   or [q] to go back to the race menu.\r\n%c%c", IAC, GA);
 		/* 10/27/96, Echo - removed default class menu in favor of above,
 		 *   which just lists available classes for the selected race.
 		 * SEND_TO_Q(class_menu, d);
@@ -2653,7 +2655,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				release_buffer(help_choice);
 			} else if ((*argu == 'q') || (*argu == 'Q')) {
 				SEND_TO_Q(d, "%s", race_menu);
-				SEND_TO_Q(d, "%s", race_prompt);
+				SEND_TO_Q(d, "%s%c%c", race_prompt, IAC, GA);
 				STATE(d) = CON_QRACE;
 				break;
 			} else
@@ -2669,9 +2671,9 @@ void nanny(struct descriptor_data *d, char *argu)
 		    if (!LEGAL_CLASS[(int)GET_RACE(d->character)][load_result])
 		{
 			SEND_TO_Q(d,
-				  "\r\n%ss are not allowed to be %ss.\r\nClass: ",
+				  "\r\n%ss are not allowed to be %ss.\r\nClass: %c%c",
 				  pc_race_types[(int)GET_RACE(d->character)],
-				  pc_class_types[(int)load_result]);
+				  pc_class_types[(int)load_result], IAC, GA);
 			return;
 		} else
 			GET_CLASS(d->character) = load_result;
@@ -2687,7 +2689,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		if (!d->first_time) {
 			send_to_char(d->character, "\r\n");
 			send_to_char(d->character, "%s", hometown_menu);
-			SEND_TO_Q(d, "%s", hometown_prompt);
+			SEND_TO_Q(d, "%s%c%c", hometown_prompt, IAC, GA);
 			STATE(d) = CON_HOME_TOWN;
 		} else {
 			/*
@@ -2720,7 +2722,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			save_char(d->character, NOWHERE);
 
 			SEND_TO_Q(d, "%s", motd);
-			SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: ");
+			SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: %c%c", IAC, GA);
 			STATE(d) = CON_RMOTD;
 		}
 		break;
@@ -2746,7 +2748,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			send_to_char(d->character,
 				     "That is not a valid hometown!\r\n\r\n");
 			send_to_char(d->character, "%s", hometown_menu);
-			SEND_TO_Q(d, "%s", hometown_prompt);
+			SEND_TO_Q(d, "%s%c%c", hometown_prompt, IAC, GA);
 			return;
 		}
 		log("Hometown: %s created with choice %c and recalls to room %ld.", GET_NAME(d->character), argu[0], GET_HOME(d->character));
@@ -2775,7 +2777,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		send_to_char(d->character, "You have %d",
 			     d->character->player_specials->saved.point);
 		send_to_char(d->character, "\033[%d;%dH", 18, 0);
-		SEND_TO_Q(d, "Enter Selection: ");
+		SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 		STATE(d) = CON_QSTAT;
 		break;
 
@@ -2794,7 +2796,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				     "\033[%d;%dH                           ",
 				     18, 0);
 			send_to_char(d->character, "\033[%d;%dH", 18, 0);
-			SEND_TO_Q(d, "Enter Selection: ");
+			SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 			return;
 		}
 		if (load_result == 2) {
@@ -2809,7 +2811,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				     "\033[%d;%dH                           ",
 				     18, 0);
 			send_to_char(d->character, "\033[%d;%dH", 18, 0);
-			SEND_TO_Q(d, "Enter Selection: ");
+			SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 			return;
 		}
 		if (load_result == 3) {
@@ -2824,7 +2826,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				     "\033[%d;%dH                           ",
 				     18, 0);
 			send_to_char(d->character, "\033[%d;%dH", 18, 0);
-			SEND_TO_Q(d, "Enter Selection: ");
+			SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 			return;
 		}
 		if (load_result == 4) {
@@ -2839,7 +2841,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				     "\033[%d;%dH                           ",
 				     18, 0);
 			send_to_char(d->character, "\033[%d;%dH", 18, 0);
-			SEND_TO_Q(d, "Enter Selection: ");
+			SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 			return;
 		}
 		if (load_result == 5) {
@@ -2854,7 +2856,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				     "\033[%d;%dH                           ",
 				     18, 0);
 			send_to_char(d->character, "\033[%d;%dH", 18, 0);
-			SEND_TO_Q(d, "Enter Selection: ");
+			SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 			return;
 		}
 		if (load_result == 6) {
@@ -2869,7 +2871,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				     "\033[%d;%dH                           ",
 				     18, 0);
 			send_to_char(d->character, "\033[%d;%dH", 18, 0);
-			SEND_TO_Q(d, "Enter Selection: ");
+			SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 			return;
 		}
 		if (load_result != -1) {
@@ -2877,7 +2879,7 @@ void nanny(struct descriptor_data *d, char *argu)
 				     "\033[%d;%dH                           ",
 				     18, 0);
 			send_to_char(d->character, "\033[%d;%dH", 18, 0);
-			SEND_TO_Q(d, "Enter Selection: ");
+			SEND_TO_Q(d, "Enter Selection: %c%c", IAC, GA);
 			return;
 		}
 
@@ -2885,7 +2887,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		save_char(d->character, NOWHERE);	/* save so dc doesn't kill stats */
 
 		SEND_TO_Q(d, "%s", motd);
-		SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: ");
+		SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: %c%c", IAC, GA);
 		STATE(d) = CON_RMOTD;
 
 		mudlogf(NRM, LVL_IMMORT, TRUE,
@@ -2897,7 +2899,7 @@ void nanny(struct descriptor_data *d, char *argu)
 	case CON_RMOTD:	/* read CR after printing motd   */
 		SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
 		if (port != 4999)
-			SEND_TO_Q(d, "%s", MENU);
+			SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 		STATE(d) = CON_MENU;
 		break;
 
@@ -3119,7 +3121,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			}
 			SEND_TO_Q(d,
 				  "Enter the text you'd like others to see when they look at you.\r\n");
-			SEND_TO_Q(d, "(/s saves /h for help)\r\n");
+			SEND_TO_Q(d, "(/s saves /h for help)\r\n%c%c", IAC, GA);
 			d->str = &d->character->player.description;
 			d->max_str = EXDSCR_LENGTH - 1;
 			STATE(d) = CON_EXDESC;
@@ -3131,14 +3133,14 @@ void nanny(struct descriptor_data *d, char *argu)
 			break;
 
 		case '4':
-			SEND_TO_Q(d, "\r\nEnter your old password: ");
+			SEND_TO_Q(d, "\r\nEnter your old password: %c%c", IAC, GA);
 			echo_off(d);
 			STATE(d) = CON_CHPWD_GETOLD;
 			break;
 
 		case '5':
 			SEND_TO_Q(d,
-				  "\r\nEnter your password for verification: ");
+				  "\r\nEnter your password for verification: %c%c", IAC, GA);
 			echo_off(d);
 			STATE(d) = CON_DELCNF1;
 			break;
@@ -3146,7 +3148,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		case '6':
 			SEND_TO_Q(d, "\n\r");
 			who_to_menu(d->character, "", 0, 0);
-			SEND_TO_Q(d, "\n\r\n\r*** PRESS RETURN:");
+			SEND_TO_Q(d, "\n\r\n\r*** PRESS RETURN:%c%c", IAC, GA);
 			STATE(d) = CON_RMOTD;
 			break;
 
@@ -3158,18 +3160,18 @@ void nanny(struct descriptor_data *d, char *argu)
 				  "third party.\r\n\r\n");
 			if (GET_EMAIL(d->character)[0]) {
 				SEND_TO_Q(d,
-					  "Current e-mail address: %s\r\n\r\n",
-					  GET_EMAIL(d->character));
+					  "Current e-mail address: %s\r\n\r\n%c%c",
+					  GET_EMAIL(d->character), IAC, GA);
 			}
 			SEND_TO_Q(d,
-				  "Enter a new e-mail address (press ENTER for none): ");
+				  "Enter a new e-mail address (press ENTER for none): %c%c", IAC, GA);
 			STATE(d) = CON_EDIT_EMAIL;
 			break;
 
 		default:
 			SEND_TO_Q(d, "\r\nThat's not a menu choice!\r\n");
 			if (port != 4999)
-				SEND_TO_Q(d, "%s", MENU);
+				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 			break;
 		}
 
@@ -3182,11 +3184,11 @@ void nanny(struct descriptor_data *d, char *argu)
 			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
 			SEND_TO_Q(d, "\r\nIncorrect password.\r\n");
 			if (port != 4999)
-				SEND_TO_Q(d, "%s", MENU);
+				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 			STATE(d) = CON_MENU;
 			return;
 		} else {
-			SEND_TO_Q(d, "\r\nEnter a new password: ");
+			SEND_TO_Q(d, "\r\nEnter a new password: %c%c", IAC, GA);
 			STATE(d) = CON_CHPWD_GETNEW;
 			return;
 		}
@@ -3205,7 +3207,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			SEND_TO_Q(d,
 				  "\r\nYOU ARE ABOUT TO DELETE THIS CHARACTER PERMANENTLY.\r\n"
 				  "ARE YOU ABSOLUTELY SURE?\r\n\r\n"
-				  "Please type \"yes\" to confirm: ");
+				  "Please type \"yes\" to confirm: %c%c", IAC, GA);
 			STATE(d) = CON_DELCNF2;
 		}
 		break;
@@ -3240,7 +3242,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			SEND_TO_Q(d, "\033[H\033[J\e[?7h\e[r\x1B[1m\x1B[36m");
 			SEND_TO_Q(d, "\r\nCharacter not deleted.\r\n");
 			if (port != 4999)
-				SEND_TO_Q(d, "%s", MENU);
+				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 			STATE(d) = CON_MENU;
 		}
 		break;
@@ -3258,7 +3260,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			"E-mail: %s changed e-mail address to \"%s\".",
 			GET_NAME(d->character), GET_EMAIL(d->character));
 		save_char(d->character, IN_ROOM(d->character));
-		SEND_TO_Q(d, "%s", MENU);
+		SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 		STATE(d) = CON_MENU;
 		break;
 
