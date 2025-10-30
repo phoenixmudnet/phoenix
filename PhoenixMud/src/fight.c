@@ -3260,16 +3260,10 @@ int get_prof(struct char_data *ch, struct obj_data *wielded)
 
       case TYPE_PIERCE:
       case TYPE_PIERCE_NO_BS:
+      case TYPE_STAB:
       case TYPE_STING:
          if(TWO_HANDED(wielded))
             prof=PROF_SPEAR;
-         else
-            prof=PROF_DAGGER;
-         break;
-
-      case TYPE_STAB:
-         if(TWO_HANDED(wielded))
-            prof=PROF_2H_SWORD;
          else
             prof=PROF_DAGGER;
          break;
