@@ -972,6 +972,16 @@ int encumberance_level(struct char_data *ch)
          }
    weight_worn /= 2;
    items_worn /= 3;
+   if (weight_worn > (4*CAN_CARRY_W(ch))/5)
+      level = 8;
+   else if (weight_worn > (3*CAN_CARRY_W(ch))/5)
+      level = 6;
+   else if (weight_worn > (2*CAN_CARRY_W(ch))/5)
+      level = 4;
+   else if (weight_worn > (CAN_CARRY_W(ch))/5)
+      level = 2;
+
+   /*  Remove speed loss from items carried in inventory - Nomikos 11/2/25
    if ((IS_CARRYING_W(ch) + weight_worn) > (4*CAN_CARRY_W(ch))/5)
       level = 8;
    else if ((IS_CARRYING_W(ch) + weight_worn) > (3*CAN_CARRY_W(ch))/5)
@@ -989,6 +999,7 @@ int encumberance_level(struct char_data *ch)
       level += 2;
    else if ((IS_CARRYING_N(ch) + items_worn) > (CAN_CARRY_N(ch))/5)
       level += 1;
+   */
 
    level /= 2;
    return(level);
