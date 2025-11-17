@@ -36,6 +36,7 @@ extern const int exp_table[];
 extern const float class_exp_multipliers[];
 extern const float race_exp_multipliers[];
 extern struct zone_data *zone_table;
+extern int top_of_zone_table;
 
 
 /* extern function prototypes */
@@ -46,6 +47,8 @@ void str_add_spaces(char *source,int total_length);
 int min_level(struct char_data *ch,int spellnum);
 
 #define GM_COST(i,j,k) (int) (GM_CHARGE(i)* min_level(k,j))
+#define ZCOM zone_table[zone].cmd[cmd_no]  /*from DB.C*/
+
 
 /* Local variables */
 struct guild_master_data *gm_index;
@@ -99,6 +102,51 @@ char *prac_types[] = {
                        "spell",
                        "skill"
                      };
+
+/* This function helps GMs inform players where they need to go - Nomikos 11/16/2025 */
+int gm_refers(struct char_data *keeper, int guild_nr, struct char_data *ch)
+  {
+  zone_rnum zone;
+  int ii, cmd_no, count = 0;
+  int lvl = GET_LEVEL(ch);
+
+  /* This is to match up decimal classes with bitwise trainers (they are out of order) */
+  int gm_match[] = {1<<6, 1<<4, 1<<5, 1<<3, 1<<7, 1<<8, 1<<9, 1<<10, 1<<11, 1<<12,
+                    1<<13, 1<<14, 1<<15, 1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21};
+
+  /* This is the right GM, no referral needed */
+  if ((lvl >= GM_MINLVL(guild_nr)) && (lvl <= GM_MAXLVL(guild_nr)))
+     return 0;
+
+  /* Let them know why they need to go elsewhere */
+  if (lvl < GM_MINLVL(guild_nr))
+    send_to_char(ch, "Your guildmaster tells you 'I do not deal with people so inexperienced in the ways of the world!!'\r\n");
+  else
+    send_to_char(ch, "Your guildmaster tells you 'But I have already taught you all I know!'\r\n");
+
+  for (ii = 0; ii < top_guild; ii++)
+    {
+    /* This means they don't like that class, so go to next GM */
+    if (gm_match[(int)GET_CLASS(ch)] & GM_WITH_WHO(ii))
+      continue;
+    /* They are over the GM's maximum level */
+    if (lvl > GM_MAXLVL(ii))
+      continue;
+    /* They are lower than the GM's minimum level */
+    if (lvl < GM_MINLVL(ii))
+      continue;
+    /* Check where they load (mimics vload code) */
+    for (zone = 0; zone <= top_of_zone_table; zone++)
+      for (cmd_no = 0; ZCOM.command != 'S'; cmd_no++)
+        if (ZCOM.command == 'M')
+          if (ZCOM.arg1 == GM_TRAINER(ii))
+            /* These are the GMs they should seek */
+            send_to_char(ch, "You %s seek %s near %s.\r\n", count++?"could also":"should", 
+               mob_proto[GM_TRAINER(ii)].player.short_descr, zone_table[zone].name);
+    }
+  /* The player has been referred to at least one other GM (hopefully) */
+  return 1;
+  }
 
 
 int is_guild_open(struct char_data *keeper, int guild_nr, int msg)
@@ -355,15 +403,11 @@ SPECIAL(guild)
       what_does_gm_know(guild_nr, ch,1);
       return 1;
       }
-    else if(GET_LEVEL(ch) < GM_MINLVL(guild_nr))
+    else if (gm_refers(keeper, guild_nr, ch))
       {
-      send_to_char(ch, "Your guildmaster tells you 'I do not deal with people so inexperienced in the ways of the world!!'\r\n");
-      return 1;
-      }
-    else if(GET_LEVEL(ch)> (1+GM_MAXLVL(guild_nr))&&(GET_LEVEL(ch)<LVL_IMMORT))
-      {
-      send_to_char(ch, "Your guildmaster tells you 'But I have already taught you all I know!'\r\n");
-      return 1;
+      /* Added this to allow players to learn for that last level, and ignore imms */
+      if ((GET_LEVEL(ch) > (1+GM_MAXLVL(guild_nr))) && (GET_LEVEL(ch) < LVL_IMMORT))
+        return 1;
       }
 
     skill_num = find_skill_num(argument);
@@ -438,15 +482,11 @@ SPECIAL(guild)
       what_does_gm_know(guild_nr, ch,0);
       return 1;
       }
-    else if(GET_LEVEL(ch) < GM_MINLVL(guild_nr))
+    else if (gm_refers(keeper, guild_nr, ch))
       {
-      send_to_char(ch,"Your guildmaster tells you 'I do not deal with people so inexperienced in the ways of the world!!'\r\n");
-      return 1;
-      }
-    else if(GET_LEVEL(ch)> (1+GM_MAXLVL(guild_nr)))
-      {
-      send_to_char(ch,"Your guildmaster tells you 'But i have already taught you all I know!'\r\n");
-      return 1;
+      /* Added this to allow players to practice for that last level, and ignore imms */
+      if ((GET_LEVEL(ch) > (1+GM_MAXLVL(guild_nr))) && (GET_LEVEL(ch) < LVL_IMMORT))
+        return 1;
       }
 
     skill_num = find_skill_num(argument);
@@ -555,46 +595,33 @@ SPECIAL(guild)
     }
   else if (CMD_IS("gain"))
     {
-    if(GET_LEVEL(ch) < GM_MINLVL(guild_nr))
-      {
-      send_to_char(ch,"Your guildmaster tells you 'I do not deal with people so inexperienced in the ways of the world!!'\r\n");
-      }
-    else if(GET_LEVEL(ch)> GM_MAXLVL(guild_nr))
-      {
-      send_to_char(ch,"Your guildmaster tells you 'But i have already taught you all I know!'\r\n");
-      }
+    if (gm_refers(keeper, guild_nr, ch))
+      return 1;
     else if(GET_LEVEL(ch) == (LVL_HERO-1))
       {
       send_to_char(ch,"Your guildmaster tells you 'You are of too high a level for me to train.'\r\n");
       send_to_char(ch,"Your guildmaster tells you 'Now is the time to begin to prepare for the\r\n");
       send_to_char(ch,"Your guildmaster tells you '%s quest. Please see a god for details.'\r\n",
+                   is_remort_level(ch, TRIPLE_REMORT)?"Demi-God":
                    is_remort_level(ch, DOUBLE_REMORT)?"Avatar":
                    is_remort_level(ch, SINGLE_REMORT)?"Angel":"Hero");
       }
     else if(GET_LEVEL(ch)>=LVL_HERO)
       send_to_char(ch,"Your guildmaster tells you 'I cannot train you.'\r\n");
-    else if(is_remort_level(ch,SINGLE_REMORT)&&(GET_CLASS(ch)<CLASS_KENSAI)&&
-            (GET_LEVEL(ch)>=40)&&((GET_LEVEL(ch)/10)+210>time_info.year))
-      send_to_char(ch,"Your guildmaster tells you, 'The gods have imposed "
-      "a limit to your progress.  Wait a few moons, practice up on your "
-      "skills, and then return to me to see if you are worthy to advance.'\r\n");
-      /** Nomikos 7/10/05 --- Speedbump based around the current mud year of **
-      *** 213, which will only allow around 10 levels per 1/2 RL month, to   **
-      *** slow the rate of power-levelling, for our new SAME-class remorts.  **
-      *** --------------WILL REMOVE AFTER MUDYEAR 220 -nomi                  */
     else if((GET_EXP(ch)>=GET_EXP_FOR_CH(ch))&&GET_LEVEL(ch)<(LVL_HERO-1))
       {
       send_to_char(ch,"You raise a level! \r\n");
       GET_EXP(ch) = GET_EXP(ch)-GET_EXP_FOR_CH(ch);
       GET_LEVEL(ch)++;
       send_info("[ INFO ] %s has LEVELED!!!!!!\r\n", GET_NAME(ch));
-      if (GET_LEVEL(ch) <= 20 && REMORT_LEVEL(ch) == NON_REMORT) {
-	/* For players under level 20, force the guildmaster to "noobgain" which can fire
-	 * a command trigger.  The %arg% variable is the person who gained. */
-	char *buf3 = get_buffer(MAX_INPUT_LENGTH);
-	sprintf(buf3, "noobgain %s", GET_NAME(ch));
-	command_interpreter(keeper, buf3);
-	release_buffer(buf3);
+      if (GET_LEVEL(ch) <= 20 && REMORT_LEVEL(ch) == NON_REMORT)
+        {
+	     /* For players under level 20, force the guildmaster to "noobgain" which can fire
+	      * a command trigger.  The %arg% variable is the person who gained. */
+	     char *buf3 = get_buffer(MAX_INPUT_LENGTH);
+	     sprintf(buf3, "noobgain %s", GET_NAME(ch));
+	     command_interpreter(keeper, buf3);
+	     release_buffer(buf3);
       }
       advance_level(ch,1);
       }
