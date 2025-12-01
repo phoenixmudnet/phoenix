@@ -47,6 +47,14 @@
 #define MSSP 70
 #define MSSP_VAR 1
 #define MSSP_VAL 2
+
+#define MSDP 69
+#define MSDP_VAR 1
+#define MSDP_VAL 2
+#define MSDP_TABLE_OPEN 3
+#define MSDP_TABLE_CLOSE 4
+#define MSDP_ARRAY_OPEN 5
+#define MSDP_ARRAY_CLOSE 6
  
 FILE *logfile = NULL;           /* Where to send the log messages. */
 /* externs */ 
@@ -1802,6 +1810,7 @@ int new_descriptor(int s)
    newd->next = descriptor_list; 
    descriptor_list = newd; 
    SEND_TO_Q(newd, "%c%c%c", IAC, WILL, MSSP);
+   SEND_TO_Q(newd, "%c%c%c", IAC, WILL, MSDP);
    if(port!=4999)
       SEND_TO_Q(newd, "%s", GREETINGS); 
    SEND_TO_Q(newd,"Please wait"); 
@@ -1834,9 +1843,7 @@ int process_output(struct descriptor_data *t)
       strcat(i, "**OVERFLOW** Almost lost ya.\r\n"); 
  
   /* add the extra CRLF if the person isn't in compact mode */ 
-   if (STATE(t)==CON_PLAYING && t->character && !IS_NPC(t->character) &&
-       !PRF_FLAGGED(t->character,PRF_COMPACT))
-      {
+   if (STATE(t)==CON_PLAYING && t->character && !IS_NPC(t->character) && !PRF_FLAGGED(t->character,PRF_COMPACT)) {
       if (!PRF_FLAGGED(t->character,PRF_INFOBAR))  /* -naj infobar2 12/16/96 - make sure extra spacing goes to window */ 
 	 strcat(i + 2, "\r\n"); 
       else 
@@ -1853,6 +1860,23 @@ int process_output(struct descriptor_data *t)
    
   /* add a prompt */
    strncat(i + 2, make_prompt(t), MAX_PROMPT_LENGTH);
+
+   if (STATE(t)==CON_PLAYING && t->character && !IS_NPC(t->character) && IS_SET(t->oob_protocol, OOB_MSDP) && IS_SET(t->oob_protocol, OOB_REPORT_STATS)) {
+      sprintf(i + strlen(i), "%c%c%c%cHEALTH%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_HIT(t->character), IAC, SE);
+      sprintf(i + strlen(i), "%c%c%c%cMAX_HEALTH%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_HIT(t->character), IAC, SE);
+
+      sprintf(i + strlen(i), "%c%c%c%cMANA%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MANA(t->character), IAC, SE);
+      sprintf(i + strlen(i), "%c%c%c%cMAX_MANA%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_MANA(t->character), IAC, SE);
+
+      sprintf(i + strlen(i), "%c%c%c%cMOVEMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MOVE(t->character), IAC, SE);
+      sprintf(i + strlen(i), "%c%c%c%cMAX_MOVEMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_MOVE(t->character), IAC, SE);
+
+      sprintf(i + strlen(i), "%c%c%c%cALIGNMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_ALIGNMENT(t->character), IAC, SE);
+
+      sprintf(i + strlen(i), "%c%c%c%cGOLD%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_GOLD(t->character), IAC, SE);
+
+      sprintf(i + strlen(i), "%c%c%c%cEXPERIENCE_TNL%c%ld%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_EXP_FOR_CH(t->character) - GET_EXP(t->character), IAC, SE);
+   }
 
   /* 
    * now, send the output.  If this is an 'interruption', use the prepended 
@@ -1921,17 +1945,19 @@ int write_to_descriptor(socket_t desc, const char *txt)
    return 0; 
 } 
 
-void handle_iac(struct descriptor_data *d) { 
+// Handles incoming IAC (Interpret As Command) sequences from the client.
+// Returns 0 if the buffer ends in the middle of a sequence. Otherwise, returns 1.
+int handle_iac(struct descriptor_data *d) { 
 
-   for (unsigned char* ptr = d->inbuf; *ptr != 0; ptr++) {
+   for (unsigned char* ptr = (unsigned char*)d->inbuf; *ptr != 0; ptr++) {
       if (*ptr == IAC) {
          unsigned char cmd = *(ptr + 1);
 
-         if (!cmd) break;
+         if (!cmd) return 0;
 
          unsigned char opt = *(ptr + 2);
 
-         if (!opt) break;
+         if (!opt) return 0;
 
          switch (cmd) {
             case DO:
@@ -1975,9 +2001,14 @@ void handle_iac(struct descriptor_data *d) {
                   SEND_TO_Q(d, "%c%c", IAC, SE);
                }
 
+               if (opt == MSDP) {
+                  REMOVE_BIT(d->oob_protocol, OOB_GMCP);
+                  SET_BIT(d->oob_protocol, OOB_MSDP);
+               }
+
                // We processed three bytes: IAC, DO, opt. Overwrite those three with everything after them.
                // Move the pointer back one to account for the increment in the for loop.
-               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               memmove(ptr, ptr + 3, strlen((const char*)ptr + 3) + 1);
                ptr--;
                break;
             case DONT:
@@ -1988,21 +2019,157 @@ void handle_iac(struct descriptor_data *d) {
                   SEND_TO_Q(d, "%c%c%c", IAC, WONT, TELOPT_SGA);
                }
 
-               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               if (opt == MSDP) {
+                  REMOVE_BIT(d->oob_protocol, OOB_MSDP);
+               }
+
+               memmove(ptr, ptr + 3, strlen((const char*)ptr + 3) + 1);
                ptr--;
                break;
             case WILL:
 
-               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               memmove(ptr, ptr + 3, strlen((const char*)ptr + 3) + 1);
                ptr--;
                break;
             case WONT:
 
-               memmove(ptr, ptr + 3, strlen(ptr + 3) + 1);
+               memmove(ptr, ptr + 3, strlen((const char*)ptr + 3) + 1);
                ptr--;
                break;
             case SB:
-               // Read until IAC SE
+
+               // Find the end of the subnegotiation.
+               // If we reach the end of the buffer before finding it, return so
+               // we can wait for more data.
+               unsigned char* sub_ptr = ptr + 3;
+               while (*sub_ptr != IAC) {
+                  if (*sub_ptr == 0) return 0; // incomplete
+                  sub_ptr++;
+               }
+               sub_ptr++; // skip IAC
+
+               while (*sub_ptr != SE) {
+                  if (*sub_ptr == 0) return 0; // incomplete
+                  sub_ptr++;
+               }
+               sub_ptr++; // skip SE
+
+               if (opt == MSDP) {
+
+                  char* var = (char*)ptr + 4; // Skip IAC SB MSDP MSDP_VAR
+
+                  unsigned char* end = (unsigned char*) var;
+
+                  // Find the end of the variable name. We know the
+                  // subnegotiation ends at sub_ptr. If we get there without
+                  // finding MSDP_VAL, the subnegotiation is malformed and we'll
+                  // ignore it.
+                  for (; end < sub_ptr && *end != MSDP_VAL; end++);
+
+                  if (end == sub_ptr) {
+                     goto subnegotiation_handled;
+                  }
+
+                  // Null terminate the variable name
+                  *end = 0; 
+
+                  char* value = (char*) end + 1;
+
+                  // Advance end to the end of the value
+                  for (; end < sub_ptr && *end != MSDP_VAL && *end != IAC; end++);
+
+                  // Client sent multiple values... not sure how to handle that yet.
+                  if (*end == MSDP_VAL) {
+                     goto subnegotiation_handled;
+                  }
+
+                  // Null terminate the value
+                  *end = 0;
+
+                  if (strcmp(var, "LIST") == 0) {
+                     SEND_TO_Q(d, "%c%c%c", IAC, SB, MSDP);
+                     SEND_TO_Q(d, "%c%s%c", MSDP_VAR, value, MSDP_VAL);
+                     SEND_TO_Q(d, "%c", MSDP_ARRAY_OPEN);
+
+                     if (strcmp(value, "COMMANDS") == 0) {
+
+                        const char* commands[] = { "LIST", "REPORT", "SEND", "UNREPORT", NULL };
+                        for (size_t ii = 0; commands[ii] != NULL; ii++) {
+                           SEND_TO_Q(d, "%c%s", MSDP_VAL, commands[ii]);
+                        }
+
+                     } else if (strcmp(value, "LISTS") == 0) {
+
+                        const char* lists[] = { "COMMANDS", "LISTS", "REPORTABLE_VARIABLES", "SENDABLE_VARIABLES", NULL };
+                        for (size_t ii = 0; lists[ii] != NULL; ii++) {
+                           SEND_TO_Q(d, "%c%s", MSDP_VAL, lists[ii]);
+                        }
+
+                     } else if (strcmp(value, "REPORTABLE_VARIABLES") == 0) {
+
+                        const char* reportable_variables[] = { "STATS", "ROOM", NULL };
+
+                        for (size_t ii = 0; reportable_variables[ii] != NULL; ii++) {
+                           SEND_TO_Q(d, "%c%s", MSDP_VAL, reportable_variables[ii]);
+                        }
+
+                     } else if (strcmp(value, "REPORTED_VARIABLES") == 0) {
+
+                        if (IS_SET(d->oob_protocol, OOB_REPORT_STATS)) {
+                           SEND_TO_Q(d, "%cSTATS", MSDP_VAL);
+                        }
+                        if (IS_SET(d->oob_protocol, OOB_REPORT_ROOM)) {
+                           SEND_TO_Q(d, "%cROOM", MSDP_VAL);
+                        }
+
+                     } else if (strcmp(value, "SENDABLE_VARIABLES") == 0) {
+
+                        const char* sendable_variables[] = { "GITREF", NULL };
+                        for (size_t ii = 0; sendable_variables[ii] != NULL; ii++) {
+                           SEND_TO_Q(d, "%c%s", MSDP_VAL, sendable_variables[ii]);
+                        }
+
+                     }
+
+                     // If they ask for an unsupported list, we'll return an empty array.
+                     SEND_TO_Q(d, "%c", MSDP_ARRAY_CLOSE);
+                     SEND_TO_Q(d, "%c%c", IAC, SE);
+                  } else if (strcmp(var, "REPORT") == 0) {
+                     if (strcmp(value, "STATS") == 0) {
+                        SET_BIT(d->oob_protocol, OOB_REPORT_STATS);
+                     } else if (strcmp(value, "ROOM") == 0) {
+                        SET_BIT(d->oob_protocol, OOB_REPORT_ROOM);
+                     }
+                  } else if (strcmp(var, "SEND") == 0) {
+                     if (strcmp(value, "GITREF") == 0) {
+                        SEND_TO_Q(d, "%c%c%c", IAC, SB, MSDP);
+#ifdef GIT_REF
+#define STRING(a) #a
+#define XSTRING(a) STRING(a)
+                        SEND_TO_Q(d, "%c%s%c%s", MSDP_VAR, "GITREF", MSDP_VAL, XSTRING(GIT_REF));
+#undef STRING
+#undef XSTRING
+#endif
+                        SEND_TO_Q(d, "%c%c", IAC, SE);
+                     }
+                  } else if (strcmp(var, "UNREPORT") == 0) {
+                     if (strcmp(value, "STATS") == 0) {
+                        REMOVE_BIT(d->oob_protocol, OOB_REPORT_STATS);
+                     } else if (strcmp(value, "ROOM") == 0) {
+                        REMOVE_BIT(d->oob_protocol, OOB_REPORT_ROOM);
+                     }
+                  } else {
+                     fprintf(stderr, "Unhandled command >%s:", var);
+                  }
+               }
+
+               fprintf(stderr, "\n");
+
+            subnegotiation_handled:
+               // We've now either processed or ignored the subnegotiation.
+               // Remove it from the buffer.
+               memmove(ptr, sub_ptr, strlen((const char*)sub_ptr) + 1);
+               ptr--;
                break;
             default:
                break;
@@ -2010,6 +2177,7 @@ void handle_iac(struct descriptor_data *d) {
       }
    }
 
+   return 1;
 }
  
 /* 
@@ -2052,7 +2220,7 @@ int process_input(struct descriptor_data *t) {
 
    *(read_point + bytes_read) = '\0'; /* terminate the string */
 
-   handle_iac(t); /* check for IAC commands */
+   if (handle_iac(t) == 0) return 0; /* check for IAC commands */
 
    /* search for a newline in the data we just read */
 

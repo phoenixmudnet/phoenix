@@ -519,6 +519,12 @@
 #define CON_HOME_TOWN    38             /* Confirm hometown. */
 #define CON_EDIT_EMAIL   39             /* At main menu, editing e-mail address. */
 
+#define OOB_NONE 0
+#define OOB_MSDP (1 << 0)
+#define OOB_GMCP (1 << 1)
+#define OOB_REPORT_STATS (1 << 2)
+#define OOB_REPORT_ROOM (1 << 3)
+
 /* Updated to match Phoenix */
 /* Character equipment positions: used as index for char_data.equipment[] */
 /* NOTE: Don't confuse these constants with the ITEM_ bitvectors
@@ -1787,7 +1793,7 @@ struct descriptor_data {
    byte	bad_pws;		/* number of bad pw attemps this login	*/
    byte idle_tics;		/* tics idle at password prompt		*/
    int	connected;		/* mode of 'connectedness'		*/
-   int connected2;		/* extra modes				*/
+   int oob_protocol;		/* Out of band protocol settings */
 /*   int	wait;*/			/* wait for how many loops		*/
    int	desc_num;		/* unique num assigned to desc		*/
    time_t login_time;		/* when the person connected		*/
