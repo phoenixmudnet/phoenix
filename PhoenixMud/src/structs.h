@@ -525,6 +525,14 @@
 #define OOB_REPORT_STATS (1 << 2)
 #define OOB_REPORT_ROOM (1 << 3)
 
+#define MSDP 69
+#define MSDP_VAR 1
+#define MSDP_VAL 2
+#define MSDP_TABLE_OPEN 3
+#define MSDP_TABLE_CLOSE 4
+#define MSDP_ARRAY_OPEN 5
+#define MSDP_ARRAY_CLOSE 6
+
 /* Updated to match Phoenix */
 /* Character equipment positions: used as index for char_data.equipment[] */
 /* NOTE: Don't confuse these constants with the ITEM_ bitvectors

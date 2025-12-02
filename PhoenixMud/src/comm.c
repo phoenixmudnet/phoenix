@@ -48,14 +48,6 @@
 #define MSSP_VAR 1
 #define MSSP_VAL 2
 
-#define MSDP 69
-#define MSDP_VAR 1
-#define MSDP_VAL 2
-#define MSDP_TABLE_OPEN 3
-#define MSDP_TABLE_CLOSE 4
-#define MSDP_ARRAY_OPEN 5
-#define MSDP_ARRAY_CLOSE 6
- 
 FILE *logfile = NULL;           /* Where to send the log messages. */
 /* externs */ 
 extern int circle_restrict; 
@@ -2036,7 +2028,7 @@ int handle_iac(struct descriptor_data *d) {
                memmove(ptr, ptr + 3, strlen((const char*)ptr + 3) + 1);
                ptr--;
                break;
-            case SB:
+            case SB:;
 
                // Find the end of the subnegotiation.
                // If we reach the end of the buffer before finding it, return so

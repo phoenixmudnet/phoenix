@@ -11,6 +11,9 @@
 #include "../localHeader/conf.h"
 #include "../localHeader/sysdep.h"
 
+// For MSDP
+#include <arpa/telnet.h> 
+
 #include "structs.h"
 #include "buffer.h"
 #include "utils.h"
@@ -964,6 +967,112 @@ ACMD(do_exits)
 	release_buffer(buf);
 }
 
+// Send exits as a nested MSDP table. This generates a structure that, in JSON,
+// might look like:
+//
+// "EXITS":{
+//   "east": {
+//     "FLAGS": [],
+//     "NAME": "The Temple Forge",
+//     "VNUM": "3063"
+//   },
+//   "north": {
+//     "FLAGS": [],
+//     "NAME": "The Northern End of the Temple",
+//     "VNUM": "3054"
+//   },
+//   "south": {
+//     "FLAGS": [],
+//     "NAME": "The Temple Plaza",
+//     "VNUM": "3005"
+//   },
+//   "west": {
+//     "FLAGS": [
+//       "HIDDEN",
+//       "DOOR"
+//     ],
+//     "NAME": "The Meditation Chamber",
+//     "VNUM": "3000"
+//   }
+// }
+//
+// Exits are only sent if the character would normally see them. VNUMs are only
+// sent if the character has the roomflags preference enabled, which is only set
+// on immortals.
+void msdp_exits(struct char_data* ch) {
+	send_to_char(ch, "%cEXITS%c%c", MSDP_VAR, MSDP_VAL, MSDP_TABLE_OPEN);
+
+	for (int direction = 0; direction < NUM_OF_DIRS; direction++) {
+		struct room_direction_data* exit = EXIT(ch, direction);
+
+		// Is there an exit in this direction?
+		if (exit == NULL) continue;
+		if (exit->to_room == NOWHERE) continue;
+
+		// Can the character see this exit?
+		if (GET_LEVEL(ch) < LVL_IMMORT) {
+			if (EXIT_FLAGGED(exit, EX_NOPASS)) continue;
+			if (EXIT_FLAGGED(exit, EX_HIDDEN)) continue;
+			if (EXIT_FLAGGED(exit, EX_CLOSED) && EXIT_FLAGGED(exit, EX_SECRET)) continue;
+		}
+
+		send_to_char(ch, "%c%s%c%c", MSDP_VAR, dirs[direction], MSDP_VAL, MSDP_TABLE_OPEN);
+
+		// Only send VNUMs if the roomflags bit is set. This matches the behavior above for the current room.
+		if (PRF_FLAGGED(ch, PRF_ROOMFLAGS)) {
+			send_to_char(ch, "%cVNUM%c%ld", MSDP_VAR, MSDP_VAL, GET_ROOM_VNUM(exit->to_room));
+		}
+
+		// Send exit flags. If the exit was marked secret but happens to be
+		// open, we're giving away that it's a secret exit vs a normal one.
+		// There's no real advantage to knowing that an exit will disappear
+		// if you close it, so I think it's fine.
+		send_to_char(ch, "%cFLAGS%c%c", MSDP_VAR, MSDP_VAL, MSDP_ARRAY_OPEN);
+		if (EXIT_FLAGGED(exit, EX_CLOSED)) { send_to_char(ch, "%cCLOSED", MSDP_VAL); }
+		if (EXIT_FLAGGED(exit, EX_HIDDEN)) { send_to_char(ch, "%cHIDDEN", MSDP_VAL); }
+		if (EXIT_FLAGGED(exit, EX_SECRET)) { send_to_char(ch, "%cSECRET", MSDP_VAL); }
+		if (EXIT_FLAGGED(exit, EX_NOPASS)) { send_to_char(ch, "%cNOPASS", MSDP_VAL); }
+		if (EXIT_FLAGGED(exit, EX_ISDOOR)) { send_to_char(ch, "%cDOOR",   MSDP_VAL); }
+		send_to_char(ch, "%c", MSDP_ARRAY_CLOSE);
+
+		// Send the title of the connected room to everyone
+		send_to_char(ch, "%cNAME%c%s", MSDP_VAR, MSDP_VAL, world[exit->to_room].name);
+
+		send_to_char(ch, "%c", MSDP_TABLE_CLOSE);
+	}
+
+	send_to_char(ch, "%c", MSDP_TABLE_CLOSE);
+}
+
+// Send room information as an MSDP table. This generates structure that, in
+// JSON, might look like:
+//
+// "ROOM" : {
+//   "NAME": "The Temple of the Phoenix",
+//   "VNUM": "3001",
+//   "ZONE": "Heliopolis  "
+//   "EXITS": { ... see msdp_exits ... }
+// }
+//
+// VNUM is only sent if the character has the roomflags preference enabled,
+// which is only set on immortals.
+void msdp_room(struct char_data* ch) {
+	send_to_char(ch, "%c%c%c%cROOM", IAC, SB, MSDP, MSDP_VAR);
+	send_to_char(ch, "%c%c", MSDP_VAL, MSDP_TABLE_OPEN);
+
+	if (PRF_FLAGGED(ch, PRF_ROOMFLAGS)) {
+		send_to_char(ch, "%cVNUM%c%ld", MSDP_VAR, MSDP_VAL, GET_ROOM_VNUM(IN_ROOM(ch)));
+	}
+
+	send_to_char(ch, "%cNAME%c%s", MSDP_VAR, MSDP_VAL, world[IN_ROOM(ch)].name);
+	send_to_char(ch, "%cZONE%c%s", MSDP_VAR, MSDP_VAL, zone_table[world[IN_ROOM(ch)].zone].name);
+
+	msdp_exits(ch);
+
+	send_to_char(ch, "%c", MSDP_TABLE_CLOSE);
+	send_to_char(ch, "%c%c", IAC, SE);
+}
+
 void look_at_room(struct char_data *ch, int ignore_brief)
 {
 	if (!ch->desc)
@@ -1018,6 +1127,10 @@ void look_at_room(struct char_data *ch, int ignore_brief)
 	list_obj_to_char(world[IN_ROOM(ch)].contents, ch, 6, FALSE);
 	list_char_to_char(world[IN_ROOM(ch)].people, ch);
 	send_to_char(ch, CCNRM(ch, C_NRM));
+
+	if (!IS_NPC(ch) && IS_SET(ch->desc->oob_protocol, OOB_MSDP) && IS_SET(ch->desc->oob_protocol, OOB_REPORT_ROOM)) {
+		msdp_room(ch);
+	}
 }
 
 void look_in_direction(struct char_data *ch, int dir)
