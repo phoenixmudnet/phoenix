@@ -533,6 +533,8 @@
 #define MSDP_ARRAY_OPEN 5
 #define MSDP_ARRAY_CLOSE 6
 
+#define GMCP 201
+
 /* Updated to match Phoenix */
 /* Character equipment positions: used as index for char_data.equipment[] */
 /* NOTE: Don't confuse these constants with the ITEM_ bitvectors
