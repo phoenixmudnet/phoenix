@@ -12,6 +12,7 @@
  
 #include "../localHeader/conf.h" 
 #include "../localHeader/sysdep.h" 
+#include "json.h"
  
 #include <sys/socket.h> 
 #include <sys/resource.h> 
@@ -20,6 +21,7 @@
 #include <signal.h> 
 
 #include <stdarg.h> 
+
 
 #include "structs.h" 
 #include "buffer.h"
@@ -1801,8 +1803,10 @@ int new_descriptor(int s)
   /* prepend to list */ 
    newd->next = descriptor_list; 
    descriptor_list = newd; 
-   SEND_TO_Q(newd, "%c%c%c", IAC, WILL, MSSP);
-   SEND_TO_Q(newd, "%c%c%c", IAC, WILL, MSDP);
+   SEND_TO_Q(newd, "%c%c%c", IAC, WILL, MSSP); // Advertise MSSP support
+   SEND_TO_Q(newd, "%c%c%c", IAC, WILL, MSDP); // Advertise MSDP support
+   SEND_TO_Q(newd, "%c%c%c", IAC, WILL, GMCP); // Advertise GMCP support
+
    if(port!=4999)
       SEND_TO_Q(newd, "%s", GREETINGS); 
    SEND_TO_Q(newd,"Please wait"); 
@@ -1852,22 +1856,44 @@ int process_output(struct descriptor_data *t)
    
   /* add a prompt */
    strncat(i + 2, make_prompt(t), MAX_PROMPT_LENGTH);
+   if (STATE(t)==CON_PLAYING && t->character && !IS_NPC(t->character) && IS_SET(t->oob_protocol, OOB_REPORT_STATS)) {
+      if (IS_SET(t->oob_protocol, OOB_MSDP)) {
+         sprintf(i + strlen(i), "%c%c%c%cHEALTH%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_HIT(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cMAX_HEALTH%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_HIT(t->character), IAC, SE);
 
-   if (STATE(t)==CON_PLAYING && t->character && !IS_NPC(t->character) && IS_SET(t->oob_protocol, OOB_MSDP) && IS_SET(t->oob_protocol, OOB_REPORT_STATS)) {
-      sprintf(i + strlen(i), "%c%c%c%cHEALTH%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_HIT(t->character), IAC, SE);
-      sprintf(i + strlen(i), "%c%c%c%cMAX_HEALTH%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_HIT(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cMANA%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MANA(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cMAX_MANA%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_MANA(t->character), IAC, SE);
 
-      sprintf(i + strlen(i), "%c%c%c%cMANA%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MANA(t->character), IAC, SE);
-      sprintf(i + strlen(i), "%c%c%c%cMAX_MANA%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_MANA(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cMOVEMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MOVE(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cMAX_MOVEMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_MOVE(t->character), IAC, SE);
 
-      sprintf(i + strlen(i), "%c%c%c%cMOVEMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MOVE(t->character), IAC, SE);
-      sprintf(i + strlen(i), "%c%c%c%cMAX_MOVEMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_MAX_MOVE(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cALIGNMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_ALIGNMENT(t->character), IAC, SE);
 
-      sprintf(i + strlen(i), "%c%c%c%cALIGNMENT%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_ALIGNMENT(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cGOLD%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_GOLD(t->character), IAC, SE);
 
-      sprintf(i + strlen(i), "%c%c%c%cGOLD%c%d%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_GOLD(t->character), IAC, SE);
+         sprintf(i + strlen(i), "%c%c%c%cEXPERIENCE_TNL%c%ld%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_EXP_FOR_CH(t->character) - GET_EXP(t->character), IAC, SE);
+      }
 
-      sprintf(i + strlen(i), "%c%c%c%cEXPERIENCE_TNL%c%ld%c%c", IAC, SB, MSDP, MSDP_VAR, MSDP_VAL, GET_EXP_FOR_CH(t->character) - GET_EXP(t->character), IAC, SE);
+      if (IS_SET(t->oob_protocol, OOB_GMCP)) {
+         sprintf(i + strlen(i), "%c%c%cChar.Vitals {", IAC, SB, GMCP);
+
+         sprintf(i + strlen(i), "\"HEALTH\":\"%d\",", GET_HIT(t->character));
+         sprintf(i + strlen(i), "\"MAX_HEALTH\":\"%d\",", GET_MAX_HIT(t->character));
+
+         sprintf(i + strlen(i), "\"MANA\":\"%d\",", GET_MANA(t->character));
+         sprintf(i + strlen(i), "\"MAX_MANA\":\"%d\",", GET_MAX_MANA(t->character));
+
+         sprintf(i + strlen(i), "\"MOVEMENT\":\"%d\",", GET_MOVE(t->character));
+         sprintf(i + strlen(i), "\"MAX_MOVEMENT\":\"%d\",", GET_MAX_MOVE(t->character));
+
+         sprintf(i + strlen(i), "\"ALIGNMENT\":\"%d\",", GET_ALIGNMENT(t->character));
+
+         sprintf(i + strlen(i), "\"GOLD\":\"%d\",", GET_GOLD(t->character));
+
+         sprintf(i + strlen(i), "\"EXPERIENCE_TNL\":\"%ld\"", GET_EXP_FOR_CH(t->character) - GET_EXP(t->character));
+
+         sprintf(i + strlen(i), "}%c%c", IAC, SE);
+      }
    }
 
   /* 
@@ -1937,6 +1963,292 @@ int write_to_descriptor(socket_t desc, const char *txt)
    return 0; 
 } 
 
+void handle_mssp(struct descriptor_data* d) {
+   SEND_TO_Q(d, "%c%c%c", IAC, SB, MSSP);
+   SEND_TO_Q(d, "%cNAME%cPhoenixMud", MSSP_VAR, MSSP_VAL);
+
+   int players = 0;
+
+   for (struct char_data* vict = character_list; vict != 0; vict = vict->next) {
+      if (IS_NPC(vict)) continue;
+      if (vict->desc) players++;
+   }
+
+   SEND_TO_Q(d, "%cPLAYERS%c%d", MSSP_VAR, MSSP_VAL, players);
+   SEND_TO_Q(d, "%cUPTIME%c%ld", MSSP_VAR, MSSP_VAL, boot_time);
+
+   SEND_TO_Q(d, "%cCREATED%c1996", MSSP_VAR, MSSP_VAL);
+   SEND_TO_Q(d, "%cDISCORD%chttps://discord.gg/dUE3Nm2rEE", MSSP_VAR, MSSP_VAL);
+   SEND_TO_Q(d, "%cHOSTNAME%cphoenixmud.net", MSSP_VAR, MSSP_VAL);
+   SEND_TO_Q(d, "%cPORT%c4000", MSSP_VAR, MSSP_VAL);
+   SEND_TO_Q(d, "%cWEBSITE%chttps://phoenixmud.net", MSSP_VAR, MSSP_VAL);
+
+   SEND_TO_Q(d, "%cFAMILY%cPhoenixMUD%cCircleMUD%cDikuMUD%cAberMUD", MSSP_VAR, MSSP_VAL, MSSP_VAL, MSSP_VAL, MSSP_VAL);
+   SEND_TO_Q(d, "%cGENRE%cFantasy", MSSP_VAR, MSSP_VAL);
+   SEND_TO_Q(d, "%cSTATUS%cLive", MSSP_VAR, MSSP_VAL);
+
+   SEND_TO_Q(d, "%cAREAS%c%d", MSSP_VAR, MSSP_VAL, top_of_zone_table + 1);
+   SEND_TO_Q(d, "%cHELPFILES%c%d", MSSP_VAR, MSSP_VAL, top_of_helpt + 1);
+   SEND_TO_Q(d, "%cMOBILES%c%d", MSSP_VAR, MSSP_VAL, top_of_mobt + 1);
+   SEND_TO_Q(d, "%cOBJECTS%c%d", MSSP_VAR, MSSP_VAL, top_of_objt + 1);
+   SEND_TO_Q(d, "%cROOMS%c%ld", MSSP_VAR, MSSP_VAL, top_of_world + 1);
+
+   SEND_TO_Q(d, "%cCLASSES%c15", MSSP_VAR, MSSP_VAL);
+   SEND_TO_Q(d, "%cLEVELS%c%d", MSSP_VAR, MSSP_VAL, 101+102+103+104);
+   SEND_TO_Q(d, "%cRACES%c15", MSSP_VAR, MSSP_VAL);
+   SEND_TO_Q(d, "%cSKILLS%c%d", MSSP_VAR, MSSP_VAL, MAX_SPELLS);
+
+   SEND_TO_Q(d, "%cANSI%c1", MSSP_VAR, MSSP_VAL);
+
+   SEND_TO_Q(d, "%c%c", IAC, SE);
+}
+
+void handle_msdp_subopt(struct descriptor_data* d, unsigned char* subopt_start, unsigned char* subopt_end) {
+
+   if (*subopt_start != MSDP_VAR) {
+      return;
+   }
+
+   char* var = (char*)subopt_start + 1; // MSDP_VAR
+
+   unsigned char* end = (unsigned char*) var;
+
+   // Find the end of the variable name. We know the
+   // subnegotiation ends at sub_ptr. If we get there without
+   // finding MSDP_VAL, the subnegotiation is malformed and we'll
+   // ignore it.
+   for (; end < subopt_end && *end != MSDP_VAL; end++);
+
+   if (end == subopt_end) {
+      return;
+   }
+
+   // Null terminate the variable name
+   *end = 0; 
+
+   char* value = (char*) end + 1;
+
+   // Advance end to the end of the value
+   for (; end < subopt_end && *end != MSDP_VAL; end++);
+
+   // Client sent multiple values... not sure how to handle that yet.
+   if (*end == MSDP_VAL) {
+      return;
+   }
+
+   // Null terminate the value
+   *end = 0;
+
+   if (strcmp(var, "LIST") == 0) {
+      SEND_TO_Q(d, "%c%c%c", IAC, SB, MSDP);
+      SEND_TO_Q(d, "%c%s%c", MSDP_VAR, value, MSDP_VAL);
+      SEND_TO_Q(d, "%c", MSDP_ARRAY_OPEN);
+
+      if (strcmp(value, "COMMANDS") == 0) {
+
+         const char* commands[] = { "LIST", "REPORT", "SEND", "UNREPORT", NULL };
+         for (size_t ii = 0; commands[ii] != NULL; ii++) {
+            SEND_TO_Q(d, "%c%s", MSDP_VAL, commands[ii]);
+         }
+
+      } else if (strcmp(value, "LISTS") == 0) {
+
+         const char* lists[] = { "COMMANDS", "LISTS", "REPORTABLE_VARIABLES", "SENDABLE_VARIABLES", NULL };
+         for (size_t ii = 0; lists[ii] != NULL; ii++) {
+            SEND_TO_Q(d, "%c%s", MSDP_VAL, lists[ii]);
+         }
+
+      } else if (strcmp(value, "REPORTABLE_VARIABLES") == 0) {
+
+         const char* reportable_variables[] = { "STATS", "ROOM", NULL };
+
+         for (size_t ii = 0; reportable_variables[ii] != NULL; ii++) {
+            SEND_TO_Q(d, "%c%s", MSDP_VAL, reportable_variables[ii]);
+         }
+
+      } else if (strcmp(value, "REPORTED_VARIABLES") == 0) {
+
+         if (IS_SET(d->oob_protocol, OOB_REPORT_STATS)) {
+            SEND_TO_Q(d, "%cSTATS", MSDP_VAL);
+         }
+         if (IS_SET(d->oob_protocol, OOB_REPORT_ROOM)) {
+            SEND_TO_Q(d, "%cROOM", MSDP_VAL);
+         }
+
+      } else if (strcmp(value, "SENDABLE_VARIABLES") == 0) {
+
+         const char* sendable_variables[] = { "GITREF", NULL };
+         for (size_t ii = 0; sendable_variables[ii] != NULL; ii++) {
+            SEND_TO_Q(d, "%c%s", MSDP_VAL, sendable_variables[ii]);
+         }
+
+      }
+
+      // If they ask for an unsupported list, we'll return an empty array.
+      SEND_TO_Q(d, "%c", MSDP_ARRAY_CLOSE);
+      SEND_TO_Q(d, "%c%c", IAC, SE);
+   } else if (strcmp(var, "REPORT") == 0) {
+      if (strcmp(value, "STATS") == 0) {
+         SET_BIT(d->oob_protocol, OOB_REPORT_STATS);
+      } else if (strcmp(value, "ROOM") == 0) {
+         SET_BIT(d->oob_protocol, OOB_REPORT_ROOM);
+      }
+   } else if (strcmp(var, "SEND") == 0) {
+      if (strcmp(value, "GITREF") == 0) {
+         SEND_TO_Q(d, "%c%c%c", IAC, SB, MSDP);
+#ifdef GIT_REF
+#define STRING(a) #a
+#define XSTRING(a) STRING(a)
+         SEND_TO_Q(d, "%c%s%c%s", MSDP_VAR, "GITREF", MSDP_VAL, XSTRING(GIT_REF));
+#undef STRING
+#undef XSTRING
+#endif
+         SEND_TO_Q(d, "%c%c", IAC, SE);
+      }
+   } else if (strcmp(var, "UNREPORT") == 0) {
+      if (strcmp(value, "STATS") == 0) {
+         REMOVE_BIT(d->oob_protocol, OOB_REPORT_STATS);
+      } else if (strcmp(value, "ROOM") == 0) {
+         REMOVE_BIT(d->oob_protocol, OOB_REPORT_ROOM);
+      }
+   } else {
+      fprintf(stderr, "Unhandled command >%s:", var);
+   }
+}
+
+void handle_gmcp_core_hello(struct descriptor_data* d, char* data) {
+   struct json_value_s* root = json_parse(data, strlen(data));
+
+   const char* client = NULL;
+
+   if (root->type == json_type_object) {
+      struct json_object_s* object = (struct json_object_s*)root->payload;
+
+      for (struct json_object_element_s* element = object->start; element != NULL; element = element->next) {
+         if (strcmp(element->name->string, "client") == 0) {
+            struct json_value_s* client_value = element->value;
+            if (client_value->type == json_type_string) {
+               struct json_string_s* client_string = (struct json_string_s*)client_value->payload;
+               client = client_string->string;
+            }
+         } else if (strcmp(element->name->string, "version") == 0) {
+            struct json_value_s* version_value = element->value;
+            if (version_value->type == json_type_string) {
+               struct json_string_s* version_string = (struct json_string_s*)version_value->payload;
+
+               // Mudlet also sends version. Should we do something with it?
+            }
+         }
+      }
+   }
+
+   // Send Mudlet package information if the client is Mudlet
+   if (strcmp(client, "Mudlet") == 0) {
+      fprintf(stderr, "Sending Mudlet package information\n");
+      SEND_TO_Q(d, "%c%c%cClient.GUI ", IAC, SB, GMCP);
+      SEND_TO_Q(d, "{ \"version\": \"1.0\", \"url\": \"https://phoenixmud.net/phoenixmud.mpackage\" }");
+      SEND_TO_Q(d, "%c%c", IAC, SE);
+   }
+
+   free(root);
+}
+
+void handle_gmcp_core_ping(struct descriptor_data* d, char* data) {
+   SEND_TO_Q(d, "%c%c%cCore.Ping%c%c", IAC, SB, GMCP, IAC, SE);
+}
+
+void handle_gmcp_core_supports_set(struct descriptor_data* d, char* data) {
+   struct json_value_s* root = json_parse(data, strlen(data));
+
+   if (root->type == json_type_array) {
+      struct json_array_s* array = (struct json_array_s*)root->payload;
+
+      for (struct json_array_element_s* element = array->start; element != NULL; element = element->next) {
+         struct json_value_s* value = element->value;
+         if (value->type == json_type_string) {
+            struct json_string_s* string = (struct json_string_s*)value->payload;
+
+            if (strcmp(string->string, "Char 1") == 0) {
+               SET_BIT(d->oob_protocol, OOB_REPORT_STATS);
+            } else if (strcmp(string->string, "Room 1") == 0) {
+               SET_BIT(d->oob_protocol, OOB_REPORT_ROOM);
+            }
+         }
+      }
+   }
+
+   free(root);
+}
+
+void handle_gmcp_core_supports_add(struct descriptor_data* d, char* data) {
+   struct json_value_s* root = json_parse(data, strlen(data));
+
+   if (root->type == json_type_array) {
+      struct json_array_s* array = (struct json_array_s*)root->payload;
+
+      for (struct json_array_element_s* element = array->start; element != NULL; element = element->next) {
+         struct json_value_s* value = element->value;
+         if (value->type == json_type_string) {
+            struct json_string_s* string = (struct json_string_s*)value->payload;
+
+            if (strcmp(string->string, "Char 1") == 0) {
+               SET_BIT(d->oob_protocol, OOB_REPORT_STATS);
+            } else if (strcmp(string->string, "Room 1") == 0) {
+               SET_BIT(d->oob_protocol, OOB_REPORT_ROOM);
+            }
+         }
+      }
+   }
+
+   free(root);
+}
+
+void handle_gmcp_core_supports_remove(struct descriptor_data* d, char* data) {
+   struct json_value_s* root = json_parse(data, strlen(data));
+
+   if (root->type == json_type_array) {
+      struct json_array_s* array = (struct json_array_s*)root->payload;
+
+      for (struct json_array_element_s* element = array->start; element != NULL; element = element->next) {
+         struct json_value_s* value = element->value;
+         if (value->type == json_type_string) {
+            struct json_string_s* string = (struct json_string_s*)value->payload;
+
+            if (strcmp(string->string, "Char 1") == 0) {
+               REMOVE_BIT(d->oob_protocol, OOB_REPORT_STATS);
+            } else if (strcmp(string->string, "Room 1") == 0) {
+               REMOVE_BIT(d->oob_protocol, OOB_REPORT_ROOM);
+            }
+         }
+      }
+   }
+
+   free(root);
+}
+
+void handle_gmcp_subopt(struct descriptor_data* d, unsigned char* subopt_start, unsigned char* subopt_end) {
+   char* package = (char*)subopt_start;
+
+   unsigned char* end = (unsigned char*) package;
+
+   // Find the end of the package name. This should either be when we hit a
+   // space or when we get to the end of the subnegotiation.
+   for (; end < subopt_end && *end != ' '; end++);
+
+   // Null terminate the package name
+   *end = 0; 
+
+   char* data = (char*) end + 1;
+
+   fprintf(stderr, "GMCP Package: %s\nData:\n%s\n", package, data);
+
+   if (strcmp(package, "Core.Hello") == 0) { handle_gmcp_core_hello(d, data); }
+   if (strcmp(package, "Core.Ping") == 0) { handle_gmcp_core_ping(d, data); }
+   if (strcmp(package, "Core.Supports.Set") == 0) { handle_gmcp_core_supports_set(d, data); }
+   if (strcmp(package, "Core.Supports.Add") == 0) { handle_gmcp_core_supports_add(d, data); }
+   if (strcmp(package, "Core.Supports.Remove") == 0) { handle_gmcp_core_supports_remove(d, data); }
+}
+
 // Handles incoming IAC (Interpret As Command) sequences from the client.
 // Returns 0 if the buffer ends in the middle of a sequence. Otherwise, returns 1.
 int handle_iac(struct descriptor_data *d) { 
@@ -1954,48 +2266,17 @@ int handle_iac(struct descriptor_data *d) {
          switch (cmd) {
             case DO:
                if (opt == MSSP) {
-                  SEND_TO_Q(d, "%c%c%c", IAC, SB, MSSP);
-                  SEND_TO_Q(d, "%cNAME%cPhoenixMud", MSSP_VAR, MSSP_VAL);
-
-                  int players = 0;
-
-                  for (struct char_data* vict = character_list; vict != 0; vict = vict->next) {
-                     if (IS_NPC(vict)) continue;
-                     if (vict->desc) players++;
-                  }
-
-                  SEND_TO_Q(d, "%cPLAYERS%c%d", MSSP_VAR, MSSP_VAL, players);
-                  SEND_TO_Q(d, "%cUPTIME%c%ld", MSSP_VAR, MSSP_VAL, boot_time);
-
-                  SEND_TO_Q(d, "%cCREATED%c1996", MSSP_VAR, MSSP_VAL);
-                  SEND_TO_Q(d, "%cDISCORD%chttps://discord.gg/dUE3Nm2rEE", MSSP_VAR, MSSP_VAL);
-                  SEND_TO_Q(d, "%cHOSTNAME%cphoenixmud.net", MSSP_VAR, MSSP_VAL);
-                  SEND_TO_Q(d, "%cPORT%c4000", MSSP_VAR, MSSP_VAL);
-                  SEND_TO_Q(d, "%cWEBSITE%chttps://phoenixmud.net", MSSP_VAR, MSSP_VAL);
-
-                  SEND_TO_Q(d, "%cFAMILY%cPhoenixMUD%cCircleMUD%cDikuMUD%cAberMUD", MSSP_VAR, MSSP_VAL, MSSP_VAL, MSSP_VAL, MSSP_VAL);
-                  SEND_TO_Q(d, "%cGENRE%cFantasy", MSSP_VAR, MSSP_VAL);
-                  SEND_TO_Q(d, "%cSTATUS%cLive", MSSP_VAR, MSSP_VAL);
-
-                  SEND_TO_Q(d, "%cAREAS%c%d", MSSP_VAR, MSSP_VAL, top_of_zone_table + 1);
-                  SEND_TO_Q(d, "%cHELPFILES%c%d", MSSP_VAR, MSSP_VAL, top_of_helpt + 1);
-                  SEND_TO_Q(d, "%cMOBILES%c%d", MSSP_VAR, MSSP_VAL, top_of_mobt + 1);
-                  SEND_TO_Q(d, "%cOBJECTS%c%d", MSSP_VAR, MSSP_VAL, top_of_objt + 1);
-                  SEND_TO_Q(d, "%cROOMS%c%ld", MSSP_VAR, MSSP_VAL, top_of_world + 1);
-
-                  SEND_TO_Q(d, "%cCLASSES%c15", MSSP_VAR, MSSP_VAL);
-                  SEND_TO_Q(d, "%cLEVELS%c%d", MSSP_VAR, MSSP_VAL, 101+102+103+104);
-                  SEND_TO_Q(d, "%cRACES%c15", MSSP_VAR, MSSP_VAL);
-                  SEND_TO_Q(d, "%cSKILLS%c%d", MSSP_VAR, MSSP_VAL, MAX_SPELLS);
-
-                  SEND_TO_Q(d, "%cANSI%c1", MSSP_VAR, MSSP_VAL);
-
-                  SEND_TO_Q(d, "%c%c", IAC, SE);
+                  handle_mssp(d);
                }
 
                if (opt == MSDP) {
                   REMOVE_BIT(d->oob_protocol, OOB_GMCP);
                   SET_BIT(d->oob_protocol, OOB_MSDP);
+               }
+
+               if (opt == GMCP) {
+                  REMOVE_BIT(d->oob_protocol, OOB_MSDP);
+                  SET_BIT(d->oob_protocol, OOB_GMCP);
                }
 
                // We processed three bytes: IAC, DO, opt. Overwrite those three with everything after them.
@@ -2013,6 +2294,10 @@ int handle_iac(struct descriptor_data *d) {
 
                if (opt == MSDP) {
                   REMOVE_BIT(d->oob_protocol, OOB_MSDP);
+               }
+
+               if (opt == GMCP) {
+                  REMOVE_BIT(d->oob_protocol, OOB_GMCP);
                }
 
                memmove(ptr, ptr + 3, strlen((const char*)ptr + 3) + 1);
@@ -2046,118 +2331,21 @@ int handle_iac(struct descriptor_data *d) {
                }
                sub_ptr++; // skip SE
 
+               // Replace IAC SE with null terminators
+               *(sub_ptr - 2) = 0; 
+               *(sub_ptr - 1) = 0; 
+
+               unsigned char* subopt_data_start = ptr + 3; // Skip IAC SB opt
+               unsigned char* subopt_data_end = sub_ptr - 2; // Back up past IAC SE
+
                if (opt == MSDP) {
-
-                  char* var = (char*)ptr + 4; // Skip IAC SB MSDP MSDP_VAR
-
-                  unsigned char* end = (unsigned char*) var;
-
-                  // Find the end of the variable name. We know the
-                  // subnegotiation ends at sub_ptr. If we get there without
-                  // finding MSDP_VAL, the subnegotiation is malformed and we'll
-                  // ignore it.
-                  for (; end < sub_ptr && *end != MSDP_VAL; end++);
-
-                  if (end == sub_ptr) {
-                     goto subnegotiation_handled;
-                  }
-
-                  // Null terminate the variable name
-                  *end = 0; 
-
-                  char* value = (char*) end + 1;
-
-                  // Advance end to the end of the value
-                  for (; end < sub_ptr && *end != MSDP_VAL && *end != IAC; end++);
-
-                  // Client sent multiple values... not sure how to handle that yet.
-                  if (*end == MSDP_VAL) {
-                     goto subnegotiation_handled;
-                  }
-
-                  // Null terminate the value
-                  *end = 0;
-
-                  if (strcmp(var, "LIST") == 0) {
-                     SEND_TO_Q(d, "%c%c%c", IAC, SB, MSDP);
-                     SEND_TO_Q(d, "%c%s%c", MSDP_VAR, value, MSDP_VAL);
-                     SEND_TO_Q(d, "%c", MSDP_ARRAY_OPEN);
-
-                     if (strcmp(value, "COMMANDS") == 0) {
-
-                        const char* commands[] = { "LIST", "REPORT", "SEND", "UNREPORT", NULL };
-                        for (size_t ii = 0; commands[ii] != NULL; ii++) {
-                           SEND_TO_Q(d, "%c%s", MSDP_VAL, commands[ii]);
-                        }
-
-                     } else if (strcmp(value, "LISTS") == 0) {
-
-                        const char* lists[] = { "COMMANDS", "LISTS", "REPORTABLE_VARIABLES", "SENDABLE_VARIABLES", NULL };
-                        for (size_t ii = 0; lists[ii] != NULL; ii++) {
-                           SEND_TO_Q(d, "%c%s", MSDP_VAL, lists[ii]);
-                        }
-
-                     } else if (strcmp(value, "REPORTABLE_VARIABLES") == 0) {
-
-                        const char* reportable_variables[] = { "STATS", "ROOM", NULL };
-
-                        for (size_t ii = 0; reportable_variables[ii] != NULL; ii++) {
-                           SEND_TO_Q(d, "%c%s", MSDP_VAL, reportable_variables[ii]);
-                        }
-
-                     } else if (strcmp(value, "REPORTED_VARIABLES") == 0) {
-
-                        if (IS_SET(d->oob_protocol, OOB_REPORT_STATS)) {
-                           SEND_TO_Q(d, "%cSTATS", MSDP_VAL);
-                        }
-                        if (IS_SET(d->oob_protocol, OOB_REPORT_ROOM)) {
-                           SEND_TO_Q(d, "%cROOM", MSDP_VAL);
-                        }
-
-                     } else if (strcmp(value, "SENDABLE_VARIABLES") == 0) {
-
-                        const char* sendable_variables[] = { "GITREF", NULL };
-                        for (size_t ii = 0; sendable_variables[ii] != NULL; ii++) {
-                           SEND_TO_Q(d, "%c%s", MSDP_VAL, sendable_variables[ii]);
-                        }
-
-                     }
-
-                     // If they ask for an unsupported list, we'll return an empty array.
-                     SEND_TO_Q(d, "%c", MSDP_ARRAY_CLOSE);
-                     SEND_TO_Q(d, "%c%c", IAC, SE);
-                  } else if (strcmp(var, "REPORT") == 0) {
-                     if (strcmp(value, "STATS") == 0) {
-                        SET_BIT(d->oob_protocol, OOB_REPORT_STATS);
-                     } else if (strcmp(value, "ROOM") == 0) {
-                        SET_BIT(d->oob_protocol, OOB_REPORT_ROOM);
-                     }
-                  } else if (strcmp(var, "SEND") == 0) {
-                     if (strcmp(value, "GITREF") == 0) {
-                        SEND_TO_Q(d, "%c%c%c", IAC, SB, MSDP);
-#ifdef GIT_REF
-#define STRING(a) #a
-#define XSTRING(a) STRING(a)
-                        SEND_TO_Q(d, "%c%s%c%s", MSDP_VAR, "GITREF", MSDP_VAL, XSTRING(GIT_REF));
-#undef STRING
-#undef XSTRING
-#endif
-                        SEND_TO_Q(d, "%c%c", IAC, SE);
-                     }
-                  } else if (strcmp(var, "UNREPORT") == 0) {
-                     if (strcmp(value, "STATS") == 0) {
-                        REMOVE_BIT(d->oob_protocol, OOB_REPORT_STATS);
-                     } else if (strcmp(value, "ROOM") == 0) {
-                        REMOVE_BIT(d->oob_protocol, OOB_REPORT_ROOM);
-                     }
-                  } else {
-                     fprintf(stderr, "Unhandled command >%s:", var);
-                  }
+                  handle_msdp_subopt(d, subopt_data_start, subopt_data_end);
                }
 
-               fprintf(stderr, "\n");
+               if (opt == GMCP) {
+                  handle_gmcp_subopt(d, subopt_data_start, subopt_data_end);
+               }
 
-            subnegotiation_handled:
                // We've now either processed or ignored the subnegotiation.
                // Remove it from the buffer.
                memmove(ptr, sub_ptr, strlen((const char*)sub_ptr) + 1);

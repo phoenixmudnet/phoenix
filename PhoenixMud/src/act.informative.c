@@ -1073,6 +1073,76 @@ void msdp_room(struct char_data* ch) {
 	send_to_char(ch, "%c%c", IAC, SE);
 }
 
+void gmcp_exits(struct char_data* ch) {
+	send_to_char(ch, "\"EXITS\":{");
+
+	bool first_exit = TRUE;
+
+	for (int direction = 0; direction < NUM_OF_DIRS; direction++) {
+		struct room_direction_data* exit = EXIT(ch, direction);
+
+		// Is there an exit in this direction?
+		if (exit == NULL) continue;
+		if (exit->to_room == NOWHERE) continue;
+
+		// Can the character see this exit?
+		if (GET_LEVEL(ch) < LVL_IMMORT) {
+			if (EXIT_FLAGGED(exit, EX_NOPASS)) continue;
+			if (EXIT_FLAGGED(exit, EX_HIDDEN)) continue;
+			if (EXIT_FLAGGED(exit, EX_CLOSED) && EXIT_FLAGGED(exit, EX_SECRET)) continue;
+		}
+
+		if (!first_exit) {
+			send_to_char(ch, ",");
+		} else {
+			first_exit = FALSE;
+		}
+
+		send_to_char(ch, "\"%s\":{",dirs[direction]);
+
+		// Only send VNUMs if the roomflags bit is set. This matches the behavior above for the current room.
+		if (PRF_FLAGGED(ch, PRF_ROOMFLAGS)) {
+			send_to_char(ch, "\"VNUM\": \"%ld\",", GET_ROOM_VNUM(exit->to_room));
+		}
+
+		// Send exit flags. If the exit was marked secret but happens to be
+		// open, we're giving away that it's a secret exit vs a normal one.
+		// There's no real advantage to knowing that an exit will disappear
+		// if you close it, so I think it's fine.
+
+		char* first_flag = "\0";
+		send_to_char(ch, "\"FLAGS\":[");
+		if (EXIT_FLAGGED(exit, EX_CLOSED)) { send_to_char(ch, "\"CLOSED\""); first_flag[0] = ',';}
+		if (EXIT_FLAGGED(exit, EX_HIDDEN)) { send_to_char(ch, "%s\"HIDDEN\"", first_flag); first_flag[0] = ',';}
+		if (EXIT_FLAGGED(exit, EX_SECRET)) { send_to_char(ch, "%s\"SECRET\"", first_flag); first_flag[0] = ',';}
+		if (EXIT_FLAGGED(exit, EX_NOPASS)) { send_to_char(ch, "%s\"NOPASS\"", first_flag); first_flag[0] = ',';}
+		if (EXIT_FLAGGED(exit, EX_ISDOOR)) { send_to_char(ch, "%s\"DOOR\""  , first_flag); }
+		send_to_char(ch, "],");
+
+		// Send the title of the connected room to everyone
+		send_to_char(ch, "\"NAME\":\"%s\"", world[exit->to_room].name);
+
+		send_to_char(ch, "}");
+	}
+
+	send_to_char(ch, "}");
+}
+
+void gmcp_room(struct char_data* ch) {
+	send_to_char(ch, "%c%c%cRoom.Info {", IAC, SB, GMCP);
+
+	if (PRF_FLAGGED(ch, PRF_ROOMFLAGS)) {
+		send_to_char(ch, "\"VNUM\":\"%ld\",", GET_ROOM_VNUM(IN_ROOM(ch)));
+	}
+
+	send_to_char(ch, "\"NAME\":\"%s\",", world[IN_ROOM(ch)].name);
+	send_to_char(ch, "\"ZONE\":\"%s\",", zone_table[world[IN_ROOM(ch)].zone].name);
+
+	gmcp_exits(ch);
+
+	send_to_char(ch, "}%c%c", IAC, SE);
+}
+
 void look_at_room(struct char_data *ch, int ignore_brief)
 {
 	if (!ch->desc)
@@ -1128,8 +1198,13 @@ void look_at_room(struct char_data *ch, int ignore_brief)
 	list_char_to_char(world[IN_ROOM(ch)].people, ch);
 	send_to_char(ch, CCNRM(ch, C_NRM));
 
-	if (!IS_NPC(ch) && IS_SET(ch->desc->oob_protocol, OOB_MSDP) && IS_SET(ch->desc->oob_protocol, OOB_REPORT_ROOM)) {
-		msdp_room(ch);
+	if (!IS_NPC(ch) && IS_SET(ch->desc->oob_protocol, OOB_REPORT_ROOM)) {
+		if (IS_SET(ch->desc->oob_protocol, OOB_MSDP)) {
+			msdp_room(ch);
+		}
+		if (IS_SET(ch->desc->oob_protocol, OOB_GMCP)) {
+			gmcp_room(ch);
+		}
 	}
 }
 
