@@ -495,21 +495,21 @@ int parse_race(char *arg)
 /* The following are race minimums for stat menu */ 
 const long race_stats[NUM_RACES][6] = 
 { /* S I W D C Ch */ 
-   { 6,6,6,6,6,6 } , /* Human min stats*/ 
-   { 4,8,8,6,5,7 } , /* Elf min stats */ 
-   { 5,7,7,6,6,6 } , /* Half Elf min stats */ 
-   { 5,8,7,7,5,4 } , /* Dark Elf min stata */ 
-   { 7,5,6,5,8,5 } , /* Dwarf min stata */ 
-   { 5,5,6,9,6,7 } , /* Halfling min stata */ 
-   { 4,9,8,8,4,5 } , /* Sprite min stata */ 
-   { 8,6,5,6,8,5 } , /* Minotaur min stata */ 
-   { 5,8,9,7,5,4 } , /* Avian min stata */ 
-   { 9,4,4,5,9,5 } , /* Half-Ogre min stata */ 
-   { 7,5,5,8,7,4 } , /* Half-Orc min stata */ 
-   { 6,6,6,6,6,6 } , /* Drac min stats*/ 
-   { 6,6,6,6,6,6 } , /* Shadow min stats*/ 
-   { 6,6,6,6,6,6 } , /* Titan min stats*/ 
-   { 6,6,6,6,6,6 }   /* Aesir min stats*/ 
+   { 6,6,6,6,6,10 } , /* Human min stats*/ 
+   { 4,8,8,6,5,11 } , /* Elf min stats */ 
+   { 5,7,7,6,6,10 } , /* Half Elf min stats */ 
+   { 5,8,7,7,5,8  } , /* Dark Elf min stata */ 
+   { 7,5,6,5,8,9  } , /* Dwarf min stata */ 
+   { 5,5,6,9,6,11 } , /* Halfling min stata */ 
+   { 4,9,8,8,4,9  } , /* Sprite min stata */ 
+   { 8,6,5,6,8,9  } , /* Minotaur min stata */ 
+   { 5,8,9,7,5,8  } , /* Avian min stata */ 
+   { 9,4,4,5,9,9  } , /* Half-Ogre min stata */ 
+   { 7,5,5,8,7,8  } , /* Half-Orc min stata */ 
+   { 6,6,6,6,6,6  } , /* Drac min stats*/ 
+   { 6,6,6,6,6,6  } , /* Shadow min stats*/ 
+   { 6,6,6,6,6,6  } , /* Titan min stats*/ 
+   { 6,6,6,6,6,6  }   /* Aesir min stats*/ 
 
 } ; 
  
