@@ -3026,7 +3026,7 @@ void nanny(struct descriptor_data *d, char *argu)
 						vict = e->original;
 					else
 						vict = e->character;
-					if (IS_NPC(vict)) {
+					if (!vict || IS_NPC(vict)) {
 						continue;
 					}
 					struct char_data *p = d->character;
