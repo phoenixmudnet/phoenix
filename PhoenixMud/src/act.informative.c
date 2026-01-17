@@ -1110,13 +1110,13 @@ void gmcp_exits(struct char_data* ch) {
 		// There's no real advantage to knowing that an exit will disappear
 		// if you close it, so I think it's fine.
 
-		char* first_flag = "\0";
+		bool first_flag = TRUE;
 		send_to_char(ch, "\"FLAGS\":[");
-		if (EXIT_FLAGGED(exit, EX_CLOSED)) { send_to_char(ch, "\"CLOSED\""); first_flag[0] = ',';}
-		if (EXIT_FLAGGED(exit, EX_HIDDEN)) { send_to_char(ch, "%s\"HIDDEN\"", first_flag); first_flag[0] = ',';}
-		if (EXIT_FLAGGED(exit, EX_SECRET)) { send_to_char(ch, "%s\"SECRET\"", first_flag); first_flag[0] = ',';}
-		if (EXIT_FLAGGED(exit, EX_NOPASS)) { send_to_char(ch, "%s\"NOPASS\"", first_flag); first_flag[0] = ',';}
-		if (EXIT_FLAGGED(exit, EX_ISDOOR)) { send_to_char(ch, "%s\"DOOR\""  , first_flag); }
+		if (EXIT_FLAGGED(exit, EX_CLOSED)) { send_to_char(ch, "\"CLOSED\""); first_flag = FALSE;}
+		if (EXIT_FLAGGED(exit, EX_HIDDEN)) { send_to_char(ch, "%s\"HIDDEN\"", first_flag?"":","); first_flag = FALSE;}
+		if (EXIT_FLAGGED(exit, EX_SECRET)) { send_to_char(ch, "%s\"SECRET\"", first_flag?"":","); first_flag = FALSE;}
+		if (EXIT_FLAGGED(exit, EX_NOPASS)) { send_to_char(ch, "%s\"NOPASS\"", first_flag?"":","); first_flag = FALSE;}
+		if (EXIT_FLAGGED(exit, EX_ISDOOR)) { send_to_char(ch, "%s\"DOOR\""  , first_flag?"":","); }
 		send_to_char(ch, "],");
 
 		// Send the title of the connected room to everyone
