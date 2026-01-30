@@ -738,71 +738,132 @@ int perform_group(struct char_data *ch, struct char_data *vict)
    }
 
 
+/* Updated Nomikos 1/29/2026 to allow players to see who are following them outside of the 
+   group. A group member is also able to see if someone is following them outside of the 
+   group structure */
+
+#define GRP     0
+#define CH_FOL  1
+#define PC_FOL  2
+#define NPC_FOL 3
+
 void print_group(struct char_data *ch)
    {
    struct char_data *k;
    struct follow_type *f;
+   int ftype[200] = { 0 };
+   int msg[4];
+   int ii, jj;
 
+   /* Give a message if you're not in a group, but stay in the function */
    if (!AFF_FLAGGED(ch, AFF_GROUP))
       send_to_char(ch, "But you are not the member of a group!\r\n");
-   else
+
+   char *buf=get_buffer(MAX_STRING_LENGTH);
+
+   /* If you're a member of a group, see who is in the leader's group */
+   k = (ch->master ? ch->master : ch);
+
+   /* Give grouped message, and let you know who's the head of the group */
+   if (AFF_FLAGGED(k, AFF_GROUP))
       {
-	char *buf=get_buffer(MAX_STRING_LENGTH);
       send_to_char(ch, "Your group consists of:\r\n");
 
-      k = (ch->master ? ch->master : ch);
-
-      if (AFF_FLAGGED(k, AFF_GROUP))
+      char *buf2 = get_buffer(MAX_STRING_LENGTH);
+      buf2[0] = '\x0';
+      if (GET_NUM_GUARDING_ME(k) > 0)
          {
-	   char *buf2 = get_buffer(MAX_STRING_LENGTH);
-	   buf2[0] = '\x0';
-	   if (GET_NUM_GUARDING_ME(k) > 0) {
-	     sprintf(buf2, "(guarded by ");
-	     int i;
-	     for (i = 0; i < GET_NUM_GUARDING_ME(k)-1; i++) {
-	       strcat(buf2, GET_NAME(GET_GUARDING_ME(k)[i]));
-	       strcat(buf2, ", ");
-	     }
-	     strcat(buf2, GET_NAME(GET_GUARDING_ME(k)[GET_NUM_GUARDING_ME(k)-1]));
-	     strcat(buf2, ")");
-	   }
-         sprintf(buf, "     [%3dH %3dM %3dV] [%2d %s] $N (Head of group) %s",
-                 GET_HIT(k),GET_MANA(k),GET_MOVE(k),GET_LEVEL(k),
-                 CLASS_ABBR(k), buf2);
-         act(buf, FALSE, ch, 0, k, TO_CHAR);
-	 release_buffer(buf2);
+         sprintf(buf2, "(guarded by ");
+         for (int i = 0; i < GET_NUM_GUARDING_ME(k)-1; i++)
+            {
+            strcat(buf2, GET_NAME(GET_GUARDING_ME(k)[i]));
+            strcat(buf2, ", ");
+            }
+         strcat(buf2, GET_NAME(GET_GUARDING_ME(k)[GET_NUM_GUARDING_ME(k)-1]));
+         strcat(buf2, ")");
+         }
+      sprintf(buf, "     [%3dH %3dM %3dV] [%2d %s] $N (Head of group) %s",
+              GET_HIT(k),GET_MANA(k),GET_MOVE(k),GET_LEVEL(k),
+              CLASS_ABBR(k), buf2);
+      act(buf, FALSE, ch, 0, k, TO_CHAR);
+      release_buffer(buf2);
+      }
+
+   /* Added this to check for followers if you're not the leader of a group */
+   for (int mm = 0; mm < 2; mm++)
+      {
+      /* Reset the message checks */
+      msg[0] = 1; msg[1] = msg[2] = msg[3] = 0;
+      if (mm == 1)
+         {
+         if (k != ch)
+            k = ch;
+         else
+            continue;
          }
 
-      for (f = k->followers; f; f = f->next)
+      /* Cycle through the followers and tally their type */
+      for (ii = 0, f = k->followers; f && ii < 200; f = f->next, ii++)
          {
-         if (!AFF_FLAGGED(f->follower, AFF_GROUP))
-            continue;
+         if (AFF_FLAGGED(f->follower, AFF_GROUP))
+            ftype[ii] = GRP;
+         else if (AFF_FLAGGED(f->follower, AFF_CHARM))
+            ftype[ii] = CH_FOL;
+         else if (IS_NPC(f->follower))
+            ftype[ii] = NPC_FOL;
          else
-            {
-	      struct char_data *tch = f->follower;
-	      char *buf2 = get_buffer(MAX_STRING_LENGTH);
-	      buf2[0] = '\x0';
-	      if (GET_NUM_GUARDING_ME(tch) > 0) {
-		sprintf(buf2, "(guarded by ");
-		int i;
-		for (i = 0; i < GET_NUM_GUARDING_ME(tch)-1; i++) {
-		  strcat(buf2, GET_NAME(GET_GUARDING_ME(tch)[i]));
-		  strcat(buf2, ", ");
-		}
-		strcat(buf2, GET_NAME(GET_GUARDING_ME(tch)[GET_NUM_GUARDING_ME(tch)-1]));
-		strcat(buf2, ")");
-	      }
+            ftype[ii] = PC_FOL;
+         }
 
+      /* Cycle through the follow types, group them together */
+      for (ii = 0; ii < 4; ii++)
+         {
+         /* Cycle through followers and show them if they're the right kind */
+         for (jj = 0, f = k->followers; f && jj < 200; f = f->next, jj++)
+            {
+            if (ftype[jj] != ii)
+               continue;
+
+            /* Print the follower type message once */
+            if (!msg[ii])
+               {
+               msg[ii] = 1;
+               switch (ftype[jj])
+                  {
+                  case CH_FOL:  send_to_char(ch, "Charmed followers:\r\n"); break;
+                  case PC_FOL:  send_to_char(ch, "Player followers:\r\n"); break;
+                  case NPC_FOL: send_to_char(ch, "NPC followers:\r\n"); break;
+                  default: break;
+                  }
+               }
+
+            /* Print the guarded by stuff */
+            struct char_data *tch = f->follower;
+            char *buf2 = get_buffer(MAX_STRING_LENGTH);
+            buf2[0] = '\x0';
+            if (GET_NUM_GUARDING_ME(tch) > 0)
+               {
+   	         sprintf(buf2, "(guarded by ");
+	            for (int i = 0; i < GET_NUM_GUARDING_ME(tch)-1; i++)
+                  {
+	               strcat(buf2, GET_NAME(GET_GUARDING_ME(tch)[i]));
+	               strcat(buf2, ", ");
+	               }
+   	         strcat(buf2, GET_NAME(GET_GUARDING_ME(tch)[GET_NUM_GUARDING_ME(tch)-1]));
+	            strcat(buf2, ")");
+               }
+
+            /* Send a line for each follower */
             sprintf(buf, "     [%3dH %3dM %3dV] [%2d %s] $N %s",
                     GET_HIT(f->follower),GET_MANA(f->follower),
                     GET_MOVE(f->follower),GET_LEVEL(f->follower),
                     CLASS_ABBR(f->follower), buf2);
             act(buf, FALSE, ch, 0, f->follower, TO_CHAR);
-	    release_buffer(buf2);
+            release_buffer(buf2);
             }
          }
-      release_buffer(buf);
       }
+   release_buffer(buf);
    }
 
 
