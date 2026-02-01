@@ -305,6 +305,7 @@ ACMD(do_redirect);
 ACMD(do_reelin);
 ACMD(do_refuel);
 ACMD(do_reimb);
+ACMD(do_release);
 ACMD(do_home);
 ACMD(do_remove);
 ACMD(do_remort);
@@ -314,12 +315,12 @@ ACMD(do_removemember);
 ACMD(do_rent);
 ACMD(do_repair);
 ACMD(do_reply);
-ACMD(do_restring);
 ACMD(do_report);
 ACMD(do_retool);
 ACMD(do_rescue);
 ACMD(do_rest);
 ACMD(do_restore);
+ACMD(do_restring);
 ACMD(do_return);
 ACMD(do_rlist);
 ACMD(do_rove);
@@ -800,7 +801,7 @@ const struct command_info cmd_info[] = {
 	{"poofout", POS_DEAD, do_poofset, LVL_IMMORT, SCMD_POOFOUT},
 	{"pour", POS_STANDING, do_pour, 0, SCMD_POUR},
 	{"prompt", POS_DEAD, do_display, 0, 0},
-	{"practice", POS_CHANT, do_practice, 1, 0},
+	{"practice", POS_SLEEPING, do_practice, 1, 0},
 	/*{ "project"  , POS_DEAD    , do_project  , 108, 0}, */
 	{"pull", POS_STANDING, do_pull, 0, 0},
 	{"ps", POS_DEAD, do_show_queue, LVL_GOD, 0},
@@ -816,7 +817,6 @@ const struct command_info cmd_info[] = {
 	{"qsay", POS_SLEEPING, do_qcomm, 0, SCMD_QSAY},
 
 	{"reply", POS_SLEEPING, do_reply, 0, 0},
-	{"restring", POS_SLEEPING, do_restring, LVL_IMPL, 0},
 	{"raceskills", POS_DEAD, do_race_skillhelp, 0, 0},
 	{"rage", POS_FIGHTING, do_rage, 1, 0},
 	{"rest", POS_CHANT, do_rest, 0, 0},
@@ -831,6 +831,7 @@ const struct command_info cmd_info[] = {
 	{"redraw", POS_DEAD, do_infobar, 0, SCMDB_REDRAW},
 	{"reelin", POS_SITTING, do_reelin, 1, 0},
 	{"old_reimburse", POS_CHANT, do_reimb, LVL_ADMIN, 0},
+   {"release", POS_SITTING, do_release, 0, 0},
 	{"remove", POS_CHANT, do_remove, 0, 0},
 	{"remortnet", POS_SLEEPING, do_remortnet, 0, 0},
 	{"remort!", POS_CHANT, do_remort, LVL_HERO, 0},
@@ -844,6 +845,7 @@ const struct command_info cmd_info[] = {
 	{"rescue", POS_FIGHTING, do_rescue, 1, 0},
 	{"resize", POS_DEAD, do_infobar, 0, SCMDB_RESIZE},
 	{"restore", POS_DEAD, do_restore, LVL_DGOD, 0},
+   {"restring", POS_SLEEPING, do_restring, LVL_IMPL, 0},
 	{"return", POS_DEAD, do_return, 0, 0},
 	{"redit", POS_DEAD, do_olc, 108, SCMD_OLC_REDIT},
 	{"revsnoop", POS_DEAD, do_snoop, LVL_SERP, SCMD_REVSNOOP},
