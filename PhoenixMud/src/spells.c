@@ -807,28 +807,30 @@ ASPELL(spell_charm)
    else if (AFF_FLAGGED(victim, AFF_SANCTUARY))
       send_to_char(ch,"Your victim is protected by sanctuary!\r\n");
    else if (MOB_FLAGGED(victim, MOB_NOCHARM))
-      send_to_char(ch,"Your victim resists!\r\n");
+      send_to_char(ch,"You cannot charm this one, no matter how hard you try!\r\n");
    else if (AFF_FLAGGED(ch, AFF_CHARM))
       send_to_char(ch,"You can't have any followers of your own!\r\n");
-   else if (AFF_FLAGGED(victim, AFF_CHARM) || level*10 < GET_LEVEL(victim))
-      send_to_char(ch,"You fail.\r\n");
+   else if (AFF_FLAGGED(victim, AFF_CHARM))
+	  send_to_char(ch,"Your victim is already charmed!.\r\n");
+   else if (level*10 < GET_LEVEL(victim))
+      send_to_char(ch,"You need to cast a stronger spell to wrangle this one!\r\n");
    else if (GET_LEVEL(ch) < GET_LEVEL(victim))
-      send_to_char(ch,"You fail.\r\n");
+      send_to_char(ch,"This victim is too strong, or you are too weak. Maybe both?\r\n");
    /* player charming another player - no legal reason for this */
    else if (!pk_allowed && !IS_NPC(victim))
       send_to_char(ch,"You fail - shouldn't be doing it anyway.\r\n");
    else if (circle_follow(victim, ch))
-      send_to_char(ch,"Sorry, following in circles can not be allowed.\r\n");
+      send_to_char(ch,"Sorry, following in circles is a bad idea.\r\n");
    else if (mag_savingthrow(victim, SAVING_PARA,level,0))
-      send_to_char(ch,"Your victim resists!\r\n");
+      send_to_char(ch,"Your victim resists your attempt to charm them!\r\n");
    /*   else if (num_charmies(ch) >= (NUM_CHARM_ADJ_CHA(ch, victim) + \
 	(GET_LEVEL(ch)/10)))*/
    else if (num_charmies(ch) >= MAX_CHARMIES)
-      send_to_char(ch,"You fail.\r\n");
+      send_to_char(ch,"Too many of your adoring fans/thralls are charmed by you.\r\n");
    else if (IS_NPC(victim) && (MOB2_FLAGGED(victim, MOB2_COMPONENT)))
       send_to_char(ch,"The limb is not fooled by your shennanigans.\r\n");
    else if (IS_NPC(victim) && (IS_IMMUNE(victim, IMM_BLUNT) || IS_IMMUNE(victim, IMM_PIERCE) || IS_IMMUNE(victim, IMM_SLASH) || IS_IMMUNE(victim, IMM_PLUS1) || IS_IMMUNE(victim, IMM_PLUS2) || IS_IMMUNE(victim, IMM_PLUS3) || IS_IMMUNE(victim, IMM_PLUS4) || IS_IMMUNE(victim, IMM_NONMAG)))
-     send_to_char(ch, "You fail.\r\n");
+     send_to_char(ch, "This victim is immune to something and would be an awesome tank! We think NOT.\r\n");
    else
       {
       if (victim->master)
