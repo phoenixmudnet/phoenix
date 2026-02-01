@@ -2944,3 +2944,35 @@ ACMD(do_flush)
   send_to_char(ch, "Command queue flushed.\r\n");
 }
 
+
+/* release command, allows players or mobs to release charmed followers - Nomikos 1/31/2026 */
+ACMD(do_release)
+   {
+   struct char_data *vict;
+   char *arg;
+
+   arg = get_buffer(MAX_INPUT_LENGTH);
+   any_one_arg(argument, arg);
+   if (!(vict = get_char_vis(ch, arg, FIND_CHAR_ROOM)))
+      {
+      send_to_char(ch, "Who or what do you wish to release???\r\n");
+      release_buffer(arg);
+      return;
+      }
+   release_buffer(arg);
+
+   if (vict == ch)
+      send_to_char(ch,"If you love someone, set them free!\r\n");
+   else if (!AFF_FLAGGED(vict, AFF_CHARM))
+      send_to_char(ch,"You can't release this one, as you hold no sway over them!\r\n");
+   else if (vict->master != ch)
+      send_to_char(ch,"Nice try! This one's heart belongs to another.\r\n");
+   else
+      {
+      act("You release $N from your control. They are free to go as they please.", FALSE, ch, 0, vict, TO_CHAR);
+      act("$n releases you from their control. You have been set free!", FALSE, ch, 0, vict, TO_VICT);
+      act("$n must really love $N, because they have set them free!", FALSE, ch, 0, vict, TO_NOTVICT);
+      
+      stop_follower(vict);
+      }
+   }
