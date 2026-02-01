@@ -234,7 +234,7 @@ const struct trait_data trait_info[] = {
    { 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1,
      IMM_ENERGY|IMM_HOLD|IMM_ACID, IMM_PIERCE|IMM_SLASH|IMM_BLUNT, 0}, /* Titan */
    { 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 2, 
-     IMM_SLASH|IMM_UNHOLY, IMM_FIRE|IMM_COLD|IMM_ELEC|IMM_ACID|IMM_POISON, IMM_HOLY}, /* Aesir */
+     IMM_UNHOLY, IMM_FIRE|IMM_COLD|IMM_ELEC|IMM_ACID|IMM_POISON, IMM_HOLY}, /* Aesir */
    { 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 6, 
      0, 0, 0}, /* Humanoid */
    { 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0,

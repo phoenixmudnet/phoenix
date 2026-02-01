@@ -845,7 +845,7 @@ const struct command_info cmd_info[] = {
 	{"rescue", POS_FIGHTING, do_rescue, 1, 0},
 	{"resize", POS_DEAD, do_infobar, 0, SCMDB_RESIZE},
 	{"restore", POS_DEAD, do_restore, LVL_DGOD, 0},
-   {"restring", POS_SLEEPING, do_restring, LVL_IMPL, 0},
+  {"restring", POS_SLEEPING, do_restring, LVL_IMPL, 0},
 	{"return", POS_DEAD, do_return, 0, 0},
 	{"redit", POS_DEAD, do_olc, 108, SCMD_OLC_REDIT},
 	{"revsnoop", POS_DEAD, do_snoop, LVL_SERP, SCMD_REVSNOOP},
