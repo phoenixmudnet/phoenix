@@ -1588,8 +1588,32 @@ void find_replacement(void *go, struct script_data *sc, trig_data *trig,
                sprintf(str,"%s", month_name[time_info.month]);
             else if (!str_cmp(field, "year"))
                sprintf(str,"%d", time_info.year);
+            /* Add RL time - Nomikos 2/13/2026 */
             else
-               *str = '\0';
+               {
+               time_t mytime;
+               struct tm *now;
+
+               mytime = time(0);
+               now = localtime(&mytime);
+
+               if (!str_cmp(field, "rl_minute"))
+                  strftime(str, 8, "%M", now);
+               else if (!str_cmp(field, "rl_hour"))
+                  strftime(str, 8, "%H", now);
+               else if (!str_cmp(field, "rl_day"))
+                  strftime(str, 8, "%d", now);
+               else if (!str_cmp(field, "rl_day_name"))
+                  strftime(str, 16, "%A", now);
+               else if (!str_cmp(field, "rl_month"))
+                  strftime(str, 8, "%m", now);
+               else if (!str_cmp(field, "rl_month_name"))
+                  strftime(str, 16, "%B", now);
+               else if (!str_cmp(field, "rl_year"))
+                  strftime(str, 8, "%Y", now);
+               else
+                  *str = '\0';
+               }
             return;
             }
          else if (!str_cmp(var, "random"))
