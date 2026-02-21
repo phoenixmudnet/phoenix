@@ -2986,11 +2986,13 @@ ACMD(do_release)
    release_buffer(arg);
 
    if (vict == ch)
-      send_to_char(ch,"If you love someone, set them free!\r\n");
+      send_to_char(ch, "If you love someone, set them free!\r\n");
    else if (!AFF_FLAGGED(vict, AFF_CHARM))
-      send_to_char(ch,"You can't release this one, as you hold no sway over them!\r\n");
+      send_to_char(ch, "You can't release this one, as you hold no sway over them!\r\n");
    else if (vict->master != ch)
-      send_to_char(ch,"Nice try! This one's heart belongs to another.\r\n");
+      send_to_char(ch, "Nice try! This one's heart belongs to another.\r\n");
+   else if (FIGHTING(vict))
+      send_to_char(ch, "This one is too busy fighting for you to be released!\r\n");
    else
       {
       act("You release $N from your control. They are free to go as they please.", FALSE, ch, 0, vict, TO_CHAR);
@@ -2998,5 +3000,6 @@ ACMD(do_release)
       act("$n must really love $N, because they have set them free!", FALSE, ch, 0, vict, TO_NOTVICT);
       
       stop_follower(vict);
+	  SET_BIT(MOB_FLAGS(vict), MOB_WIMPY);
       }
    }
