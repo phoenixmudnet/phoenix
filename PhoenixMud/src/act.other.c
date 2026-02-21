@@ -760,11 +760,18 @@ void print_group(struct char_data *ch)
 
    /* Give grouped message, let you know who's the head of the group, and list members of group */
    if (!AFF_FLAGGED(ch, AFF_GROUP))
-      send_to_char(ch, "But you are not the member of a group!\r\n");
+      {
+      // ch is not the leader and is not grouped
+      if (ch->master)
+         send_to_char(ch, "You are following %s.\r\n", GET_NAME(ch->master));
+      else
+         send_to_char(ch, "But you are not the member of a group!\r\n");
+      }
    else
       {
       /* only check for master in here, since the group is only shown here */
       k = (ch->master ? ch->master : ch);
+
       send_to_char(ch, "Your group consists of:\r\n");
 
       char *buf2 = get_buffer(MAX_STRING_LENGTH);
@@ -784,10 +791,39 @@ void print_group(struct char_data *ch)
               GET_HIT(k),GET_MANA(k),GET_MOVE(k),GET_LEVEL(k),
               CLASS_ABBR(k), buf2);
       act(buf, FALSE, ch, 0, k, TO_CHAR);
+      
+      /* Cycle through grouped followers of leader */
+      for (f = k->followers; f; f = f->next)
+         {
+         if (!AFF_FLAGGED(f->follower, AFF_GROUP))
+            continue;
+
+         /* Print the guarded by stuff */
+         struct char_data *tch = f->follower;
+         buf2[0] = '\x0';
+         if (GET_NUM_GUARDING_ME(tch) > 0)
+            {
+            sprintf(buf2, "(guarded by ");
+            for (int i = 0; i < GET_NUM_GUARDING_ME(tch)-1; i++)
+               {
+               strcat(buf2, GET_NAME(GET_GUARDING_ME(tch)[i]));
+               strcat(buf2, ", ");
+               }
+  	         strcat(buf2, GET_NAME(GET_GUARDING_ME(tch)[GET_NUM_GUARDING_ME(tch)-1]));
+            strcat(buf2, ")");
+            }
+
+         /* Send a line for each follower */
+         sprintf(buf, "     [%3dH %3dM %3dV] [%2d %s] $N %s",
+                 GET_HIT(f->follower),GET_MANA(f->follower),
+                 GET_MOVE(f->follower),GET_LEVEL(f->follower),
+                 CLASS_ABBR(f->follower), buf2);
+         act(buf, FALSE, ch, 0, f->follower, TO_CHAR);
+         }
       release_buffer(buf2);
       }
 
-   /* default back to show the followers of the person that used the group command */
+   /* default back to show the ungrouped followers of the person that used the group command */
    k = ch;
 
    /* Cycle through the followers and tally their type */
@@ -804,7 +840,7 @@ void print_group(struct char_data *ch)
       }
 
    /* Cycle through the follow types, group them together */
-   for (ii = 0; ii < 4; ii++)
+   for (ii = 1; ii < 4; ii++)
       {
       /* Cycle through followers and show them if they're the right kind */
       for (jj = 0, f = k->followers; f && jj < 200; f = f->next, jj++)
