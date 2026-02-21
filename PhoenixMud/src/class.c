@@ -1032,12 +1032,12 @@ void advance_level(struct char_data * ch, bool show)
     {
     case CLASS_MAGIC_USER:
       add_hp += number(1, 3);
-      add_mana += number(5, 9) + 3;   // changed from number(2, 9)
+      add_mana += number(5, 9);   // changed from number(2, 9)
       add_move += number(1, 2);
       break;
     case CLASS_CLERIC:
       add_hp += number(1, 4);
-      add_mana += number(4, 8) + 2;   // changed from number(2, 8)
+      add_mana += number(4, 8);   // changed from number(2, 8)
       add_move += number(1, 2);
       break;
     case CLASS_THIEF:
@@ -1046,7 +1046,7 @@ void advance_level(struct char_data * ch, bool show)
       add_move += number(1, 2);
       break;
     case CLASS_WARRIOR:
-      add_hp += number(4, 8) + 3;     // changed from number(1, 8)
+      add_hp += number(4, 8);     // changed from number(1, 8)
       add_mana += number(1, 4);
       add_move += number(1, 2);
       break;
@@ -1057,7 +1057,7 @@ void advance_level(struct char_data * ch, bool show)
       break;
     case CLASS_BARD:
       add_hp += number(1, 5);
-      add_mana += number(2, 6) + 1;   // changed from number(1, 6)
+      add_mana += number(2, 6);   // changed from number(1, 6)
       add_move += number(1, 2);
       break;
     case CLASS_MONK:
@@ -1066,7 +1066,7 @@ void advance_level(struct char_data * ch, bool show)
       add_move += number(1, 2);
       break;
     case CLASS_BARBARIAN:
-      add_hp += number(4, 8) + 3;     // changed from number(1, 8)
+      add_hp += number(4, 8);     // changed from number(1, 8)
       add_mana += number(1, 4);
       add_move += number(1, 2);
       break;
@@ -1078,43 +1078,43 @@ void advance_level(struct char_data * ch, bool show)
         break;
         */
     case CLASS_PALADIN:
-      add_hp += number(3, 7) + 2;     // changed from number(1, 7)
+      add_hp += number(3, 7);     // changed from number(1, 7)
       add_mana += number(1, 5);
       add_move += number(1, 2);
       break;
     case CLASS_ANTI_PALADIN:
-      add_hp += number(3, 7) + 2;     // changed from number(1, 7)
+      add_hp += number(3, 7);     // changed from number(1, 7)
       add_mana += number(1, 5);
       add_move += number(1, 2);
       break;
     case CLASS_DRUID:
       add_hp += number(1, 5);
-      add_mana += number(3, 7) + 1;   // changed from number(2, 7)
+      add_mana += number(3, 7);   // changed from number(2, 7)
       add_move += number(1, 2);
       break;
     case CLASS_MERCHANT:
       add_hp += number(1, 2);
       add_mana += number(1, 2);
-      add_move += number(4, 8) + 3;   // changed from number(1, 8)
+      add_move += number(4, 8);   // changed from number(1, 8)
       break;
     case CLASS_KENSAI:
-      add_hp += 1+number(5, 8) + 4;   // changed from number(1, 8)
-      add_mana += 1+number(3, 6) + 2; // changed from number(1, 6)
+      add_hp += 1+number(5, 8);   // changed from number(1, 8)
+      add_mana += 1+number(3, 6); // changed from number(1, 6)
       add_move += 1+number(1, 2);
       break;
     case CLASS_ASSASSIN:
-      add_hp += 1+number(4, 7) + 3;   // changed from number(1, 7)
-      add_mana += 1+number(3, 6) + 2; // changed from number(1, 6)
+      add_hp += 1+number(4, 7);   // changed from number(1, 7)
+      add_mana += 1+number(3, 6); // changed from number(1, 6)
       add_move += 1+number(1, 2);
       break;
     case CLASS_NECROMANCER:
-      add_hp += 1+number(2, 5) + 1;   // changed from number(1, 5)
-      add_mana += 1+number(6, 9) + 4; // changed from number(2, 9)
+      add_hp += 1+number(2, 5);   // changed from number(1, 5)
+      add_mana += 1+number(6, 9); // changed from number(2, 9)
       add_move += 1+number(1, 2);
       break;
     case CLASS_DEVA:
-      add_hp += 1+number(2, 5) + 1;   // changed from number(1, 5)
-      add_mana += 1+number(6, 9) + 4; // changed from number(2, 9)
+      add_hp += 1+number(2, 5);   // changed from number(1, 5)
+      add_mana += 1+number(6, 9); // changed from number(2, 9)
       add_move += 1+number(1, 2);
       break;
     default:
