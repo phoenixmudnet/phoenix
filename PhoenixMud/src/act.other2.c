@@ -1,5 +1,5 @@
 /* ************************************************************************
-*   File: act.other.c                                   Part of CircleMUD * 
+*   File: act.other2.c                                  Part of CircleMUD * 
 *  Usage: Miscellaneous player-level commands                             * 
 *                                                                         * 
 *  All rights reserved.  See license.doc for complete information.        * 
@@ -66,7 +66,7 @@ void prune_crlf(char* txt);
 int get_shop_item_count(struct player_shop*);
 void save_char_ascii(struct char_file_u*);
 int is_name(const char*, const char*);
-
+void id_obj_to_char(struct char_data *ch, struct obj_data *obj);
 
 ACMD(do_shop);
 
@@ -665,8 +665,45 @@ ACMD(do_shop)
     mudlogf(CMP, LVL_IMMORT, TRUE, "PLAYER_SHOP: %s bought %s from %s's shop for %d coins.",
 	GET_NAME(ch), GET_OBJ_NAME(obj), shop->player_name, cost);
     return;
-  }
+  } else if (is_abbrev(command, "identify")) {
+    struct player_shop* shop = find_player_shop_by_room(GET_ROOM_VNUM(IN_ROOM(ch)));
+    if (!shop) {
+      send_to_char(ch, "This isn't a shop.\r\n");
+      return;
+    }
+    if (!shop->is_active) {
+      send_to_char(ch, "This shop has been closed.\r\n");
+      return;
+    }
+    if (strlen(arg1) < 2 || arg1[0] != '#') {
+      send_to_char(ch, "Usage: shop identify #<item_number>\r\n  Example: shop identify #4");
+      return;
+    }
+    int num = atoi(arg1+1);
+    num--;
+    if (num < 0 || num >= get_shop_item_count(shop)) {
+      send_to_char(ch, "No item for sale by that number.\r\n");
+      return;
+    }
+    struct shop_item* item = get_player_shop_item(shop, num);
+    if (!item) {
+      send_to_char(ch, "No, really.  No item for sale by that number.\r\n");
+      return;
+    }
+    int cost = 50;
+    if (GET_GOLD(ch) < cost) {
+      send_to_char(ch, "Dude..... You is broke!\r\n");
+      return;
+    }
+    GET_GOLD(ch) -= cost;
 
+    send_to_char(ch, "The shopkeeper tells you all about %s.\r\n", GET_OBJ_NAME(item->item));
+    char buf2[1024];
+    sprintf(buf2, "$n asks %s's shopkeeper about %s.", shop->player_name, GET_OBJ_NAME(item->item));
+    act(buf2, TRUE, ch, 0, 0, TO_ROOM);
+    id_obj_to_char(ch, item->item);
+    return;
+  }
   send_to_char(ch, "Try \"help shop\"?\r\n");
   return;
 }
