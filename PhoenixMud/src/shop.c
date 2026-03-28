@@ -57,6 +57,7 @@ int Obj_to_store(struct obj_data * obj, FILE * fl,int location);
 int Crash_is_unrentable(struct obj_data * obj);
 int parse_xap_obj(char *filename, struct obj_data **obj,char *line, FILE *fl, int version, int *locate);
 void Crash_count_items(struct obj_data * obj, long *nitems);
+void id_obj_to_char(struct char_data *ch, struct obj_data *obj);
 
 /* Local variables */
 struct shop_data *shop_index;
@@ -1040,6 +1041,77 @@ void shopping_value(char *arg, struct char_data * ch,
    return;
    }
 
+/* Add identify to NPC shopkeepers -Nomikos 3/28/2026 */
+void shopping_identify(char *arg, struct char_data * ch,
+                       struct char_data * keeper, int shop_nr)
+   {
+   char *buf;
+   struct obj_data *obj;
+   int buynum, shop_cost = 50;
+
+   if (!(is_ok(keeper, ch, shop_nr)))
+      return;
+
+   buf=get_buffer(MAX_STRING_LENGTH);
+   if (SHOP_SORT(shop_nr) < IS_CARRYING_N(keeper))
+      sort_keeper_objs(keeper, shop_nr);
+
+   if ((buynum = transaction_amt(arg)) < 0)
+      {
+      sprintf(buf, "%s Bruh... What are you doing?!?",
+              GET_NAME(ch));
+      do_tell(keeper, buf, cmd_tell, 0);
+      release_buffer(buf);
+      return;
+      }
+
+   if (!(*arg) || !(buynum))
+      {
+      sprintf(buf, "%s Which item would you like me to identify??", GET_NAME(ch));
+      do_tell(keeper, buf, cmd_tell, 0);
+      release_buffer(buf);
+      return;
+      }
+
+   if (!(obj = get_purchase_obj(ch, arg, keeper, shop_nr, TRUE)))
+      {
+      release_buffer(buf);
+      return;
+      }
+
+   /* 50 coins to identify */
+   if ((shop_cost > GET_GOLD(ch)) && !IS_GOD(ch))
+      {
+      sprintf(buf, shop_index[shop_nr].missing_cash2, GET_NAME(ch));
+      do_tell(keeper, buf, cmd_tell, 0);
+
+      switch (SHOP_BROKE_TEMPER(shop_nr))
+         {
+      case 0:
+         do_action(keeper, GET_NAME(ch), cmd_puke, 0);
+         release_buffer(buf);
+         return;
+      case 1:
+         do_echo(keeper, "smokes on his joint.", cmd_emote, SCMD_EMOTE);
+         release_buffer(buf);
+         return;
+      default:
+         release_buffer(buf);
+         return;
+         }
+      }
+   
+   GET_GOLD(ch) -= MAX(0, shop_cost);
+   
+   sprintf(buf, "%s Here are the specs on %s", GET_NAME(ch), GET_OBJ_NAME(obj));
+   do_tell(keeper, buf, cmd_tell, 0);
+   
+   id_obj_to_char(ch, obj);
+
+   release_buffer(buf);
+   return;
+   }
+
 int can_use(struct char_data *ch,struct obj_data *obj)
    {
    if ((IS_OBJ_STAT(obj, ITEM_ANTI_EVIL) && IS_EVIL(ch)) ||
@@ -1268,6 +1340,11 @@ SPECIAL(shop_keeper)
    else if (CMD_IS("value"))
       {
       shopping_value(argument, ch, keeper, shop_nr);
+      return (TRUE);
+      }
+   else if (CMD_IS("identify"))
+      {
+      shopping_identify(argument, ch, keeper, shop_nr);
       return (TRUE);
       }
    else if (CMD_IS("list"))
