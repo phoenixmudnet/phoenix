@@ -442,10 +442,23 @@ ACMD(do_backup)
   fprintf(fp, "\n");
   fclose(fp);
 
+  /* Sanitize email address to prevent command injection */
+  char *email = GET_EMAIL(ch);
+  int valid = 1;
+  for (int i = 0; email[i]; i++) {
+    if (!isalnum(email[i]) && email[i] != '@' && email[i] != '.' && email[i] != '-' && email[i] != '_') {
+      valid = 0; break;
+    }
+  }
+  if (!valid) {
+    send_to_char(ch, "Invalid characters in e-mail address. Backup aborted.\r\n");
+    return;
+  }
+
   sprintf(buf, "/usr/bin/mutt -s \"Zone %d - %s world files\" -a %s/zone%d.zip %s < %s/body.txt",
 	  znum, zone_table[rnum].name, 
 	  BACKUP_TMP_DIR, znum,
-	  GET_EMAIL(ch),
+	  email,
 	  BACKUP_TMP_DIR
 	  );
   system(buf);
