@@ -157,14 +157,21 @@ void redit_setup_existing(struct descriptor_data *d, int real_num)
    if (SCRIPT(&world[real_num]))
       script_copy(room, &world[real_num], WLD_TRIGGER);
    proto = world[real_num].proto_script;
+   struct trig_proto_list *last_proto = NULL;
+
    while (proto) 
       {
       CREATE(fproto, struct trig_proto_list, 1);
       fproto->vnum = proto->vnum;
-      if (room->proto_script==NULL)
-	 room->proto_script = fproto;
+      fproto->next = NULL;
+
+      if (room->proto_script == NULL)
+         room->proto_script = fproto;
+      else
+         last_proto->next = fproto;
+
+      last_proto = fproto;
       proto = proto->next;
-      fproto = fproto->next; /* NULL */
       }
 
   /*. Attatch room copy to players descriptor .*/ 
