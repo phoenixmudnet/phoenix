@@ -3008,6 +3008,21 @@ void nanny(struct descriptor_data *d, char *argu)
 			character_list = d->character;
 			char_to_room(d->character, load_room);
 			load_result = Crash_load(d->character);
+			/* Crash_load re-equips saved gear; a negative-apply
+			 * item (e.g. a -mana muzzle) lowers the affected max
+			 * BELOW the current pool saved while the gear was off
+			 * at rent, so a character logs in over max (320/245M
+			 * reported). Clamp all three pools to their equipped
+			 * maxima. */
+			if (GET_HIT(d->character) > GET_MAX_HIT(d->character))
+				GET_HIT(d->character) =
+				    GET_MAX_HIT(d->character);
+			if (GET_MANA(d->character) > GET_MAX_MANA(d->character))
+				GET_MANA(d->character) =
+				    GET_MAX_MANA(d->character);
+			if (GET_MOVE(d->character) > GET_MAX_MOVE(d->character))
+				GET_MOVE(d->character) =
+				    GET_MAX_MOVE(d->character);
 			save_char(d->character, IN_ROOM(d->character));
 
             if (GET_INVIS_LEV(d->character) == 0) {
