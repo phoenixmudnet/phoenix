@@ -19,6 +19,7 @@
 #include "buffer.h"
 #include "utils.h"
 #include "db.h"
+#include "events.h"
 #include "comm.h"
 #include "handler.h"
 #include "queue.h"
@@ -396,6 +397,7 @@ void boot_db(void)
 
    log("Loading spells.");
    load_spells();
+   load_events();
 
    boot_world();
 
