@@ -82,14 +82,13 @@ const int prac_slots[] =
  * display whether a trip to the guildmaster had done anything.
  *
  * The nine words are unchanged and none are invented: each now has a '+'
- * half, and "mastered" names the last window. 18 + 1 = 19 labels against 19
- * windows of 5, which lands exactly on 95 -- every practice moves the label,
- * and no band spans two visits.
+ * half. "mastered" fires ONLY at the 95 ceiling (> 94), so the word never
+ * leads the cap the way it did opening at 91; superb+ now covers 86-94.
  *
- * "mastered" is 91-95, the final climb. The practice list's "Completely
- * Knowledgable" marker is untouched and still fires at exactly 95: one is the
- * tier reached, the other is the list's note that there is nothing left to
- * buy.
+ * Practice lands on 85/90/95 -- superb/superb+/mastered, a distinct label
+ * every visit. Only use-improvement (odd increments) reaches the 91-94
+ * interior, which reads superb+. The practice list's "Completely Knowledgable"
+ * marker is untouched and still fires at exactly 95.
  *
  * NOT a difficulty change. improve_skill's chance curve, the 5-per-visit
  * grant and the 19 visits are all untouched: effort still runs 5 uses for the
@@ -136,7 +135,7 @@ char *how_good(int percent)
     strcpy(buf, " (very good+)");
   else if (percent <= 85)
     strcpy(buf, " (superb)");
-  else if (percent <= 90)
+  else if (percent <= 94)
     strcpy(buf, " (superb+)");
   else
     strcpy(buf, " (mastered)");
