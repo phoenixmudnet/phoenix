@@ -181,6 +181,7 @@ ACMD(do_drink);
 ACMD(do_drop);
 ACMD(do_eat);
 ACMD(do_echo);
+ACMD(do_event);
 ACMD(do_end_discussion);
 ACMD(do_enter);
 ACMD(do_equipment);
@@ -590,6 +591,7 @@ const struct command_info cmd_info[] = {
 	{"drop", POS_CHANT, do_drop, 0, SCMD_DROP},
 
 	{"eat", POS_CHANT, do_eat, 0, SCMD_EAT},
+  { "event"    , POS_DEAD    , do_event    , LVL_ADMIN, 0 },
 	{"echo", POS_SLEEPING, do_echo, 108, SCMD_ECHO},
 	{"emote", POS_CHANT, do_echo, 1, SCMD_EMOTE},
 	{":", POS_CHANT, do_echo, 1, SCMD_EMOTE},

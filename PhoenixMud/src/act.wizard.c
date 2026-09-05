@@ -19,6 +19,7 @@
 #include "interpreter.h"
 #include "handler.h"
 #include "db.h"
+#include "events.h"
 #include "spells.h"
 #include "house.h"
 #include "screen.h"
@@ -3540,6 +3541,164 @@ ACMD(do_dc)
 
 
 
+
+
+/*
+ * do_event -- schedule a dated window. See docs/design/event-scheduler.md.
+ *
+ * The operator sets a window; the game asks whether one is live. Nothing
+ * fires at a boundary, so a window that opens while the game is down is
+ * simply live when it comes back.
+ *
+ * The parsed window is echoed back in full on add, because a date typed
+ * wrong is otherwise invisible until the event does or does not happen.
+ */
+static const char *event_kind_name(int kind)
+{
+   switch (kind) {
+   case EVENT_FERN: return "fern";
+   case EVENT_XP:   return "xp";
+   case EVENT_GOLD: return "gold";
+   default:         return "?";
+   }
+}
+
+/* YYYY-MM-DD or YYYY-MM-DD:HH, server local time. Returns 0 on failure. */
+static time_t event_parse_when(const char *arg)
+{
+   struct tm tm;
+   int y, mo, d, h = 0;
+   int n = sscanf(arg, "%d-%d-%d:%d", &y, &mo, &d, &h);
+
+   if (n < 3)
+      return 0;
+   if (mo < 1 || mo > 12 || d < 1 || d > 31 || h < 0 || h > 23)
+      return 0;
+
+   memset(&tm, 0, sizeof(tm));
+   tm.tm_year = y - 1900;
+   tm.tm_mon  = mo - 1;
+   tm.tm_mday = d;
+   tm.tm_hour = h;
+   tm.tm_isdst = -1;         /* let libc decide, so DST does not shift it */
+   return mktime(&tm);
+}
+
+ACMD(do_event)
+{
+   char *arg1 = get_buffer(MAX_INPUT_LENGTH);
+   char *arg2 = get_buffer(MAX_INPUT_LENGTH);
+   char buf[MAX_STRING_LENGTH];
+   int i;
+
+   half_chop(argument, arg1, arg2);
+
+   if (!*arg1) {
+      time_t now = time(0);
+      if (!n_events) {
+         send_to_char(ch, "No events scheduled.\r\n");
+         release_buffer(arg1); release_buffer(arg2);
+         return;
+      }
+      send_to_char(ch, "name             kind  value  window                             state\r\n");
+      for (i = 0; i < n_events; i++) {
+         struct event_window *e = &event_list[i];
+         char s1[64], s2[64];
+         const char *state = (now >= e->start && now < e->end) ? "LIVE"
+                           : (now < e->start) ? "upcoming" : "expired";
+         strftime(s1, sizeof(s1), "%b %e %H:%M", localtime(&e->start));
+         strftime(s2, sizeof(s2), "%b %e %H:%M", localtime(&e->end));
+         sprintf(buf, "%-16s %-5s %5d  %s - %-18s %s\r\n",
+                 e->name, event_kind_name(e->kind), e->value, s1, s2, state);
+         send_to_char(ch, "%s", buf);
+      }
+      release_buffer(arg1); release_buffer(arg2);
+      return;
+   }
+
+   if (!str_cmp(arg1, "del")) {
+      char *nm = get_buffer(MAX_INPUT_LENGTH);
+      one_argument(arg2, nm);
+      for (i = 0; i < n_events; i++)
+         if (!str_cmp(event_list[i].name, nm)) {
+            memmove(&event_list[i], &event_list[i + 1],
+                    (n_events - i - 1) * sizeof(struct event_window));
+            n_events--;
+            save_events();
+            send_to_char(ch, "Removed '%s'.\r\n", nm);
+            release_buffer(nm); release_buffer(arg1); release_buffer(arg2);
+            return;
+         }
+      send_to_char(ch, "No event named '%s'.\r\n", nm);
+      release_buffer(nm); release_buffer(arg1); release_buffer(arg2);
+      return;
+   }
+
+   if (!str_cmp(arg1, "add")) {
+      char nm[64], kd[32], w1[32], w2[32];
+      int val, kind;
+      time_t st, en;
+      struct event_window *e;
+      char s1[64], s2[64];
+
+      if (sscanf(arg2, "%63s %31s %31s %31s %d", nm, kd, w1, w2, &val) != 5) {
+         send_to_char(ch, "Usage: event add <name> <fern|xp|gold> <start> <end> <value>\r\n"
+                          "       dates are YYYY-MM-DD or YYYY-MM-DD:HH, server local time\r\n"
+                          "       fern value is the CAST LEVEL; xp and gold are a PERCENT (200 = double)\r\n");
+         release_buffer(arg1); release_buffer(arg2);
+         return;
+      }
+      if (!str_cmp(kd, "fern"))    kind = EVENT_FERN;
+      else if (!str_cmp(kd, "xp")) kind = EVENT_XP;
+      else if (!str_cmp(kd, "gold")) kind = EVENT_GOLD;
+      else {
+         send_to_char(ch, "Kind must be 'fern', 'xp' or 'gold'.\r\n");
+         release_buffer(arg1); release_buffer(arg2);
+         return;
+      }
+      if (n_events >= MAX_EVENTS) {
+         send_to_char(ch, "The schedule is full (%d). Remove an expired one.\r\n", MAX_EVENTS);
+         release_buffer(arg1); release_buffer(arg2);
+         return;
+      }
+      if (!(st = event_parse_when(w1)) || !(en = event_parse_when(w2))) {
+         send_to_char(ch, "Dates are YYYY-MM-DD or YYYY-MM-DD:HH.\r\n");
+         release_buffer(arg1); release_buffer(arg2);
+         return;
+      }
+      if (en <= st) {
+         send_to_char(ch, "The window ends before it starts.\r\n");
+         release_buffer(arg1); release_buffer(arg2);
+         return;
+      }
+      for (i = 0; i < n_events; i++)
+         if (!str_cmp(event_list[i].name, nm)) {
+            send_to_char(ch, "An event named '%s' already exists. Remove it first.\r\n", nm);
+            release_buffer(arg1); release_buffer(arg2);
+            return;
+         }
+
+      e = &event_list[n_events++];
+      strncpy(e->name, nm, sizeof(e->name) - 1);
+      e->name[sizeof(e->name) - 1] = '\0';
+      e->kind = kind; e->start = st; e->end = en; e->value = val;
+      save_events();
+
+      strftime(s1, sizeof(s1), "%a %b %e %H:%M", localtime(&st));
+      strftime(s2, sizeof(s2), "%a %b %e %H:%M", localtime(&en));
+      send_to_char(ch, "Scheduled '%s': %s %s %d, %s -> %s\r\n",
+                   nm, event_kind_name(kind),
+                   kind == EVENT_FERN ? "level" : "percent", val, s1, s2);
+      mudlogf(NRM, MAX(LVL_IMMORT, GET_INVIS_LEV(ch)), TRUE,
+              "(GC) %s scheduled event %s (%s %d) %s -> %s",
+              GET_NAME(ch), nm, event_kind_name(kind), val, s1, s2);
+      release_buffer(arg1); release_buffer(arg2);
+      return;
+   }
+
+   send_to_char(ch, "Usage: event | event add <name> <fern|xp|gold> <start> <end> <value> | event del <name>\r\n");
+   release_buffer(arg1); release_buffer(arg2);
+}
 
 ACMD(do_wizlock)
    {

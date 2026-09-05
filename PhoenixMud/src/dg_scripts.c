@@ -14,6 +14,7 @@
 
 #include "structs.h"
 #include "dg_scripts.h"
+#include "events.h"
 #include "utils.h"
 #include "comm.h"
 #include "interpreter.h"
@@ -1576,6 +1577,28 @@ void find_replacement(void *go, struct script_data *sc, trig_data *trig,
          else if (!str_cmp(var, "people"))
             {
             sprintf(str,"%d",((num=atoi(field))>0)?trgvar_in_room(num):0);
+            return;
+            }
+         /*
+          * %event.fern%      the live fern window's CAST LEVEL, 0 when none
+          * %event.fern.name% that window's name, "" when none
+          *
+          * The name is what lets trigger 3099 mint a fresh quest tag per
+          * event without an immortal editing the trigger: a new window means
+          * a new name means a new tag, so mdoonce gates each event once.
+          */
+         else if (!str_cmp(var, "event"))
+            {
+            if (!str_cmp(field, "fern"))
+               sprintf(str, "%d", event_value(EVENT_FERN));
+            else if (!str_cmp(field, "fern.name"))
+               sprintf(str, "%s", event_name(EVENT_FERN));
+            else if (!str_cmp(field, "xp"))
+               sprintf(str, "%d", event_value(EVENT_XP));
+            else if (!str_cmp(field, "gold"))
+               sprintf(str, "%d", event_value(EVENT_GOLD));
+            else
+               *str = '\0';
             return;
             }
          else if (!str_cmp(var, "time"))

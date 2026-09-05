@@ -17,6 +17,7 @@
 #include "spells.h"
 #include "comm.h"
 #include "db.h"
+#include "events.h"
 #include "handler.h"
 #include "interpreter.h"
 #include "constants.h"
@@ -383,6 +384,18 @@ void gain_exp(struct char_data * ch, long gain)
       if (affected_by_spell(ch, SPELL_ZEAL))
       {
         multiplier *= ZEAL_EXP_BONUS;
+      }
+
+      /*
+       * A scheduled experience window (events.c). Percent, so 200 is double
+       * and a live 100 is a visible no-op. Multiplicative with class and race
+       * for the reason zeal is: a flat addition is worth least to the classes
+       * that already gain slowest.
+       */
+      {
+        int evpct = event_value(EVENT_XP);
+        if (evpct > 0)
+          multiplier *= (float) evpct / 100.0f;
       }
 
       if (gain > 0)
