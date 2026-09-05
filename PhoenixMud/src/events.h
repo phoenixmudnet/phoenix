@@ -8,6 +8,7 @@
 
 #define EVENT_FERN    0   /* value = the cast level the trigger uses */
 #define EVENT_XP      1   /* value = percent; 100 is no change       */
+#define EVENT_GOLD    2   /* value = percent on mob gold drops; 100 no change */
 
 #define EVENT_COMMENT_LEN 160
 

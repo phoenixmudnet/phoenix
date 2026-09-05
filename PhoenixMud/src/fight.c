@@ -24,6 +24,7 @@
 #include "screen.h"
 #include "dg_scripts.h"
 #include "constants.h"
+#include "events.h"
 
 /* Structures */
 struct char_data *combat_list = NULL; /* head of l-list of fighting chars */
@@ -1399,6 +1400,14 @@ void make_corpse(struct char_data * ch, struct char_data * killer)
       /* transfer gold */
       if (GET_GOLD(ch) > 0)
          {
+         /* A live gold-drop window scales an NPC's death gold (events.c).
+            Percent; NPC only, so player death gold is left untouched. */
+         if (IS_NPC(ch))
+            {
+            int goldpct = event_value(EVENT_GOLD);
+            if (goldpct > 0)
+               GET_GOLD(ch) = (int)((float) GET_GOLD(ch) * goldpct / 100.0f);
+            }
          /* following 'if' clause added to fix gold duplication loophole */
          if (IS_NPC(ch) || (!IS_NPC(ch) && ch->desc))
             {

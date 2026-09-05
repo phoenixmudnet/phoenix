@@ -1595,6 +1595,8 @@ void find_replacement(void *go, struct script_data *sc, trig_data *trig,
                sprintf(str, "%s", event_name(EVENT_FERN));
             else if (!str_cmp(field, "xp"))
                sprintf(str, "%d", event_value(EVENT_XP));
+            else if (!str_cmp(field, "gold"))
+               sprintf(str, "%d", event_value(EVENT_GOLD));
             else
                *str = '\0';
             return;

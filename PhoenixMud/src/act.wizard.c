@@ -3558,6 +3558,7 @@ static const char *event_kind_name(int kind)
    switch (kind) {
    case EVENT_FERN: return "fern";
    case EVENT_XP:   return "xp";
+   case EVENT_GOLD: return "gold";
    default:         return "?";
    }
 }
@@ -3641,16 +3642,17 @@ ACMD(do_event)
       char s1[64], s2[64];
 
       if (sscanf(arg2, "%63s %31s %31s %31s %d", nm, kd, w1, w2, &val) != 5) {
-         send_to_char(ch, "Usage: event add <name> <fern|xp> <start> <end> <value>\r\n"
+         send_to_char(ch, "Usage: event add <name> <fern|xp|gold> <start> <end> <value>\r\n"
                           "       dates are YYYY-MM-DD or YYYY-MM-DD:HH, server local time\r\n"
-                          "       fern value is the CAST LEVEL; xp value is a PERCENT (200 = double)\r\n");
+                          "       fern value is the CAST LEVEL; xp and gold are a PERCENT (200 = double)\r\n");
          release_buffer(arg1); release_buffer(arg2);
          return;
       }
       if (!str_cmp(kd, "fern"))    kind = EVENT_FERN;
       else if (!str_cmp(kd, "xp")) kind = EVENT_XP;
+      else if (!str_cmp(kd, "gold")) kind = EVENT_GOLD;
       else {
-         send_to_char(ch, "Kind must be 'fern' or 'xp'.\r\n");
+         send_to_char(ch, "Kind must be 'fern', 'xp' or 'gold'.\r\n");
          release_buffer(arg1); release_buffer(arg2);
          return;
       }
@@ -3694,7 +3696,7 @@ ACMD(do_event)
       return;
    }
 
-   send_to_char(ch, "Usage: event | event add <name> <fern|xp> <start> <end> <value> | event del <name>\r\n");
+   send_to_char(ch, "Usage: event | event add <name> <fern|xp|gold> <start> <end> <value> | event del <name>\r\n");
    release_buffer(arg1); release_buffer(arg2);
 }
 
