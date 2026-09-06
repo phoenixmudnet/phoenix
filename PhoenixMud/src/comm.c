@@ -481,6 +481,7 @@ void init_game()
    cap_close();
 
    Crash_save_all();
+   { extern void save_potion_room(void); save_potion_room(); } /* 4.2 potion room */
 
    log("Closing all sockets."); 
    while (descriptor_list) 
@@ -1167,9 +1168,10 @@ void heartbeat()
       if (++mins_since_crashsave >= autosave_time) 
 	 { 
 	 mins_since_crashsave = 0; 
-	 Crash_save_all(); 
-	 House_save_all(); 
-	 } 
+	 Crash_save_all();
+	 House_save_all();
+	 { extern void save_potion_room(void); save_potion_room(); } /* 4.2 potion room */
+	 }
       } 
 
    /* Back up the index files every 12 hours.  With 6 backup files, this gives

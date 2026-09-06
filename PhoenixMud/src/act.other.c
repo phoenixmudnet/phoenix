@@ -92,6 +92,63 @@ char *ztquit[] =
       "Camp!"
    };
 
+/* ---- 4.2 brewed/scribed camp cap ------------------------------------------
+ * Brewed potions (make_potion vnums 700-719) and scribed scrolls (make_scroll:
+ * ITEM_SCROLL, vnum NOTHING) are ordinary items now (act.create.c dropped their
+ * ITEM_NORENT), but a camper may carry out no more than POTION_ROOM_CAP of them:
+ * the oldest overflow is donated to the potion room instead of blocking the
+ * camp. Room POTION_ROOM_VNUM (one down from room 3054) is ROOM_NO_DECAY and its
+ * floor persists across reboots (save_potion_room/load_potion_room, house.c). */
+#define POTION_ROOM_VNUM 3100
+#define POTION_ROOM_CAP  20
+#define BREW_POTION_LO   700
+#define BREW_POTION_HI   719
+
+static int is_brew_or_scribe(struct obj_data *o)
+   {
+   int vnum = GET_OBJ_VNUM(o);
+   if (GET_OBJ_TYPE(o) == ITEM_POTION && vnum >= BREW_POTION_LO && vnum <= BREW_POTION_HI)
+      return 1;
+   if (GET_OBJ_TYPE(o) == ITEM_SCROLL && vnum == NOTHING)
+      return 1;
+   return 0;
+   }
+
+/* Donate the oldest brewed/scribed overflow to the potion room. ch->carrying is
+ * prepend-ordered (obj_to_char), so the head is newest and the tail oldest: keep
+ * the newest POTION_ROOM_CAP and rehome the rest. Returns the number donated. */
+static int donate_excess_brews(struct char_data *ch)
+   {
+   struct obj_data *o, *next_o;
+   int count = 0, kept = 0, donated = 0;
+   room_rnum rnum;
+
+   for (o = ch->carrying; o; o = o->next_content)
+      if (is_brew_or_scribe(o))
+         count++;
+
+   if (count <= POTION_ROOM_CAP)
+      return 0;
+   if ((rnum = real_room(POTION_ROOM_VNUM)) == NOWHERE)
+      return 0;
+
+   for (o = ch->carrying; o; o = next_o)
+      {
+      next_o = o->next_content;
+      if (!is_brew_or_scribe(o))
+         continue;
+      if (kept < POTION_ROOM_CAP)
+         {
+         kept++;
+         continue;
+         }
+      obj_from_char(o);
+      obj_to_room(o, rnum);
+      donated++;
+      }
+   return donated;
+   }
+
 ACMD(do_quit)
    {
    room_rnum save_room,rnum;
@@ -161,6 +218,16 @@ ACMD(do_quit)
             }
 
          }
+      /* 4.2 brewed/scribed cap: donate the oldest overflow to the potion room
+       * BEFORE the item count below, so donating brings the count down. */
+      if (((subcmd==SCMD_CAMP)||(subcmd==SCMD_CAMPR)) && (GET_LEVEL(ch) < LVL_IMMORT))
+         {
+         int donated = donate_excess_brews(ch);
+         if (donated > 0)
+            send_to_char(ch, "You have donated %d potion%s to the potion room.\r\n",
+                         donated, donated == 1 ? "" : "s");
+         }
+
       nitems=0;
 
       for(i=0;i<NUM_WEARS;i++)

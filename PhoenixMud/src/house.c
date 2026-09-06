@@ -279,6 +279,109 @@ void House_crashsave(room_vnum vnum)
    }
 
 
+/* ---- 4.2 persistent potion room -------------------------------------------
+ * Room POTION_ROOM_VNUM (3100, one down from room 3054) is the donation store
+ * for brewed potions and scribed scrolls capped out at camp (do_quit
+ * donate_excess_brews). It has no zone reset, so boot_db leaves it empty; these
+ * two carry its floor across reboots, modeled on House_crashsave/House_load and
+ * reusing the same object serializer. The room is ROOM_NO_DECAY, so nothing in
+ * it ages. */
+#define POTION_ROOM_VNUM  3100
+#define POTION_ROOM_FILE  "house/potion_room.aschouse"
+
+void save_potion_room(void)
+   {
+   room_rnum rnum;
+   FILE *fp;
+
+   if ((rnum = real_room(POTION_ROOM_VNUM)) == NOWHERE)
+      return;
+   if (!(fp = fopen(POTION_ROOM_FILE, "wb")))
+      {
+      perror("SYSERR: Error saving potion room file");
+      return;
+      }
+   if (fprintf(fp, "@Version: %d\n", CUR_POBJ_VER) < 1)
+      {
+      log("SYSERR OBJSAVE: Error writing potion room version");
+      fclose(fp);
+      return;
+      }
+   if (!House_save(world[rnum].contents, fp))
+      {
+      fclose(fp);
+      return;
+      }
+   fclose(fp);
+   House_restore_weight(world[rnum].contents);
+   }
+
+void load_potion_room(void)
+   {
+   FILE *fl;
+   struct obj_file_elem object;
+   room_rnum rnum;
+   sh_int i;
+   char *line;
+   int locate = 0;
+   int version;
+   struct obj_data *temp = NULL;
+
+   if ((rnum = real_room(POTION_ROOM_VNUM)) == NOWHERE)
+      return;
+   if (!(fl = fopen(POTION_ROOM_FILE, "r+b")))
+      return;  /* no file yet — the room boots empty, which is correct */
+   if (!xap_objs)
+      {
+      while (!feof(fl))
+         {
+         fread(&object, sizeof(struct obj_file_elem), 1, fl);
+         if (ferror(fl))
+            {
+            perror("SYSERR: Reading potion room file: load_potion_room.");
+            fclose(fl);
+            return;
+            }
+         if (!feof(fl))
+            obj_to_room(Obj_from_store(object, &i), rnum);
+         }
+      }
+   else
+      {
+      line = get_buffer(256);
+      if (!feof(fl))
+         get_line(fl, line);
+      if (*line == '@')
+         {
+         if (sscanf(line, "@Version: %d", &version) != 1)
+            version = CUR_POBJ_VER;
+         if (!feof(fl))
+            get_line(fl, line);
+         }
+      else
+         version = 1;
+      while (!feof(fl))
+         {
+         temp = NULL;
+         if (parse_xap_obj(POTION_ROOM_FILE, &temp, line, fl, version, &locate))
+            {
+            if (temp != NULL)
+               obj_to_room(temp, rnum);
+            }
+         else
+            {
+            if (!feof(fl))
+               get_line(fl, line);
+            else
+               break;
+            }
+         }
+      release_buffer(line);
+      }
+   fclose(fl);
+   }
+
+
 /* Delete a house save file */
 void House_delete_file(int vnum)
    {

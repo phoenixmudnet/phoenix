@@ -176,6 +176,7 @@ void mprog_read_programs(FILE * fp, struct index_data * pMobIndex);
 void prune_crlf(char *txt);
 void save_char_vars(struct char_data *ch);
 void load_corpses(void);
+void load_potion_room(void);   /* 4.2 persistent potion room (house.c) */
 void load_spells(void);
 int find_first_step(room_rnum src, room_rnum target,long iFlag);
 int find_name(char *name);
@@ -469,6 +470,8 @@ void boot_db(void)
       {
       log("Booting houses.");
       House_boot();
+      log("Loading the potion room.");
+      load_potion_room();   /* 4.2 persistent potion room (3100) */
       }
 
   for (i = 0; i <= top_of_zone_table; i++)

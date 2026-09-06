@@ -204,7 +204,9 @@ void make_potion(struct char_data *ch, int potion, struct obj_data *container,
  
    GET_OBJ_TYPE(final_potion) = ITEM_POTION;
    GET_OBJ_WEAR(final_potion) = ITEM_WEAR_TAKE;
-   GET_OBJ_EXTRA(final_potion) = ITEM_NORENT;
+   GET_OBJ_EXTRA(final_potion) = 0; /* 4.2: was ITEM_NORENT. Now an ordinary
+                                       item so it saves and survives camp,
+                                       capped at 20 (do_quit donate_excess). */
    GET_OBJ_VAL(final_potion, 0) = clevel;
    GET_OBJ_VAL(final_potion, 1) = potion;
    GET_OBJ_VAL(final_potion, 2) = -1;
@@ -216,7 +218,8 @@ void make_potion(struct char_data *ch, int potion, struct obj_data *container,
    GET_OBJ_CSLOTS(final_potion) = 10;
    GET_OBJ_OSLOTS(final_potion) = 10;
    GET_OBJ_TSLOTS(final_potion) = 10;
-   GET_OBJ_TIMER(final_potion) = 1152; /* 24 hours. */
+   GET_OBJ_TIMER(final_potion) = 0; /* 4.2: no in-hand rot; decays only when
+                                       dropped outside, frozen in the potion room. */
    obj_to_char(final_potion, ch);
 }
 
@@ -518,7 +521,9 @@ void make_scroll(struct char_data *ch, int scroll, struct obj_data *paper,
    
    GET_OBJ_TYPE(final_scroll) = ITEM_SCROLL;
    GET_OBJ_WEAR(final_scroll) = ITEM_WEAR_TAKE;
-   GET_OBJ_EXTRA(final_scroll) = ITEM_NORENT;
+   GET_OBJ_EXTRA(final_scroll) = 0; /* 4.2: was ITEM_NORENT. Ordinary item now
+                                       so it saves and survives camp, capped at
+                                       20 (do_quit donate_excess). */
    GET_OBJ_VAL(final_scroll, 0) = clevel;
    GET_OBJ_VAL(final_scroll, 1) = scroll;
    GET_OBJ_VAL(final_scroll, 2) = -1;
@@ -530,7 +535,7 @@ void make_scroll(struct char_data *ch, int scroll, struct obj_data *paper,
    GET_OBJ_CSLOTS(final_scroll) = 10;
    GET_OBJ_OSLOTS(final_scroll) = 10;
    GET_OBJ_TSLOTS(final_scroll) = 10;
-   GET_OBJ_TIMER(final_scroll) = 1152; /* 24 hours. */
+   GET_OBJ_TIMER(final_scroll) = 0; /* 4.2: no in-hand rot; ordinary decay. */
 
    obj_to_char(final_scroll, ch);
    release_buffer(buf);
