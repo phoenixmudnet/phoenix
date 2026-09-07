@@ -1003,18 +1003,14 @@ void advance_level(struct char_data * ch, bool show)
    * where that one begins and the two can never stack: at 75+ stat_bonus is 0,
    * which is the precondition that code is built on.
    *
-   * Tiers are the old shape scaled by 74/39 -- 15/30/39 becomes 28/57/74 --
-   * so the ramp-down still spends the same three steps over a longer window.
+   * Owner ruling 2026-09-07: the whole window levels at the 25 cap, not a
+   * 15/10/5 ramp. stat_bonus = 25 makes MIN(25, stat+25) == 25 for any stat,
+   * so every gain from 0 to 74 is paid at a full 25 in each ability regardless
+   * of the character's rolled or geared stats.
    * Draws no RNG.
    */
   if (!IS_NPC(ch) && REMORT_LEVEL(ch) == 0 && GET_LEVEL(ch) < 75) {
-    if (GET_LEVEL(ch) <= 28) {
-      stat_bonus = 15;
-    } else if (GET_LEVEL(ch) <= 57) {
-      stat_bonus = 10;
-    } else {
-      stat_bonus = 5;
-    }
+    stat_bonus = 25;
   }
 
   // Remort happens automatically when the mob is defeated. Give those folks a
