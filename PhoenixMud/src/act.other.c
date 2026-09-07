@@ -99,7 +99,7 @@ char *ztquit[] =
  * the oldest overflow is donated to the potion room instead of blocking the
  * camp. Room POTION_ROOM_VNUM (one down from room 3054) is ROOM_NO_DECAY and its
  * floor persists across reboots (save_potion_room/load_potion_room, house.c). */
-#define POTION_ROOM_VNUM 3100
+#define POTION_ROOM_VNUM 3055
 #define POTION_ROOM_CAP  20
 #define BREW_POTION_LO   700
 #define BREW_POTION_HI   719

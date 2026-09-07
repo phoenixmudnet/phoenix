@@ -280,13 +280,13 @@ void House_crashsave(room_vnum vnum)
 
 
 /* ---- 4.2 persistent potion room -------------------------------------------
- * Room POTION_ROOM_VNUM (3100, one down from room 3054) is the donation store
- * for brewed potions and scribed scrolls capped out at camp (do_quit
- * donate_excess_brews). It has no zone reset, so boot_db leaves it empty; these
- * two carry its floor across reboots, modeled on House_crashsave/House_load and
- * reusing the same object serializer. The room is ROOM_NO_DECAY, so nothing in
- * it ages. */
-#define POTION_ROOM_VNUM  3100
+ * Room POTION_ROOM_VNUM (3055, one above the temple altar room 3054) is the
+ * donation store for brewed potions and scribed scrolls capped out at camp
+ * (do_quit donate_excess_brews). It sits in zone 30, whose reset does not load
+ * into it, so these two carry its floor across reboots, modeled on
+ * House_crashsave/House_load and reusing the same object serializer. The room
+ * is ROOM_NO_DECAY, so nothing in it ages. */
+#define POTION_ROOM_VNUM  3055
 #define POTION_ROOM_FILE  "house/potion_room.aschouse"
 
 void save_potion_room(void)
