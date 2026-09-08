@@ -195,9 +195,9 @@ int is_combat_buff(int spellnum)
       case SPELL_FIRESHIELD:            /* 196 */
       /*
        * FERN (53) is here for the same reason as the rest: it does nothing
-       * outside combat, so that is where it should be spent. Its duration was
-       * re-denominated to combat time when it was added (6*level) -- listing it
-       * here without that change would have made it effectively permanent.
+       * outside combat, so that is where it should be spent. Its duration is
+       * combat-denominated (24*level) -- listing it here without that would
+       * have made it effectively permanent.
        */
       case SPELL_FERN:                  /* 53  */
          return TRUE;
@@ -208,7 +208,7 @@ int is_combat_buff(int spellnum)
 
 /*
  * 4.2: how long a gifted fern may be held, in days, whatever the holder does
- * with it. Owner ruling 2026-08-22. The in-combat duration (6*level ticks) is
+ * with it. Owner ruling 2026-08-22. The in-combat duration (24*level ticks) is
  * the VALUE cap; this is the SHELF LIFE.
  */
 #define FERN_WINDOW_DAYS 14
@@ -977,19 +977,19 @@ void mag_affects(int level, struct char_data * ch, struct char_data * victim,
           if (GET_LEVEL(ch) >= LVL_GRGOD)
              {
              /*
-              * 4.2: fern is denominated in COMBAT time, not wall time. It used
-              * to be 24*level ticks -- 3,048 at an immortal 127, i.e. over a
-              * real day of holding it, spent whether or not the holder ever
-              * fought. Combat buffs no longer burn out of combat
-              * (is_combat_buff), so leaving it wall-denominated would have
-              * made it permanent for anyone who simply stopped fighting.
-              * 6*level = 762 ticks is about 15.9 hours of actual combat.
+              * fern is denominated in COMBAT time, not wall time. Combat buffs
+              * no longer burn out of combat (is_combat_buff), so leaving it
+              * wall-denominated would have made it permanent for anyone who
+              * simply stopped fighting. 24*level = 240 ticks at the level-10
+              * grant, about 5 hours of actual combat. (Owner ruling
+              * 2026-09-08 restored the multiplier to 24; the 4.2 change had
+              * cut it to 6. The FERN_WINDOW_DAYS ceiling below is unchanged.)
               */
              af[0].location = APPLY_HITROLL;
-             af[0].duration = 6*level;
+             af[0].duration = 24*level;
              af[0].modifier = 10*level; /* 10hr/dr per level. */
              af[1].location = APPLY_DAMROLL;
-             af[1].duration = 6*level;
+             af[1].duration = 24*level;
              af[1].modifier = 10*level;
              /*
               * ...and a wall-clock ceiling on top, because a character who
