@@ -102,6 +102,38 @@ int isname(const char *str, const char *namelist)
      return 0;
 }
 
+/* Like isname(), but EVERY word of str must match, so a multi-word argument
+   picks out one item instead of everything sharing its first word: "white
+   dragonscale vest" no longer matches every white thing in the world.  A
+   one-word str is exactly isname(), so existing single-keyword lookups are
+   unaffected.
+
+   Deliberately does not use strtok: isname() uses it internally, and nesting
+   the two would clobber the outer scan's state. */
+int isname_all(const char *str, const char *namelist)
+{
+  char word[MAX_INPUT_LENGTH];
+  const char *p = str;
+  int any = 0;
+
+  while (*p) {
+    int n = 0;
+
+    while (*p && strchr(WHITESPACE, *p))
+      p++;
+    while (*p && !strchr(WHITESPACE, *p) && n < (int)sizeof(word) - 1)
+      word[n++] = *p++;
+    word[n] = '\0';
+
+    if (!n)
+      break;
+    any = 1;
+    if (!isname(word, namelist))
+      return 0;
+  }
+  return any;
+}
+
 /* Stock isname(). */
 
 int is_name(const char *str, const char *namelist)

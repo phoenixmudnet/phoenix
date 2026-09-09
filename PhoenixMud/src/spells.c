@@ -711,7 +711,10 @@ ASPELL(spell_locate_object)
    log("Locate-Obj: %s cast locate obj on |%s|.",GET_NAME(ch),name);
    for (i = object_list; i && (j > 0); i = i->next)
       {
-      if (!isname(name, i->name))
+      /* Every word of the argument must match, so a multi-word name picks
+         out the item the caster meant rather than everything sharing its
+         first word. One-word arguments behave exactly as before. */
+      if (!isname_all(name, i->name))
          continue;
       /* cannot locate for body parts on NPCs */
       if (IS_SET(GET_OBJ_EXTRA2(i), ITEM2_BODYPART) &&
@@ -778,7 +781,11 @@ ASPELL(spell_locate_object)
                       GET_NAME(i->worn_by));
          }
       else
-         send_to_char(ch, "%s's location is uncertain.\r\n", buf);
+         /* No room, holder or container: nothing the caster could act on.
+            Skip it rather than spending one of their few results on a row
+            that says nothing. `continue` also leaves j alone, so it does
+            not count against the result limit. */
+         continue;
 
       j--;
       }

@@ -2116,6 +2116,15 @@ ACMD(do_cast)
    if (t != NULL)
       {
       arg=get_buffer(MAX_INPUT_LENGTH);
+      /* CAST_ARG keeps the WHOLE argument, lowercased. `t` is still reduced
+         to its first word below for the target ladder, but locate object
+         matches every word of what was typed, so "white dragonscale vest"
+         has to survive intact. Lowercased because one_argument used to do
+         it, and the Locate-Obj log line prints this verbatim. */
+      strncpy(CAST_ARG(ch), t, 120);
+      CAST_ARG(ch)[120]='\0';
+      for (i = 0; CAST_ARG(ch)[i]; i++)
+         CAST_ARG(ch)[i] = LOWER(CAST_ARG(ch)[i]);
       one_argument(strcpy(arg, t), t);
       skip_spaces(&t);
       release_buffer(arg);
@@ -2126,8 +2135,7 @@ ACMD(do_cast)
       }
    else if (t != NULL && *t)
       {
-      strncpy(CAST_ARG(ch),t,120);
-      CAST_ARG(ch)[120]='\0';
+      /* CAST_ARG was set above, from the full argument. */
 
       if (!target && (IS_SET(SINFO.targets, TAR_CHAR_ROOM)))
          {

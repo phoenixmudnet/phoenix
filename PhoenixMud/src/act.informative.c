@@ -3403,6 +3403,15 @@ void perform_mortal_where(struct char_data *ch, char *arg)
 	}
 }
 
+/* Has this object a location worth printing?  An object with no room, no
+   holder, no container and no shop produces only "in an unknown location",
+   a row nobody can act on, so `where` filters those out instead. */
+int object_location_known(struct obj_data *obj)
+{
+	return (IN_ROOM(obj) > NOWHERE) || obj->carried_by || obj->worn_by ||
+	    obj->in_obj || is_object_in_player_shop(obj);
+}
+
 void print_object_location(int num, struct obj_data *obj, struct char_data *ch,
 			   int recur, char *pztBuf)
 {
@@ -3529,6 +3538,7 @@ void perform_immort_where(struct char_data *ch, char *arg)
 			strcat(buf, "\r\nObjects\r\n-------\r\n");
 			for (num = 0, k = object_list; k; k = k->next)
 				if (CAN_SEE_OBJ(ch, k) && isname(arg, k->name)
+				    && object_location_known(k)
 				    && (!k->carried_by
 					|| CAN_SEE(ch, k->carried_by))
 				    && !(item_owner(k) && !IS_NPC(item_owner(k))

@@ -42,6 +42,7 @@ void affect_join_room(struct room_data *rm, struct room_affected_type * af,
 char *money_desc(int amount);
 struct obj_data *create_money(int amount);
 int	isname(const char *str, const char *namelist);
+int	isname_all(const char *str, const char *namelist);
 char	*fname(char *namelist);
 int	get_number(char **name);
 
