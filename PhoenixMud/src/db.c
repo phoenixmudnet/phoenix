@@ -96,6 +96,7 @@ char *teams = NULL;  /* teams page   */
 char *policies = NULL;  /* policies page   */
 char *marriages = NULL; /* marriages page */
 char *areas = NULL;  /* areas page   */
+char *arealevels = NULL;  /* areas <level> table (generated) */
 char *pspells = NULL;  /* spell list   */
 char *pskills = NULL;  /* skill list   */
 
@@ -242,6 +243,7 @@ ACMD(do_reboot)
       file_to_string_alloc(HANDBOOK_FILE, &handbook);
       file_to_string_alloc(BACKGROUND_FILE, &background);
       file_to_string_alloc(AREAS_FILE, &areas);
+      file_to_string_alloc(AREALEVELS_FILE, &arealevels);
       file_to_string_alloc(SKILLS_FILE, &pskills);
       file_to_string_alloc(SPELLS_FILE, &pspells);
       }
@@ -273,8 +275,10 @@ ACMD(do_reboot)
       file_to_string_alloc(HANDBOOK_FILE, &handbook);
    else if (!str_cmp(arg, "background"))
       file_to_string_alloc(BACKGROUND_FILE, &background);
-   else if (!str_cmp(arg, "areas"))
+   else if (!str_cmp(arg, "areas")) {
       file_to_string_alloc(AREAS_FILE, &areas);
+      file_to_string_alloc(AREALEVELS_FILE, &arealevels);
+   }
    else if (!str_cmp(arg, "spells"))
       file_to_string_alloc(SPELLS_FILE, &pspells);
    else if (!str_cmp(arg, "skills"))
@@ -393,6 +397,7 @@ void boot_db(void)
    file_to_string_alloc(HANDBOOK_FILE, &handbook);
    file_to_string_alloc(BACKGROUND_FILE, &background);
    file_to_string_alloc(AREAS_FILE, &areas);
+   file_to_string_alloc(AREALEVELS_FILE, &arealevels);
    file_to_string_alloc(SPELLS_FILE, &pspells);
    file_to_string_alloc(SKILLS_FILE, &pskills);
 

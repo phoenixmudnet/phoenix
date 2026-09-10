@@ -70,6 +70,7 @@ extern room_rnum top_of_world;
 #define MARRIAGES_FILE  "text/marriages"  /* Marriage rules file        */
 #define HANDBOOK_FILE	"text/handbook"	/* handbook for new immorts	*/
 #define AREAS_FILE	"text/areas"	/* areas file                   */
+#define AREALEVELS_FILE	"text/arealevels" /* areas <level> table, generated */
 #define SKILLS_FILE	"text/skills"	/* Skills file			*/
 #define SPELLS_FILE	"text/spells"	/* Spells file			*/
 

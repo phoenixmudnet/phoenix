@@ -59,6 +59,7 @@ extern char *teams;
 extern char *handbook;
 extern char *marriages;
 extern char *areas;
+extern char *arealevels;
 extern char *pskills;
 extern char *pspells;
 extern char *race_abbrevs[];	/* 10/27/96, Echo */
@@ -3255,12 +3256,252 @@ ACMD(do_users)
 }
 
 /* Generic page_string function for displaying text */
+
+/* ------------------------------------------------------------------------
+ * areas <level> - which areas suit a level, and how to WALK there.
+ *
+ * "Where do I go to level?" is the largest measured stall a new player hits.
+ * Bare `areas` prints a level band and no location, so the argument form
+ * answers the other half. do_gen_ps has always ignored its argument, so
+ * nothing legacy did is contradicted and the bare form is untouched.
+ *
+ * THE ROWS ARE NOT COMPUTED HERE. text/arealevels is derived from the world
+ * by tools/gen-areas.ts, using the same origin index the public catalog
+ * reads - which counts mobs placed by DG scripts and mprogs, not only by zone
+ * resets. This engine has no such index; recomputing here would disagree with
+ * the other engine by construction. Both read the table; only the ROUTE below
+ * is computed per-engine, from the exit graph both share.
+ *
+ * The BFS deliberately does NOT use graph.c's VALID_EDGE: that skips closed
+ * doors and NOTRACK rooms for `track`, and the other engine's sweep follows
+ * every exit. Matching it is what keeps the two outputs identical.
+ * ------------------------------------------------------------------------ */
+
+#define AREAS_MAX_ROWS   512
+#define AREAS_SHOWN       15
+#define AREAS_MIN_WINNABLE 4
+
+struct area_row {
+  int zone, lo, hi, count, min, max;
+  int is_public, reachable;
+  char hist[512];
+  char name[64];
+};
+
+/* How many mobs here are in the band `consider` calls winnable.
+ * NOT band overlap: a city spans rats to guildmasters, so its band overlaps
+ * every level and would rank the capital first for a level-5 player. */
+static int areas_winnable(const char *hist, int level)
+{
+  const char *p = hist;
+  int total = 0, lvl, cnt;
+
+  while (*p) {
+    if (sscanf(p, "%d:%d", &lvl, &cnt) == 2)
+      if (lvl >= level - 3 && lvl <= level + 2)
+        total += cnt;
+    while (*p && *p != ',')
+      p++;
+    if (*p == ',')
+      p++;
+  }
+  return total;
+}
+
+static int areas_load_rows(struct area_row *rows, int max)
+{
+  char line[MAX_STRING_LENGTH], flags[8];
+  const char *p;
+  int n = 0, len;
+
+  if (!arealevels)
+    return 0;
+
+  p = arealevels;
+  while (*p && n < max) {
+    len = 0;
+    while (p[len] && p[len] != '\n' && len < (int)sizeof(line) - 1)
+      len++;
+    strncpy(line, p, len);
+    line[len] = '\0';
+    p += len;
+    while (*p == '\n' || *p == '\r')
+      p++;
+
+    if (line[0] == '#' || line[0] == '\0')
+      continue;
+    /* zone lo hi avg count min max flags hist name */
+    if (sscanf(line, "%d\t%d\t%d\t%*d\t%d\t%d\t%d\t%7[^\t]\t%511[^\t]\t%63[^\n]",
+               &rows[n].zone, &rows[n].lo, &rows[n].hi, &rows[n].count,
+               &rows[n].min, &rows[n].max, flags, rows[n].hist,
+               rows[n].name) != 9)
+      continue;
+    rows[n].is_public = (strchr(flags, 'P') != NULL);
+    rows[n].reachable = (strchr(flags, 'R') != NULL);
+    n++;
+  }
+  return n;
+}
+
+void areas_for_level(struct char_data *ch, int level)
+{
+  struct area_row *rows;
+  int nrows, i, d, hops, qh = 0, qt = 0;
+  room_rnum *queue, *prev, cur, to;
+  char *stepdir, buf[MAX_STRING_LENGTH], row[640], route[256];
+  int *zone_room, *zone_hops, shown = 0, suited = 0;
+  int top = top_of_world + 1;
+  static const char *dabbr[] = { "n", "e", "s", "w", "u", "d" };
+
+  if (IN_ROOM(ch) == NOWHERE)
+    return;
+
+  CREATE(rows, struct area_row, AREAS_MAX_ROWS);
+  nrows = areas_load_rows(rows, AREAS_MAX_ROWS);
+  if (nrows == 0) {
+    send_to_char(ch, "The area list is not available.\r\n");
+    free(rows);
+    return;
+  }
+
+  CREATE(queue, room_rnum, top);
+  CREATE(prev, room_rnum, top);
+  CREATE(stepdir, char, top);
+  CREATE(zone_room, int, top_of_zone_table + 1);
+  CREATE(zone_hops, int, top_of_zone_table + 1);
+  for (i = 0; i < top; i++)
+    prev[i] = NOWHERE;
+  for (i = 0; i <= top_of_zone_table; i++)
+    zone_room[i] = NOWHERE;
+
+  /* One sweep, keeping parents, so a real turn-by-turn route can be rebuilt
+   * for the handful of rows actually shown. */
+  queue[qt++] = IN_ROOM(ch);
+  prev[IN_ROOM(ch)] = IN_ROOM(ch);
+  while (qh < qt) {
+    cur = queue[qh++];
+    if (cur != IN_ROOM(ch) && zone_room[world[cur].zone] == NOWHERE) {
+      zone_room[world[cur].zone] = cur;
+      hops = 0;
+      for (to = cur; to != IN_ROOM(ch); to = prev[to])
+        hops++;
+      zone_hops[world[cur].zone] = hops;
+    }
+    for (d = 0; d < NUM_OF_DIRS; d++) {
+      if (world[cur].dir_option[d] == NULL)
+        continue;
+      to = world[cur].dir_option[d]->to_room;
+      if (to == NOWHERE || to < 0 || to > top_of_world || prev[to] != NOWHERE)
+        continue;
+      prev[to] = cur;
+      stepdir[to] = d;
+      queue[qt++] = to;
+    }
+  }
+
+  sprintf(buf, "Areas for level %d, nearest first:\r\n\r\n", level);
+
+  /* Nearest first: walk zones in the order the sweep reached them. */
+  while (shown < AREAS_SHOWN) {
+    int best = -1, best_hops = 0;
+
+    for (i = 0; i < nrows; i++) {
+      zone_rnum z;
+      if (rows[i].zone < 0 || !rows[i].is_public || !rows[i].reachable)
+        continue;
+      if (areas_winnable(rows[i].hist, level) < AREAS_MIN_WINNABLE)
+        continue;
+      for (z = 0; z <= top_of_zone_table; z++)
+        if (zone_table[z].number == rows[i].zone)
+          break;
+      if (z > top_of_zone_table || zone_room[z] == NOWHERE)
+        continue;
+      if (best == -1 || zone_hops[z] < best_hops) {
+        best = i;
+        best_hops = zone_hops[z];
+      }
+    }
+    if (best == -1)
+      break;
+
+    {
+      zone_rnum z;
+      int nsteps = 0, run, j;
+      char steps[512];
+      room_rnum path[512];
+
+      for (z = 0; z <= top_of_zone_table; z++)
+        if (zone_table[z].number == rows[best].zone)
+          break;
+
+      /* Rebuild the path, then fold runs: s s s s w w u -> "4s 2w u". A
+       * playtester once read "head south, 11 rooms" as a compass bearing and
+       * walked into open wilderness; a route must print as a route. */
+      for (cur = zone_room[z]; cur != IN_ROOM(ch) && nsteps < 512; cur = prev[cur])
+        path[nsteps++] = cur;
+      route[0] = '\0';
+      for (j = nsteps - 1; j >= 0; ) {
+        int dir = stepdir[path[j]];
+        run = 0;
+        while (j >= 0 && stepdir[path[j]] == dir) { run++; j--; }
+        if (run > 1)
+          sprintf(steps, "%d%s ", run, dabbr[dir]);
+        else
+          sprintf(steps, "%s ", dabbr[dir]);
+        if (strlen(route) + strlen(steps) < sizeof(route) - 1)
+          strcat(route, steps);
+      }
+
+      if (rows[best].max > level + 5)
+        sprintf(row, "  %-32.32s %3d for you, up to %d\r\n      %d rooms: %s\r\n",
+                rows[best].name, areas_winnable(rows[best].hist, level),
+                rows[best].max, zone_hops[z], route);
+      else
+        sprintf(row, "  %-32.32s %3d for you\r\n      %d rooms: %s\r\n",
+                rows[best].name, areas_winnable(rows[best].hist, level),
+                zone_hops[z], route);
+      if (strlen(buf) + strlen(row) < MAX_STRING_LENGTH - 256)
+        strcat(buf, row);
+      zone_room[z] = NOWHERE;   /* consumed */
+      shown++;
+      suited++;
+    }
+  }
+
+  if (shown == 0)
+    strcat(buf, "  Nothing listed suits that level within walking distance.\r\n");
+
+  page_string(ch->desc, buf, TRUE, "");
+
+  free(rows);
+  free(queue);
+  free(prev);
+  free(stepdir);
+  free(zone_room);
+  free(zone_hops);
+}
+
 ACMD(do_gen_ps)
 {
 	if (!ch->desc)
 		return;
 	switch (subcmd) {
 	case SCMD_AREAS:
+		{
+		  /* An ARGUMENT asks a different question: which areas suit a level,
+		   * and how do I walk there. Bare `areas` is untouched. */
+		  char lvlarg[MAX_INPUT_LENGTH];
+		  one_argument(argument, lvlarg);
+		  if (*lvlarg) {
+		    int lvl = is_abbrev(lvlarg, "here") ? GET_LEVEL(ch) : atoi(lvlarg);
+		    if (lvl < 1) {
+		      send_to_char(ch, "Usage: areas <level>   (or \"areas here\" for your own level)\r\n");
+		      return;
+		    }
+		    areas_for_level(ch, lvl);
+		    return;
+		  }
+		}
 		page_string(ch->desc, areas, FALSE, "");
 		break;
 	case SCMD_CREDITS:
