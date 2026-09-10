@@ -185,8 +185,24 @@ ACMD(do_hit)
         if ((GET_POS(ch) == POS_STANDING) && (vict != FIGHTING(ch)))
             {
             LAST_HAND_USED(ch)=0;
-            if (!IS_NPC(ch) && (GET_LEVEL(ch) < LVL_IMMORT))
-               WAIT_STATE(ch, PULSE_VIOLENCE);
+            /*
+             * No command lag for opening a fight (owner ruling 2026-09-10).
+             * This used to be WAIT_STATE(ch, PULSE_VIOLENCE) -- half a second
+             * -- charged to mortals only. It bought nothing: the swing it
+             * covers is delivered by hit() immediately below either way, and
+             * the ROUND cadence is driven by the violence pulse, not by this.
+             * All it did was make engaging feel sticky, and punish the player
+             * who was quickest to react.
+             *
+             * A killing blow still sets its own lag: die() assigns 1 RL_SEC
+             * and clamps the killer at 15 (fight.c). That was always the real
+             * post-kill hold; this wait was only ever a FLOOR underneath it,
+             * so removing it does not change what a kill costs.
+             *
+             * Re-attacking the SAME victim is still free of extra swings --
+             * the `vict != FIGHTING(ch)` guard above sends that to "You do
+             * the best you can!" without calling hit().
+             */
             hit(ch, vict, TYPE_UNDEFINED);
             }
         else
