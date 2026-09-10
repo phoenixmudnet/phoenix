@@ -3324,6 +3324,10 @@ static int areas_load_rows(struct area_row *rows, int max)
       len++;
     strncpy(line, p, len);
     line[len] = '\0';
+    /* file_to_string_alloc appends \r\n per line; drop the CR so it cannot
+     * end up inside the last parsed field. */
+    if (len > 0 && line[len - 1] == '\r')
+      line[len - 1] = '\0';
     p += len;
     while (*p == '\n' || *p == '\r')
       p++;
@@ -3331,7 +3335,7 @@ static int areas_load_rows(struct area_row *rows, int max)
     if (line[0] == '#' || line[0] == '\0')
       continue;
     /* zone lo hi avg count min max flags hist name */
-    if (sscanf(line, "%d\t%d\t%d\t%*d\t%d\t%d\t%d\t%7[^\t]\t%511[^\t]\t%63[^\n]",
+    if (sscanf(line, "%d\t%d\t%d\t%*d\t%d\t%d\t%d\t%7[^\t]\t%511[^\t]\t%63[^\r\n]",
                &rows[n].zone, &rows[n].lo, &rows[n].hi, &rows[n].count,
                &rows[n].min, &rows[n].max, flags, rows[n].hist,
                rows[n].name) != 9)
@@ -3450,6 +3454,12 @@ void areas_for_level(struct char_data *ch, int level)
           sprintf(steps, "%s ", dabbr[dir]);
         if (strlen(route) + strlen(steps) < sizeof(route) - 1)
           strcat(route, steps);
+      }
+
+      {  /* built by appending "<dir> ", so drop the trailing space */
+        int rl = strlen(route);
+        if (rl > 0 && route[rl - 1] == ' ')
+          route[rl - 1] = '\0';
       }
 
       if (rows[best].max > level + 5)
