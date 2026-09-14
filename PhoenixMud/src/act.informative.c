@@ -611,6 +611,38 @@ void list_one_char(struct char_data *i, struct char_data *ch)
 	release_buffer(buf);
 }
 
+/* The colour a mob is drawn in for a viewer who has MOBCOLOR set.
+
+   The seven bands are a COARSENING of do_consider's twelve: every boundary
+   here (-11, -6, -1, 0, +5, +10, +20) is also one of do_consider's, so no
+   band straddles a consider cut.  That is the point -- the colour is allowed
+   to exist because consider already reports the same verdict for free, so
+   this can only ever say LESS than a mortal could already find out.  Widen a
+   band and that stops being true.
+
+   Returns the empty string when the viewer has colour off, exactly as the
+   CC* macros do, so a colourless client sees the line it always saw. */
+static const char *difficulty_color(struct char_data *ch,
+				    struct char_data *victim)
+{
+	int diff = GET_LEVEL(victim) - GET_LEVEL(ch);
+
+	if (diff <= -11)
+		return CCGRY(ch, C_NRM);
+	else if (diff <= -6)
+		return CCGRN(ch, C_NRM);
+	else if (diff <= -1)
+		return CCBLU(ch, C_NRM);
+	else if (diff <= 5)
+		return CCWHT(ch, C_NRM);
+	else if (diff <= 10)
+		return CCYEL(ch, C_NRM);
+	else if (diff <= 20)
+		return CCORG(ch, C_NRM);
+	else
+		return CCRED(ch, C_NRM);
+}
+
 void list_char_to_char(struct char_data *list, struct char_data *ch)
 {
 	struct char_data *i;
@@ -621,7 +653,21 @@ void list_char_to_char(struct char_data *list, struct char_data *ch)
 				continue;
 
 			if (CAN_SEE(ch, i)) {
-				send_to_char(ch, CCYEL(ch, C_NRM));
+				/* Every mob has been yellow here forever;
+				   that stays the default and MOBCOLOR is the
+				   only thing that changes it.  The colour is
+				   sent around list_one_char rather than
+				   inside it so the "...$e glows with a bright
+				   light!" trait lines inherit it -- left
+				   yellow under a red name they read as a
+				   second mob. */
+				if (!IS_NPC(ch)
+				    && PRF3_FLAGGED(ch, PRF3_MOBCOLOR)
+				    && IS_NPC(i))
+					send_to_char(ch, "%s",
+						     difficulty_color(ch, i));
+				else
+					send_to_char(ch, CCYEL(ch, C_NRM));
 				list_one_char(i, ch);
 				send_to_char(ch, CCNRM(ch, C_NRM));
 			} else if (IS_DARK(IN_ROOM(ch)) && !CAN_SEE_IN_DARK(ch)

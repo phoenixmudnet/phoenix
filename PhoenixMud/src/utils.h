@@ -257,6 +257,7 @@ char	*str_dup(const char *source);
   */
 #define PRF_FLAGS(ch) CHECK_PLAYER_SPECIAL((ch), ((ch)->player_specials->saved.pref))
 #define PRF2_FLAGS(ch) CHECK_PLAYER_SPECIAL((ch), ((ch)->player_specials->saved.pref2))
+#define PRF3_FLAGS(ch) CHECK_PLAYER_SPECIAL((ch), ((ch)->player_specials->saved.pref3))
 #define AFF_FLAGS(ch) ((ch)->char_specials.saved.affected_by)
 #define AFF2_FLAGS(ch) ((ch)->char_specials.saved.affected_by2)
 #define ROOM_FLAGS(loc) (world[(loc)].room_flags)
@@ -275,6 +276,7 @@ char	*str_dup(const char *source);
 #define AFF2_FLAGGED(ch, flag) (IS_SET(AFF2_FLAGS(ch), (flag)))
 #define PRF_FLAGGED(ch, flag) (IS_SET(PRF_FLAGS(ch), (flag)))
 #define PRF2_FLAGGED(ch, flag) (IS_SET(PRF2_FLAGS(ch), (flag)))
+#define PRF3_FLAGGED(ch, flag) (IS_SET(PRF3_FLAGS(ch), (flag)))
 #define ROOM_FLAGGED(loc, flag) (IS_SET(ROOM_FLAGS(loc), (flag)))
 #define ROOM2_FLAGGED(loc, flag) (IS_SET(ROOM2_FLAGS(loc), (flag)))
 #define EXIT_FLAGGED(exit, flag) (IS_SET((exit)->exit_info, (flag)))
@@ -289,6 +291,7 @@ char	*str_dup(const char *source);
 #define PLR_TOG_CHK(ch,flag) ((TOGGLE_BIT(PLR_FLAGS(ch), (flag))) & (flag))
 #define PRF_TOG_CHK(ch,flag) ((TOGGLE_BIT(PRF_FLAGS(ch), (flag))) & (flag))
 #define PRF_TOG_CHK2(ch,flag) ((TOGGLE_BIT(PRF2_FLAGS(ch), (flag))) & (flag))
+#define PRF_TOG_CHK3(ch,flag) ((TOGGLE_BIT(PRF3_FLAGS(ch), (flag))) & (flag))
 
 
 

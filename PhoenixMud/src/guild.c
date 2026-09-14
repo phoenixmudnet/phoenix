@@ -305,6 +305,15 @@ void what_does_gm_know(int guild_nr, struct char_data * ch,int learn)
       if (GET_LEVEL(ch)>=min_level(ch,i) &&
           does_gm_know(guild_nr, i)&&(GET_SKILL(ch,i)>0))
         {
+        /* HIDEMASTERED: leave out what this character can no longer
+           improve, so the list is what practice can still act on.  The
+           two thresholds are read off the "Completely Knowledgable"
+           tests below on purpose -- split them and the list would hide
+           a row that still prints as improvable. */
+        if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEMASTERED) &&
+           (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=10)) ||
+            ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>=95))))
+          continue;
         if(spells[i].is_spell==IS_SPELL)
           sprintf(buf,"Spell Level: %d",GET_SKILL(ch,i));
         else

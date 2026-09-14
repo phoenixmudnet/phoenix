@@ -425,6 +425,18 @@
 #define PRF2_MORTAL     (1 << 20) /* For imms.  Can they take damage?   */
 #define PRF2_NONEWBIE   (1 << 21) /* Can't hera newbie channel          */
 #define PRF2_DISPEXPLORED (1<<22) /* display explored in current zone   */
+
+/* Display preferences -- the pref3 word.  Declared and saved since the pfile
+   format gained a third preference word, but until now no flag used it.
+
+   BIT NUMBERS ARE SHARED WITH THE TYPESCRIPT ENGINE.  A character's pref3
+   travels in the pfile between the two, so a bit has to mean the same thing
+   on both sides or a setting silently turns into a different setting on the
+   way across.  Only MOBCOLOR is implemented here; the other two are listed
+   so the allocation cannot drift while they are unimplemented.           */
+#define PRF3_HIDEMASTERED (1 << 0) /* practice list hides mastered entries */
+#define PRF3_MOBCOLOR     (1 << 1) /* colour mobs by relative difficulty   */
+#define PRF3_DIMFARMED    (1 << 2) /* dim mobs whose xp you have worn down */
 /*** 2 Extra sets of 32 flags with pref2 and pref3  ****/
 
 /* Updated to match Phoenix */
