@@ -60,6 +60,7 @@ extern char *handbook;
 extern char *marriages;
 extern char *areas;
 extern char *arealevels;
+extern char *unreachable_rooms;
 extern char *pskills;
 extern char *pspells;
 extern char *race_abbrevs[];	/* 10/27/96, Echo */
@@ -3393,6 +3394,47 @@ static int areas_load_rows(struct area_row *rows, int max)
   return n;
 }
 
+/* Rooms with NO mortal entrance, from the generated text/unreachable.
+ *
+ * WHY THIS IS HERE. `areas <level>` prints a WALKING route, and the sweep that
+ * builds it used to follow every exit. That routed players through the
+ * Immortal Complex -- two steps from the Temple, via a donation-room door that
+ * `knock` opens -- because the door flags were never the barrier. What stops a
+ * mortal there is room trigger #1228 returning 0 on entry.
+ *
+ * The TS engine reads that from world/connectivity.json, which models the
+ * script denial. This engine cannot, so it reads the same answer as a flat
+ * list emitted by the same generator in the same pass. One source, two
+ * encodings -- otherwise the two engines print different routes, which is
+ * exactly what the cmd-areas-level sweep caught.
+ *
+ * Marked by RNUM on first use: the sweep runs in rnum space.              */
+static char *unreach_flags = NULL;
+
+static void areas_load_unreachable(void)
+{
+  char *p, *end;
+  room_rnum rn;
+  int vnum;
+
+  if (unreach_flags || !unreachable_rooms)
+    return;
+  CREATE(unreach_flags, char, top_of_world + 2);
+  p = unreachable_rooms;
+  while (*p) {
+    while (*p && !isdigit((int) *p)) {       /* skip '*' comment lines and blanks */
+      if (*p == '*') { while (*p && *p != '\n') p++; }
+      else p++;
+    }
+    if (!*p)
+      break;
+    vnum = (int) strtol(p, &end, 10);
+    p = end;
+    if ((rn = real_room(vnum)) != NOWHERE)
+      unreach_flags[rn] = 1;
+  }
+}
+
 void areas_for_level(struct char_data *ch, int level)
 {
   struct area_row *rows;
@@ -3426,6 +3468,7 @@ void areas_for_level(struct char_data *ch, int level)
 
   /* One sweep, keeping parents, so a real turn-by-turn route can be rebuilt
    * for the handful of rows actually shown. */
+  areas_load_unreachable();
   queue[qt++] = IN_ROOM(ch);
   prev[IN_ROOM(ch)] = IN_ROOM(ch);
   while (qh < qt) {
@@ -3442,6 +3485,8 @@ void areas_for_level(struct char_data *ch, int level)
         continue;
       to = world[cur].dir_option[d]->to_room;
       if (to == NOWHERE || to < 0 || to > top_of_world || prev[to] != NOWHERE)
+        continue;
+      if (unreach_flags && unreach_flags[to])   /* no mortal entrance -- never route through */
         continue;
       prev[to] = cur;
       stepdir[to] = d;
