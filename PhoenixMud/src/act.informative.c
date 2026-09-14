@@ -3508,14 +3508,17 @@ void areas_for_level(struct char_data *ch, int level)
           route[rl - 1] = '\0';
       }
 
-      if (rows[best].max > level + 5)
-        sprintf(row, "  %-32.32s %3d for you, up to %d\r\n      %d rooms: %s\r\n",
-                rows[best].name, areas_winnable(rows[best].hist, level),
-                rows[best].max, zone_hops[z], route);
-      else
-        sprintf(row, "  %-32.32s %3d for you\r\n      %d rooms: %s\r\n",
-                rows[best].name, areas_winnable(rows[best].hist, level),
-                zone_hops[z], route);
+      /* The zone's top mob level used to trail the count as ", up to 125".
+         It read as a second statistic about the player's own level and
+         answered a question nobody asked -- what matters is how much there
+         is to kill here, not what the hardest thing in the zone is.
+         The hop count is gone from the route line for the same reason:
+         "11 rooms:" read as a distance to cover rather than a label. The
+         hops still ORDER the list (nearest first), they just are not
+         printed.  One branch now, because there is nothing to vary.      */
+      sprintf(row, "  %-32.32s %3d for you\r\n      Path: %s\r\n",
+              rows[best].name, areas_winnable(rows[best].hist, level),
+              route);
       if (strlen(buf) + strlen(row) < MAX_STRING_LENGTH - 256)
         strcat(buf, row);
       zone_room[z] = NOWHERE;   /* consumed */
