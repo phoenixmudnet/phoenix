@@ -141,6 +141,8 @@ struct alias_data {
 #define SCMD_NORECALL   34
 #define SCMD_NOMUSIC    35
 #define SCMD_MORTAL     36
+#define SCMD_MOBCOLOR   37
+#define SCMD_HIDEMASTERED 38
 
 /* do_gen_vfile */
 #define SCMD_V_BUGS      0

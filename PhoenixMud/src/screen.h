@@ -16,6 +16,13 @@
 #define KMAG  "\x1B[1m\x1B[35m"
 #define KCYN  "\x1B[1m\x1B[36m"
 #define KWHT  "\x1B[1m\x1B[37m"
+/* The difficulty scale needs two colours the table above never had.  There
+   is no orange in sixteen colours, so that band borrows dark yellow -- which
+   is what every other scale of this kind does.  Both follow the split form
+   the rest of this table uses (bold, then colour), NOT the fused "\x1B[1;33m"
+   the &-token processor in color.c emits.                                 */
+#define KGRY  "\x1B[1m\x1B[30m"	/* bright black, i.e. grey */
+#define KORG  "\x1B[0m\x1B[33m"	/* dark yellow, read as orange */
 #define KNUL  ""
 
 /* conditional color.  pass it a pointer to a char_data and a color level. */
@@ -34,6 +41,8 @@
 #define CCMAG(ch,lvl)  (clr((ch),(lvl))?KMAG:KNUL)
 #define CCCYN(ch,lvl)  (clr((ch),(lvl))?KCYN:KNUL)
 #define CCWHT(ch,lvl)  (clr((ch),(lvl))?KWHT:KNUL)
+#define CCGRY(ch,lvl)  (clr((ch),(lvl))?KGRY:KNUL)
+#define CCORG(ch,lvl)  (clr((ch),(lvl))?KORG:KNUL)
 
 #define COLOR_LEV(ch) (_clrlevel(ch))
 

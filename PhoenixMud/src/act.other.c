@@ -1718,6 +1718,12 @@ ACMD(do_gen_tog)
 	 {"You are now immortal.\r\n",
 	  "You are now MORTAL!  Don't look surprised if you die...\r\n",
 	 },
+         {"Mobs will be shown in the usual colour.\r\n",
+          "Mobs will be coloured by relative difficulty.\r\n"
+         },
+         {"Practice will list every skill you know.\r\n",
+          "Practice will hide skills you have completely mastered.\r\n"
+         },
       };
 
 
@@ -1869,6 +1875,12 @@ ACMD(do_gen_tog)
      } else {
        return;
      }
+   case SCMD_MOBCOLOR:
+      result = PRF_TOG_CHK3(ch, PRF3_MOBCOLOR);
+      break;
+   case SCMD_HIDEMASTERED:
+      result = PRF_TOG_CHK3(ch, PRF3_HIDEMASTERED);
+      break;
    default:
       log("SYSERR: Unknown subcmd: %d in do_gen_toggle",subcmd);
       return;
