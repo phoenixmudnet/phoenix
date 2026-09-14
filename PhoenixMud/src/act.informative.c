@@ -3516,7 +3516,13 @@ void areas_for_level(struct char_data *ch, int level)
          "11 rooms:" read as a distance to cover rather than a label. The
          hops still ORDER the list (nearest first), they just are not
          printed.  One branch now, because there is nothing to vary.      */
-      sprintf(row, "  %-32.32s %3d for you\r\n      Path: %s\r\n",
+      /* "for you" was wrong whenever the queried level is not the
+         reader's: a level 101 typing `areas 4` was told "8 for you".
+         The count belongs to the LEVEL ASKED ABOUT, which the header
+         already names, and it counts the winnable BAND rather than one
+         exact level -- which "in range" says and "at level 30" would
+         not.                                                          */
+      sprintf(row, "  %-32.32s %3d in range\r\n      Path: %s\r\n",
               rows[best].name, areas_winnable(rows[best].hist, level),
               route);
       if (strlen(buf) + strlen(row) < MAX_STRING_LENGTH - 256)
