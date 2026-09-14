@@ -47,6 +47,9 @@ void mprog_bribe_trigger(struct char_data * mob, struct char_data * ch,
                          int amount);
 int can_give_gold(struct char_data *ch, int amount);
 int min_level(struct char_data *ch,int spellnum);
+int get_prof(struct char_data *ch, struct obj_data *wielded);   /*. fight.c .*/
+char *skill_name(int num);                                      /*. spell_parser.c .*/
+extern struct spell_info_type *spells;                          /*. spell_parser.c .*/
 
 
 void log_corpse(struct char_data *ch,struct obj_data *cont,char *ztString)
@@ -2462,6 +2465,46 @@ ACMD(do_wear)
 
 
 
+/*
+ * Training gate: may this character use a weapon of this kind at all?
+ *
+ * A weapon's attack type selects a proficiency (get_prof), and that skill
+ * feeds calc_thaco as (skill-65)/3 -- so an UNTRAINED weapon is -21 to hit,
+ * permanently, with nothing on screen saying why.  Wielding one is now
+ * refused instead of silently crippling the wielder.
+ *
+ * ONLY for proficiencies a class can actually reach.  PROF_CLAW is a MOB
+ * attack type: no class has a min_level line for it, so gating on it would
+ * make the handful of claw-typed items (a lion's paw, a wererat claw, an ant
+ * pincer) unwieldable by everyone -- not because the player skipped a
+ * practice, but because the skill was never offered to players at all.
+ * Those keep today's behaviour.
+ *
+ * The scan is across EVERY class, not just this one.  "My class cannot learn
+ * it" is exactly the case this gate exists to refuse; only "nobody can learn
+ * it" earns the exemption.
+ *
+ * Immortals bypass, as they do the other wield restrictions.
+ */
+int untrained_weapon_prof(struct char_data *ch, struct obj_data *obj)
+   {
+   int prof, class;
+
+   if (IS_NPC(ch) || GET_LEVEL(ch) >= LVL_IMMORT)
+      return 0;
+
+   prof = get_prof(ch, obj);
+   if (prof <= 0 || GET_SKILL(ch, prof) > 0)
+      return 0;
+
+   for (class = 0; class < NUM_CLASSES; class++)
+      if (spells[prof].min_level[class] <= LVL_IMPL)
+         return 1;      /* someone can learn it, and this character has not */
+
+   return 0;            /* nobody can learn it -- not the player's fault */
+   }
+
+
 ACMD(do_wield)
    {
    struct obj_data *obj;
@@ -2509,6 +2552,9 @@ ACMD(do_wield)
                 (GET_OBJ_VAL(obj,3)==13) ||
                 (GET_OBJ_VAL(obj,3)==15)))
          send_to_char(ch, "That weapon would interfere with your magic!\r\n");
+      else if (untrained_weapon_prof(ch, obj))
+         send_to_char(ch, "You have no training with %s weapons.\r\n",
+                      skill_name(get_prof(ch, obj)));
       else if (GET_OBJ_CSLOTS(obj) < 0)
          send_to_char(ch, "You sense the futility in wielding a broken weapon.\r\n");
       else
