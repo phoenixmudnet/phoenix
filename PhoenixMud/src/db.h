@@ -71,6 +71,7 @@ extern room_rnum top_of_world;
 #define HANDBOOK_FILE	"text/handbook"	/* handbook for new immorts	*/
 #define AREAS_FILE	"text/areas"	/* areas file                   */
 #define AREALEVELS_FILE	"text/arealevels" /* areas <level> table, generated */
+#define UNREACHABLE_FILE "text/unreachable" /* rooms with no mortal entrance, generated */
 #define SKILLS_FILE	"text/skills"	/* Skills file			*/
 #define SPELLS_FILE	"text/spells"	/* Spells file			*/
 
