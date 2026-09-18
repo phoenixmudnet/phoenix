@@ -2497,8 +2497,13 @@ int untrained_weapon_prof(struct char_data *ch, struct obj_data *obj)
    if (prof <= 0 || GET_SKILL(ch, prof) > 0)
       return 0;
 
+   /* spelledit.c:112 stores an UNSET class level as LVL_IMMORT, not
+    * LVL_IMPL+1, so "<= LVL_IMPL" was true for every class and the claw
+    * exemption below never fired -- every claw-typed item was refused.
+    * Learnable means what it means to `skills` and spelledit: a level
+    * below LVL_IMMORT. */
    for (class = 0; class < NUM_CLASSES; class++)
-      if (spells[prof].min_level[class] <= LVL_IMPL)
+      if (spells[prof].min_level[class] < LVL_IMMORT)
          return 1;      /* someone can learn it, and this character has not */
 
    return 0;            /* nobody can learn it -- not the player's fault */
