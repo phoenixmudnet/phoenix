@@ -3335,6 +3335,30 @@ struct area_row {
   char name[64];
 };
 
+/* `areas <level> <name>` -- the name half of the filter. Case-insensitive
+ * substring over the zone NAME. It NARROWS the level list rather than being a
+ * search of its own: that list is capped at the 15 nearest areas, so the zone
+ * a player is looking for usually is not in it, which is the whole reason to
+ * be able to name it. An empty needle matches everything, so the unfiltered
+ * form runs the same loop. */
+static int areas_name_matches(const char *name, const char *needle)
+{
+  char a[64], b[MAX_INPUT_LENGTH];
+  int i;
+
+  if (!needle || !*needle)
+    return 1;
+  strncpy(a, name, sizeof(a) - 1);
+  a[sizeof(a) - 1] = '\0';
+  strncpy(b, needle, sizeof(b) - 1);
+  b[sizeof(b) - 1] = '\0';
+  for (i = 0; a[i]; i++)
+    a[i] = LOWER(a[i]);
+  for (i = 0; b[i]; i++)
+    b[i] = LOWER(b[i]);
+  return strstr(a, b) != NULL;
+}
+
 /* How many mobs here are in the band `consider` calls winnable.
  * NOT band overlap: a city spans rats to guildmasters, so its band overlaps
  * every level and would rank the capital first for a level-5 player. */
@@ -3435,7 +3459,7 @@ static void areas_load_unreachable(void)
   }
 }
 
-void areas_for_level(struct char_data *ch, int level)
+void areas_for_level(struct char_data *ch, int level, const char *name)
 {
   struct area_row *rows;
   int nrows, i, d, hops, qh = 0, qt = 0;
@@ -3494,7 +3518,14 @@ void areas_for_level(struct char_data *ch, int level)
     }
   }
 
-  sprintf(buf, "Areas for level %d, nearest first:\r\n\r\n", level);
+  /* The filter goes in the HEADER rather than into a second empty-case
+   * sentence, so there is still exactly one of those and it reads correctly
+   * either way. Two engines render this and every extra branch is a place
+   * they can disagree. */
+  if (name && *name)
+    sprintf(buf, "Areas for level %d matching '%s', nearest first:\r\n\r\n", level, name);
+  else
+    sprintf(buf, "Areas for level %d, nearest first:\r\n\r\n", level);
 
   /* Nearest first: walk zones in the order the sweep reached them. */
   while (shown < AREAS_SHOWN) {
@@ -3505,6 +3536,8 @@ void areas_for_level(struct char_data *ch, int level)
       if (rows[i].zone < 0 || !rows[i].is_public || !rows[i].reachable)
         continue;
       if (areas_winnable(rows[i].hist, level) < AREAS_MIN_WINNABLE)
+        continue;
+      if (!areas_name_matches(rows[i].name, name))
         continue;
       for (z = 0; z <= top_of_zone_table; z++)
         if (zone_table[z].number == rows[i].zone)
@@ -3601,14 +3634,19 @@ ACMD(do_gen_ps)
 		  /* An ARGUMENT asks a different question: which areas suit a level,
 		   * and how do I walk there. Bare `areas` is untouched. */
 		  char lvlarg[MAX_INPUT_LENGTH];
-		  one_argument(argument, lvlarg);
+		  char *rest = one_argument(argument, lvlarg);
 		  if (*lvlarg) {
 		    int lvl = is_abbrev(lvlarg, "here") ? GET_LEVEL(ch) : atoi(lvlarg);
 		    if (lvl < 1) {
-		      send_to_char(ch, "Usage: areas <level>   (or \"areas here\" for your own level)\r\n");
+		      send_to_char(ch, "Usage: areas <level> [name]   (or \"areas here\" for your own level)\r\n");
 		      return;
 		    }
-		    areas_for_level(ch, lvl);
+		    /* Everything after the level narrows the list by NAME. Taken whole
+		     * rather than one_argument'd again: "midnight warlock" is a name a
+		     * player would type, and a second one_argument drops the second
+		     * word. one_argument leaves its leading space behind, so skip it. */
+		    skip_spaces(&rest);
+		    areas_for_level(ch, lvl, rest);
 		    return;
 		  }
 		}
