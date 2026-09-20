@@ -1723,6 +1723,19 @@ struct char_special_data {
 
 struct player_special_data {
    struct player_special_data_saved saved;
+   /* WHAT THIS CHARACTER WALKED AND IDENTIFIED ITSELF.
+    *
+    * explored_vnums/known_vnums below are the WORKING bitmaps: this
+    * character's own, OR'd with every sibling on its account, because
+    * exploration and the identify log are cumulative at the account level.
+    * Everything reads those -- score, the zone list, the routing fog.
+    *
+    * These two are the discrete contribution, and they are the only half
+    * written back to the pfile. Saving the working bitmap would copy a
+    * sibling's map into this record permanently, so taking a character off a
+    * roster would not return it to its own map. In-memory only. */
+   char explored_own[EXPLORED_BYTES];
+   char known_own[KNOWN_BYTES];
    struct alias_data *aliases;
    long last_tell;
    void *last_olc_targ;

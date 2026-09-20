@@ -840,3 +840,55 @@ void account_money_unbind(struct char_data *ch)
          return;                        /* somebody is still spending it */
    acct->money_live = FALSE;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Exploration and the identify log, cumulative across the account    */
+/* ------------------------------------------------------------------ */
+
+/*
+ * OR every sibling's stored bitmap into this character's working one.
+ *
+ * A room walked by any character on the account counts for all of them, and
+ * is treated as known when routing -- pathing someone around rooms their own
+ * account has mapped is the surprise, not the sharing.
+ *
+ * The CONTRIBUTIONS stay discrete: explored_own/known_own hold what this
+ * character did itself and are the only half char_to_store writes back. So
+ * the union is rebuilt at every load and never persisted, and a character
+ * taken off a roster is left with exactly its own map.
+ *
+ * Reads the siblings' RECORDS rather than their live characters: a sibling
+ * need not be in the world for its map to count, and a record read is the
+ * same answer either way because the own half is what is stored.
+ *
+ * NOTE: keep this file ASCII.
+ */
+void account_knowledge_merge(struct char_data *ch)
+{
+   struct account_data *acct;
+   struct char_file_u f;
+   int j, i;
+
+   if (!ch || IS_NPC(ch) || !ch->player_specials)
+      return;
+   if (!(acct = account_of_char(GET_PC_NAME(ch))))
+      return;
+
+   for (j = 0; j < acct->num_members; j++) {
+      if (!str_cmp(acct->members[j], GET_PC_NAME(ch)))
+         continue;                      /* own half is already in place */
+      if (load_char(acct->members[j], &f) < 0)
+         continue;                      /* unreadable sibling contributes nothing */
+      for (i = 0; i < EXPLORED_BYTES; i++)
+         ch->player_specials->explored_vnums[i] |= f.explored_vnums[i];
+      for (i = 0; i < KNOWN_BYTES; i++)
+         ch->player_specials->known_vnums[i] |= f.known_vnums[i];
+   }
+
+   /* The counter tracks the WORKING bitmap, so it has to be recomputed after
+    * the merge -- store_to_char popcounted the own half alone. */
+   GET_EXPLORED(ch) = 0;
+   for (i = 0; i < 8 * EXPLORED_BYTES; i++)
+      if (ch->player_specials->explored_vnums[i / 8] & (1 << (i % 8)))
+         (GET_EXPLORED(ch))++;
+}

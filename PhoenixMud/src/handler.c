@@ -809,6 +809,11 @@ void char_to_room(struct char_data * ch, room_rnum room)
 	char *vnums =  ch->player_specials->explored_vnums;
 	int *total = &ch->player_specials->explored_total;
 	int mask = 1 << (vnum%8);
+	/* The OWN half records the contribution even when a sibling on the
+	 * account has already walked this room -- otherwise leaving the
+	 * account would take rooms this character genuinely visited with it.
+	 * Only the working half moves the counter. */
+	ch->player_specials->explored_own[vnum/8] |= mask;
 	if (!(vnums[vnum/8] & mask)) {
 	  vnums[vnum/8] |= 1 << (vnum%8);
 	  (*total)++;

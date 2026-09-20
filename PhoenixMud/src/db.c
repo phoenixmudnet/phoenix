@@ -4488,6 +4488,11 @@ void store_to_char(struct char_file_u * st, struct char_data * ch)
          affect_from_char(ch, SPELL_PLAGUE); 
       }
 
+   /* The record holds this character's OWN contribution. Keep it as such, and
+    * seed the working bitmaps from it; account_knowledge_merge then ORs in
+    * every sibling. See explored_own in player_special_data. */
+   memcpy(ch->player_specials->explored_own, st->explored_vnums, EXPLORED_BYTES*sizeof(char));
+   memcpy(ch->player_specials->known_own, st->known_vnums, KNOWN_BYTES*sizeof(char));
    memcpy(ch->player_specials->explored_vnums, st->explored_vnums, EXPLORED_BYTES*sizeof(char));
    memcpy(ch->player_specials->known_vnums, st->known_vnums, KNOWN_BYTES*sizeof(char));
    st->fern_expiry = ch->player_specials->fern_expiry;   /* 4.2 fern window */
@@ -4642,10 +4647,12 @@ void char_to_store(struct char_data * ch, struct char_file_u * st,
 
 
    /* copy explored data. */
-   memcpy(st->explored_vnums, ch->player_specials->explored_vnums, EXPLORED_BYTES*sizeof(char));
+   /* The OWN half, never the union: writing the union would copy a sibling's
+    * map into this record permanently. */
+   memcpy(st->explored_vnums, ch->player_specials->explored_own, EXPLORED_BYTES*sizeof(char));
 
    /* copy known-item data (persistent identify). */
-   memcpy(st->known_vnums, ch->player_specials->known_vnums, KNOWN_BYTES*sizeof(char));
+   memcpy(st->known_vnums, ch->player_specials->known_own, KNOWN_BYTES*sizeof(char));
    st->fern_expiry = ch->player_specials->fern_expiry;   /* 4.2 fern window */
    ch->player_specials->fern_expiry = st->fern_expiry;   /* 4.2 fern window */
 

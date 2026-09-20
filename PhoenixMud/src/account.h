@@ -129,4 +129,9 @@ long *acct_bank_ref(struct char_data *ch);
 void  account_money_bind(struct char_data *ch);
 void  account_money_unbind(struct char_data *ch);
 
+/* Exploration and the identify log are cumulative across the account: OR every
+ * sibling's stored bitmap into this character's working one. The contribution
+ * stays discrete -- see explored_own in player_special_data. */
+void account_knowledge_merge(struct char_data *ch);
+
 #endif /* _ACCOUNT_H_ */
