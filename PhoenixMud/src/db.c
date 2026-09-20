@@ -26,6 +26,7 @@
 #include "mail.h"
 #include "interpreter.h"
 #include "house.h"
+#include "account.h"
 #include "spec_assign.h"
 #include "path.h"
 #include "dg_scripts.h"
@@ -467,6 +468,11 @@ void boot_db(void)
       {
       log("Booting houses.");
       House_boot();
+      /* AFTER the player index: a roster names characters the index must
+       * already know, and BEFORE any descriptor exists, because nanny
+       * resolves an account the moment a password verifies. */
+      log("Booting accounts.");
+      boot_accounts();
       }
 
   for (i = 0; i <= top_of_zone_table; i++)
