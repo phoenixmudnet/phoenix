@@ -97,4 +97,9 @@ void account_set_password(struct account_data *acct, char *raw);
  * balance crosses as N copies of the money. */
 const char *account_purse_holder(char *char_name);
 
+/* Account money at the persistence boundary. See the long note in account.c
+ * for why this is not the GET_GOLD macro. */
+void account_money_load(struct char_file_u *f);
+void account_money_save(struct char_file_u *f);
+
 #endif /* _ACCOUNT_H_ */
