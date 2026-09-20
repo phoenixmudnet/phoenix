@@ -596,3 +596,134 @@ void account_set_password(struct account_data *acct, char *raw)
          }
    }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Account money at the persistence boundary                          */
+/* ------------------------------------------------------------------ */
+
+/*
+ * ONE RECORD HOLDS THE MONEY; every other member stores 0.
+ *
+ * WHY THE BOUNDARY AND NOT THE MACRO. GET_GOLD and GET_BANK_GOLD are
+ * LVALUES ("+= cost") at 38+ sites, and they are applied to BOTH struct
+ * char_data and struct char_file_u (act.other2.c:366). The obvious port of
+ * the TypeScript accessor -- a pointer on char_data that the macro
+ * dereferences -- founders on something this codebase does idiomatically:
+ * it copies char_data wholesale. "*mob = mob_proto[i]" (db.c:2979) and
+ * "memcpy(&tmpmob, m, sizeof(*m))" (dg_mobcmd.c:1365) would both leave the
+ * copy's pointer aimed at the ORIGINAL's field, so a spawned mob would
+ * spend its prototype's purse, and every future struct copy would be the
+ * same trap, silently.
+ *
+ * So the money is scoped where it is WRITTEN and READ from disk:
+ *
+ *   - loading a non-holder seeds it from the HOLDER's record, so every
+ *     member sees one balance at login;
+ *   - saving a non-holder writes 0 and pushes the value to the holder, so
+ *     nothing -- not a restore, not the interchange, which turns every
+ *     member record into a TS "gold" field -- can turn one balance into
+ *     several copies of it.
+ *
+ * WHAT THIS DOES NOT GIVE: two siblings in the world AT THE SAME TIME still
+ * hold separate in-memory copies, so both can spend the same coins until
+ * one saves. That is the dupe the TypeScript purse closes with a resident
+ * balance, and closing it here needs the macro change above.
+ *
+ * NOTE: keep this file ASCII. A non-ASCII byte written through a latin-1
+ * encoder truncates it to zero length and the build then fails with a
+ * misleading link error.
+ */
+
+/* The 105-126 band overlaps nothing -- see account.h. */
+static int acct_member_shares(struct char_file_u *f)
+{
+   return account_shares_property(f->level);
+}
+
+/* Seed a freshly loaded record from the account's holder. */
+void account_money_load(struct char_file_u *f)
+{
+   struct account_data *acct;
+   struct char_file_u h;
+
+   if (!f || !*f->name)
+      return;
+   if (!(acct = account_of_char(f->name)))
+      return;
+   if (!str_cmp(acct->name, f->name))
+      return;                           /* this IS the holder */
+   if (!acct_member_shares(f))
+      return;
+   if (load_char(acct->name, &h) < 0) {
+      /* An unreadable holder is NOT zero: zero reads as "you are broke" and
+       * the next save would write that over the real balance. Leave the
+       * record's own figures alone and say so. */
+      log("SYSERR: account %s holder record unreadable; %s keeps its own "
+          "money this session.", acct->name, f->name);
+      return;
+   }
+   f->points.gold[0] = h.points.gold[0];
+   f->points.bank_gold[0] = h.points.bank_gold[0];
+}
+
+/* Push a member's money to the holder and zero its own copy. */
+void account_money_save(struct char_file_u *f)
+{
+   struct account_data *acct;
+   struct char_file_u h;
+   struct descriptor_data *d;
+
+   if (!f || !*f->name)
+      return;
+   if (!(acct = account_of_char(f->name)))
+      return;
+   if (!str_cmp(acct->name, f->name))
+      return;                           /* the holder keeps it */
+   if (!acct_member_shares(f))
+      return;
+
+   /* A live holder owns its record: writing a disk-loaded copy underneath
+    * it would roll back whatever it has not saved yet. It reads the same
+    * balance at its own next load, so there is nothing to fix. */
+   for (d = descriptor_list; d; d = d->next)
+      if (d->character && !IS_NPC(d->character)
+          && !str_cmp(GET_PC_NAME(d->character), acct->name))
+         return;
+
+   if (load_char(acct->name, &h) < 0) {
+      log("SYSERR: account %s holder record unreadable; %s keeps %ld gold on "
+          "its own record.", acct->name, f->name, f->points.gold[0]);
+      return;
+   }
+
+   /*
+    * A PUSH IS ONLY SAFE IF THIS MEMBER WAS SEEDED.
+    *
+    * account_money_load runs at every load, so normally the member's
+    * figures ARE the account's and pushing them back is a no-op or a
+    * legitimate spend. The exception is a character ALREADY in the world
+    * when it joined the roster: it still carries its own purse, never
+    * having been seeded, and pushing that would overwrite the account's
+    * balance with a stranger's -- destroying money rather than moving it.
+    *
+    * A seeded member reads 0 (its previous save zeroed it) or matches the
+    * holder. One still holding pre-join money matches neither, so refuse
+    * and leave both records for a god to reconcile.
+    */
+   if (f->points.gold[0] != 0 && h.points.gold[0] != 0
+       && f->points.gold[0] != h.points.gold[0]
+       && f->points.bank_gold[0] != h.points.bank_gold[0]) {
+      log("SYSERR: %s carries %ld gold that did not come from account %s "
+          "(holder has %ld) -- probably joined to the roster while in the "
+          "world. NOT pushed; reconcile by hand.",
+          f->name, f->points.gold[0], acct->name, h.points.gold[0]);
+      return;
+   }
+
+   h.points.gold[0] = f->points.gold[0];
+   h.points.bank_gold[0] = f->points.bank_gold[0];
+   save_char_ascii(&h);
+
+   f->points.gold[0] = 0;
+   f->points.bank_gold[0] = 0;
+}
