@@ -363,7 +363,7 @@ void pay_player_shop(struct player_shop* shop, int cost)
   char name[1024];
   sprintf(name, "%c%s", toupper(shop->player_name[0]), shop->player_name+1);
   if (load_char(name, &tmp_store) > -1) {
-    GET_BANK_GOLD((&tmp_store)) += cost;
+    GET_BANK_GOLD_FILE(&tmp_store) += cost;
     save_char_ascii(&tmp_store);
     mudlogf(CMP, LVL_IMMORT, TRUE, "PLAYER_SHOP: Paid %s %d gold coins (from file).", name, cost);
     return;
@@ -761,13 +761,13 @@ void player_shop_monthly_rent_check()
 	char name[1024];
 	sprintf(name, "%c%s", toupper(shop->player_name[0]), shop->player_name+1);
 	if (load_char(name, &tmp_store) > -1) {
-          GET_BANK_GOLD(&tmp_store) -= shop->rent;
-          if (GET_BANK_GOLD(&tmp_store) < 0) {
+          GET_BANK_GOLD_FILE(&tmp_store) -= shop->rent;
+          if (GET_BANK_GOLD_FILE(&tmp_store) < 0) {
             shop->is_active = 0;
             mudlogf(CMP, LVL_IMMORT, TRUE,
                     "PLAYER_SHOP: Closing %s's shop due to insufficient rent payment.", shop->player_name);
           }
-          GET_BANK_GOLD(&tmp_store) = GET_BANK_GOLD(&tmp_store) < 0 ? 0 : GET_BANK_GOLD(&tmp_store);
+          GET_BANK_GOLD_FILE(&tmp_store) = GET_BANK_GOLD_FILE(&tmp_store) < 0 ? 0 : GET_BANK_GOLD_FILE(&tmp_store);
 	  save_char_ascii(&tmp_store);
 	} else {
 	  mudlogf(CMP, LVL_IMMORT, TRUE, "SYSERR: monthly player shop rent, could not find player %s.", name);

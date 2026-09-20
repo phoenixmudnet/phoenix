@@ -1777,6 +1777,11 @@ struct follow_type {
 
 /* ================== Structure for player/non-player ===================== */
 struct char_data {
+   /* The account whose money this character spends, or NULL for its own.
+    * NULL is the safe default under the wholesale struct copies this
+    * codebase makes: a copied mob inherits NULL and resolves to its own
+    * field. Set only for a PC that is a sharing member of a roster. */
+   struct account_data *money_acct;
    int pfilepos;			/* playerfile pos		   */
    mob_rnum nr;				/* Mob's rnum			   */
    room_rnum in_room;			/* Location (real room number)	   */
