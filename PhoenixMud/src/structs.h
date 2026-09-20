@@ -530,6 +530,13 @@
 #define CON_FIRST_TIME   37             /* During creation, choose a hometown. */
 #define CON_HOME_TOWN    38             /* Confirm hometown. */
 #define CON_EDIT_EMAIL   39             /* At main menu, editing e-mail address. */
+/* One login, many characters. CON_ACCT_MENU is the roster a member login
+ * lands on instead of dropping straight into the world; CON_ACCT_NEWCHAR
+ * names an alt being created from that roster, which inherits the account's
+ * existing credential rather than asking for a second one. */
+#define CON_ACCT_MENU    40             /* Account roster: pick a character. */
+#define CON_ACCT_NEWCHAR 41             /* Naming an alt on this account.    */
+#define CON_ACCT_PICK    42             /* "Which character?" for D/X/E.     */
 
 #define OOB_NONE 0
 #define OOB_MSDP (1 << 0)
@@ -1888,6 +1895,8 @@ struct txt_q {
 };
 
 
+struct account_data;
+
 struct descriptor_data {
    socket_t descriptor;		/* file descriptor for socket */
    socket_t ident_sock;		/* socket used for ident process        */
@@ -1925,6 +1934,15 @@ struct descriptor_data {
    struct char_data *original;	/* original char if switched		*/
    struct descriptor_data *snooping; /* Who is this char snooping	*/
    struct descriptor_data *snoop_by; /* And who is snooping this char	*/
+   /* The roster this login resolved to, or NULL for a character on no
+    * account -- which is the pre-account behaviour and stays supported.
+    * Not owned: it points into account_list and is cleared when the
+    * descriptor goes. */
+   struct account_data *account;
+   /* Which per-character verb (D/X/E) is waiting on a row number, so the
+    * pick and the action stay one exchange apart without a second state
+    * machine. 0 = nothing pending. */
+   char acct_verb;
    struct descriptor_data *next; /* link to next descriptor		*/
    struct olc_data *olc;	     /*. OLC info - defined in olc.h   .*/
    char *storage;
