@@ -880,7 +880,9 @@ void id_obj_to_char(struct char_data *ch, struct obj_data *obj)
    * vnums only (clones/money carry -1). Draws no RNG. */
   if (!IS_NPC(ch) && ch->player_specials != NULL &&
       GET_OBJ_VNUM(obj) >= 0 && GET_OBJ_VNUM(obj) <= KNOWN_TOP_VNUM)
+    /* Working half and the discrete contribution -- see explored_own. */
     ch->player_specials->known_vnums[GET_OBJ_VNUM(obj)/8] |= (1 << (GET_OBJ_VNUM(obj)%8));
+    ch->player_specials->known_own[GET_OBJ_VNUM(obj)/8] |= (1 << (GET_OBJ_VNUM(obj)%8));
 
   
   sprinttype(GET_OBJ_TYPE(obj), item_types, buf2);
