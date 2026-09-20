@@ -3866,6 +3866,10 @@ long load_char(char *name, struct char_file_u * char_element)
 	 * latin-1 encoder truncates it to zero length. */
 	if (!tsplayer_load(char_element, name))
 	   load_char_ascii(char_element, name);
+	/* A member of an account reads the ACCOUNT's money, which lives on the
+	 * holder's record. Terminates at one level: the holder's own load sees
+	 * that it is the holder and returns. */
+	account_money_load(char_element);
       return (player_i);
       }
    else {
@@ -3900,6 +3904,11 @@ void save_char_no_logon(struct char_data* ch, room_rnum load_room) {
       else
          st.player_specials_saved.load_room = GET_ROOM_VNUM(load_room);
       }
+
+   /* Push a member's money to the holder and zero its own copy BEFORE the
+    * record is written, so what lands on disk is the one-writer shape the
+    * interchange needs. */
+   account_money_save(&st);
 
    save_char_ascii(&st);
 
@@ -3952,6 +3961,11 @@ void save_char(struct char_data * ch, room_rnum load_room)
       else
          st.player_specials_saved.load_room = GET_ROOM_VNUM(load_room);
       }
+
+   /* Push a member's money to the holder and zero its own copy BEFORE the
+    * record is written, so what lands on disk is the one-writer shape the
+    * interchange needs. */
+   account_money_save(&st);
 
    save_char_ascii(&st);
 
