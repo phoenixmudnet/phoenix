@@ -3401,6 +3401,11 @@ void nanny(struct descriptor_data *d, char *argu)
 			send_to_char(d->character, "%s", WELC_MESSG);
 			d->character->next = character_list;
 			character_list = d->character;
+			/* Attach to the account's live balance AFTER the record has
+			 * been loaded into the character: binding earlier would make
+			 * store_to_char write this member's own (zeroed) figures over
+			 * the account's slot. */
+			account_money_bind(d->character);
 			char_to_room(d->character, load_room);
 			load_result = Crash_load(d->character);
 			/* Crash_load re-equips saved gear; a negative-apply

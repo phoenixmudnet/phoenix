@@ -727,3 +727,116 @@ void account_money_save(struct char_file_u *f)
    f->points.gold[0] = 0;
    f->points.bank_gold[0] = 0;
 }
+
+/* ------------------------------------------------------------------ */
+/*  The live shared balance                                            */
+/* ------------------------------------------------------------------ */
+
+/*
+ * TWO SIBLINGS IN THE WORLD AT ONCE.
+ *
+ * The boundary scoping above gives every member one balance at LOGIN and
+ * one writer on disk. It does not stop two of one player's characters, both
+ * in the world, from each holding a copy and both spending it -- they only
+ * reconcile when one saves, and the later save wins.
+ *
+ * So a sharing member does not keep its money in its own char_data at all.
+ * It reads and writes the ACCOUNT's slot, which is one number however many
+ * siblings are logged in, and a check-and-spend on a single-threaded game
+ * loop is therefore indivisible without any locking.
+ *
+ * The pointer lives on the ACCOUNT, not the character, for a reason given
+ * at acct_gold_ref in account.h: char_data gets copied wholesale here.
+ *
+ * NOTE: keep this file ASCII.
+ */
+
+/* Seed the account slot from the holder's record, ONCE. A later member
+ * entering must join the balance already in play, not overwrite it with
+ * whatever its own (zeroed) record happens to carry -- that overwrite is the
+ * most obvious way to lose an account's savings, so it is refused here
+ * rather than guarded at each caller. */
+static void acct_money_seed(struct account_data *acct)
+{
+   struct char_file_u h;
+
+   if (!acct || acct->money_live)
+      return;
+   if (load_char(acct->name, &h) < 0) {
+      /* Unreadable is NOT zero. Leave the slot dead so every member keeps
+       * banking to its own record this session. */
+      log("SYSERR: account %s holder record unreadable; members bank "
+          "per-character this session.", acct->name);
+      return;
+   }
+   acct->gold_slot = h.points.gold[0];
+   acct->bank_slot = h.points.bank_gold[0];
+   acct->money_live = TRUE;
+}
+
+long *acct_gold_ref(struct char_data *ch)
+{
+   if (!ch)
+      return NULL;
+   if (!ch->money_acct || !ch->money_acct->money_live)
+      return &ch->points.gold[0];
+   return &ch->money_acct->gold_slot;
+}
+
+long *acct_bank_ref(struct char_data *ch)
+{
+   if (!ch)
+      return NULL;
+   if (!ch->money_acct || !ch->money_acct->money_live)
+      return &ch->points.bank_gold[0];
+   return &ch->money_acct->bank_slot;
+}
+
+/*
+ * Attach a character entering the world to its account's balance.
+ *
+ * Called once the character is settled, never for a mob: an NPC has no
+ * roster and must keep its own purse, which is what the NULL default gives
+ * every copy of a prototype.
+ */
+void account_money_bind(struct char_data *ch)
+{
+   struct account_data *acct;
+
+   if (!ch || IS_NPC(ch))
+      return;
+   ch->money_acct = NULL;
+   if (!(acct = account_of_char(GET_PC_NAME(ch))))
+      return;
+   /* The 105-126 band overlaps nothing -- see account.h. */
+   if (!account_shares_property(GET_LEVEL(ch)))
+      return;
+   acct_money_seed(acct);
+   if (!acct->money_live)
+      return;
+   ch->money_acct = acct;
+}
+
+/*
+ * Detach a character leaving the world, and drop the slot when the last
+ * member goes.
+ *
+ * The slot must not outlive the last member: the next member to enter would
+ * join a balance nobody has reconciled with the record, and a restore or an
+ * interchange import in between would be invisible to it.
+ */
+void account_money_unbind(struct char_data *ch)
+{
+   struct account_data *acct;
+   struct descriptor_data *d;
+
+   if (!ch || IS_NPC(ch) || !(acct = ch->money_acct))
+      return;
+   ch->money_acct = NULL;
+
+   for (d = descriptor_list; d; d = d->next)
+      if (d->character && d->character != ch && !IS_NPC(d->character)
+          && d->character->money_acct == acct)
+         return;                        /* somebody is still spending it */
+   acct->money_live = FALSE;
+}

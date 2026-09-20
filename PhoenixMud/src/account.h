@@ -65,6 +65,18 @@ struct account_data {
    char members[MAX_ACCT_MEMBERS][MAX_NAME_LENGTH + 1];
    int  num_members;
    int  max_online;                                       /* 0 = use default */
+
+   /* THE LIVE BALANCE. One number per account, which every member in the
+    * world reads and writes, so two siblings cannot each spend the same
+    * coins. Seeded from the holder's record the first time any member
+    * enters, and written back through that record on save.
+    *
+    * money_live says the slot has been seeded: without it a fresh account
+    * would read 0 and the first save would write that over the holder's
+    * real balance. */
+   long gold_slot;
+   long bank_slot;
+   int  money_live;
 };
 
 extern struct account_data *account_list;
@@ -101,5 +113,20 @@ const char *account_purse_holder(char *char_name);
  * for why this is not the GET_GOLD macro. */
 void account_money_load(struct char_file_u *f);
 void account_money_save(struct char_file_u *f);
+
+/* Where a live character's money actually lives. Returns a pointer to the
+ * account's shared slot when this character is a sharing member of one, and
+ * to the character's own field otherwise -- which is every mob, every
+ * character on no roster, and every immortal in the 105-126 band.
+ *
+ * A FUNCTION rather than a pointer stored on char_data, deliberately: this
+ * codebase copies char_data wholesale (db.c:2979, dg_mobcmd.c:1365) and a
+ * stored pointer would survive the copy aimed at the ORIGINAL's field. The
+ * only thing char_data carries is the ACCOUNT pointer, which is NULL for
+ * every mob, so an inherited copy resolves to the copy's own field. */
+long *acct_gold_ref(struct char_data *ch);
+long *acct_bank_ref(struct char_data *ch);
+void  account_money_bind(struct char_data *ch);
+void  account_money_unbind(struct char_data *ch);
 
 #endif /* _ACCOUNT_H_ */
