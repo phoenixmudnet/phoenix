@@ -3406,6 +3406,10 @@ void nanny(struct descriptor_data *d, char *argu)
 			 * store_to_char write this member's own (zeroed) figures over
 			 * the account's slot. */
 			account_money_bind(d->character);
+			/* Exploration and the identify log are cumulative across the
+			 * account. Merged AFTER the record is loaded, so the own half
+			 * is in place before siblings are OR'd on top. */
+			account_knowledge_merge(d->character);
 			char_to_room(d->character, load_room);
 			load_result = Crash_load(d->character);
 			/* Crash_load re-equips saved gear; a negative-apply
