@@ -17,6 +17,7 @@
 #include "utils.h"
 #include "comm.h"
 #include "db.h"
+#include "account.h"
 #include "interpreter.h"
 #include "handler.h"
 #include "queue.h"
@@ -1755,6 +1756,12 @@ extern struct char_data *find_char(int n);
 /* Extract a ch completely from the world, and leave his stuff behind */
 void extract_char(struct char_data * ch)
 {
+   /* Release the account's live balance when the last member leaves: the
+    * slot must not outlive them, or the next member to enter joins a number
+    * nobody has reconciled with the record. Harmless for a mob, which never
+    * carries an account. */
+   account_money_unbind(ch);
+
    struct char_data *k, *temp;
    struct descriptor_data *d;
    struct obj_data *obj;
