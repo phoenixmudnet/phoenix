@@ -74,7 +74,6 @@ struct account_data {
     * money_live says the slot has been seeded: without it a fresh account
     * would read 0 and the first save would write that over the holder's
     * real balance. */
-   long gold_slot;
    long bank_slot;
    int  money_live;
 };
@@ -114,7 +113,7 @@ const char *account_purse_holder(char *char_name);
 void account_money_load(struct char_file_u *f);
 void account_money_save(struct char_file_u *f);
 
-/* Where a live character's money actually lives. Returns a pointer to the
+/* Where a live character's BANK BALANCE actually lives. Returns a pointer to the
  * account's shared slot when this character is a sharing member of one, and
  * to the character's own field otherwise -- which is every mob, every
  * character on no roster, and every immortal in the 105-126 band.
@@ -124,7 +123,6 @@ void account_money_save(struct char_file_u *f);
  * stored pointer would survive the copy aimed at the ORIGINAL's field. The
  * only thing char_data carries is the ACCOUNT pointer, which is NULL for
  * every mob, so an inherited copy resolves to the copy's own field. */
-long *acct_gold_ref(struct char_data *ch);
 long *acct_bank_ref(struct char_data *ch);
 void  account_money_bind(struct char_data *ch);
 void  account_money_unbind(struct char_data *ch);

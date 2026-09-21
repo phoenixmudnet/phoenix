@@ -382,20 +382,19 @@ char	*str_dup(const char *source);
 #define GET_MAX_MOVE(ch)  ((ch)->points.max_move)
 #define GET_MANA(ch)	  ((ch)->points.mana)
 #define GET_MAX_MANA(ch)  ((ch)->points.max_mana)
-/* Money is the ACCOUNT's, not the character's. These resolve to the
- * account's shared slot for a sharing member in the world, and to the
- * character's own field for everything else -- every mob, every character on
- * no roster, every immortal in the 105-126 band. Still lvalues, so the 239
- * call sites that do "+= cost" are unchanged. See acct_gold_ref in
- * account.h for why this is a function and not a stored pointer. */
-long *acct_gold_ref(struct char_data *ch);
+/* Carried gold is the character's own field. The bank is the account's: it
+ * resolves to the account's shared slot for a sharing member in the world,
+ * and to the character's own field for everything else (every mob, every
+ * character on no roster, every immortal in the 105-126 band). Still an
+ * lvalue, so the call sites that do "+= cost" are unchanged. See
+ * acct_bank_ref in account.h for why it is a function and not a stored
+ * pointer. */
 long *acct_bank_ref(struct char_data *ch);
-#define GET_GOLD(ch)	  (*acct_gold_ref(ch))
+#define GET_GOLD(ch)	  ((ch)->points.gold[0])
 #define GET_BANK_GOLD(ch) (*acct_bank_ref(ch))
 
-/* The same fields on a FILE record. A char_file_u is a disk image and has no
- * account to resolve through, so it is read and written raw. */
-#define GET_GOLD_FILE(st)      ((st)->points.gold[0])
+/* The bank on a FILE record. A char_file_u is a disk image and has no account
+ * to resolve through, so it is read and written raw. */
 #define GET_BANK_GOLD_FILE(st) ((st)->points.bank_gold[0])
 #define GET_HITROLL(ch)	  ((ch)->points.hitroll)
 #define GET_DAMROLL(ch)   ((ch)->points.damroll)
