@@ -2739,6 +2739,7 @@ void load_help(FILE *fl,char *filename)
       /* now, add the entry to the index with each keyword on the keyword line*/
       el.entry = str_dup(entry);
       el.keywords = str_dup(key);
+      el.file_order = top_of_helpt;
 
       help_table[top_of_helpt] = el;
       top_of_helpt++;
