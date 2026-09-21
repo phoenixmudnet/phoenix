@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include "clan.h"
 #include "constants.h"
+#include "account.h"
 
 /* extern variables */
 extern struct zone_data *zone_table;
@@ -359,12 +360,9 @@ void pay_player_shop(struct player_shop* shop, int cost)
     }
   }
   /* Try to get the victim from the player file. */
-  struct char_file_u tmp_store;
   char name[1024];
   sprintf(name, "%c%s", toupper(shop->player_name[0]), shop->player_name+1);
-  if (load_char(name, &tmp_store) > -1) {
-    GET_BANK_GOLD_FILE(&tmp_store) += cost;
-    save_char_ascii(&tmp_store);
+  if (account_bank_adjust(name, cost, NULL)) {
     mudlogf(CMP, LVL_IMMORT, TRUE, "PLAYER_SHOP: Paid %s %d gold coins (from file).", name, cost);
     return;
   } else {
@@ -757,18 +755,15 @@ void player_shop_monthly_rent_check()
       }
       /* Try to get the victim from the player file. */
       if (!rent_paid) {
-	struct char_file_u tmp_store;
 	char name[1024];
+	long after;
 	sprintf(name, "%c%s", toupper(shop->player_name[0]), shop->player_name+1);
-	if (load_char(name, &tmp_store) > -1) {
-          GET_BANK_GOLD_FILE(&tmp_store) -= shop->rent;
-          if (GET_BANK_GOLD_FILE(&tmp_store) < 0) {
+	if (account_bank_adjust(name, -shop->rent, &after)) {
+          if (after < 0) {
             shop->is_active = 0;
             mudlogf(CMP, LVL_IMMORT, TRUE,
                     "PLAYER_SHOP: Closing %s's shop due to insufficient rent payment.", shop->player_name);
           }
-          GET_BANK_GOLD_FILE(&tmp_store) = GET_BANK_GOLD_FILE(&tmp_store) < 0 ? 0 : GET_BANK_GOLD_FILE(&tmp_store);
-	  save_char_ascii(&tmp_store);
 	} else {
 	  mudlogf(CMP, LVL_IMMORT, TRUE, "SYSERR: monthly player shop rent, could not find player %s.", name);
 	}

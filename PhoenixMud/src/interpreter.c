@@ -2588,6 +2588,10 @@ void nanny(struct descriptor_data *d, char *argu)
 			d->account = account_of_char(GET_PC_NAME(d->character));
 			if (d->account) {
 				account_pick_main(d->account);
+				/* Before any character enters: a holder that can
+				 * no longer hold the bank moves only while it is
+				 * out of the world. */
+				account_bank_holder(d->account);
 				save_accounts();
 				account_send_roster(d);
 				STATE(d) = CON_ACCT_MENU;

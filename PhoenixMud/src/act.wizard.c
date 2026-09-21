@@ -33,6 +33,7 @@
 #include "time.h"
 #include "assemblies.h"
 #include "gremort_exam.h"
+#include "account.h"
 
 #define ZCMD zone_table[zone].cmd[cmd_no]
 
@@ -8046,7 +8047,9 @@ ACMD(do_set)
       fseek(player_fl, (player_i) * sizeof(struct char_file_u), SEEK_SET);
       fwrite(&tmp_store, sizeof(struct char_file_u), 1, player_fl);
       */
-      save_char_ascii(&tmp_store);
+      /* NULL, not vict: vict is a copy read with load_char, so a member's
+       * bank in it is the account's and goes back to the holder. */
+      account_save_record(NULL, &tmp_store);
 
       int table_pos;
       int k;
