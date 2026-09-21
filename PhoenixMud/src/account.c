@@ -662,7 +662,6 @@ void account_money_load(struct char_file_u *f)
           "money this session.", acct->name, f->name);
       return;
    }
-   f->points.gold[0] = h.points.gold[0];
    f->points.bank_gold[0] = h.points.bank_gold[0];
 }
 
@@ -710,21 +709,18 @@ void account_money_save(struct char_file_u *f)
     * holder. One still holding pre-join money matches neither, so refuse
     * and leave both records for a god to reconcile.
     */
-   if (f->points.gold[0] != 0 && h.points.gold[0] != 0
-       && f->points.gold[0] != h.points.gold[0]
+   if (f->points.bank_gold[0] != 0 && h.points.bank_gold[0] != 0
        && f->points.bank_gold[0] != h.points.bank_gold[0]) {
-      log("SYSERR: %s carries %ld gold that did not come from account %s "
-          "(holder has %ld) -- probably joined to the roster while in the "
-          "world. NOT pushed; reconcile by hand.",
-          f->name, f->points.gold[0], acct->name, h.points.gold[0]);
+      log("SYSERR: %s banks %ld that did not come from account %s (holder has "
+          "%ld) -- probably joined to the roster while in the world. NOT "
+          "pushed; reconcile by hand.",
+          f->name, f->points.bank_gold[0], acct->name, h.points.bank_gold[0]);
       return;
    }
 
-   h.points.gold[0] = f->points.gold[0];
    h.points.bank_gold[0] = f->points.bank_gold[0];
    save_char_ascii(&h);
 
-   f->points.gold[0] = 0;
    f->points.bank_gold[0] = 0;
 }
 
@@ -733,17 +729,19 @@ void account_money_save(struct char_file_u *f)
 /* ------------------------------------------------------------------ */
 
 /*
- * TWO SIBLINGS IN THE WORLD AT ONCE.
+ * TWO SIBLINGS IN THE WORLD AT ONCE -- THE BANK ONLY.
  *
- * The boundary scoping above gives every member one balance at LOGIN and
- * one writer on disk. It does not stop two of one player's characters, both
- * in the world, from each holding a copy and both spending it -- they only
+ * The boundary scoping above gives every member one balance at LOGIN and one
+ * writer on disk. It does not stop two of one player's characters, both in
+ * the world, from each holding a copy and both spending it -- they only
  * reconcile when one saves, and the later save wins.
  *
- * So a sharing member does not keep its money in its own char_data at all.
- * It reads and writes the ACCOUNT's slot, which is one number however many
- * siblings are logged in, and a check-and-spend on a single-threaded game
- * loop is therefore indivisible without any locking.
+ * So a sharing member does not keep its BANK balance in its own char_data at
+ * all. It reads and writes the ACCOUNT's slot, which is one number however
+ * many siblings are logged in, and a check-and-spend on a single-threaded
+ * game loop is therefore indivisible without any locking.
+ *
+ * Carried gold is not scoped this way; it is each character's own field.
  *
  * The pointer lives on the ACCOUNT, not the character, for a reason given
  * at acct_gold_ref in account.h: char_data gets copied wholesale here.
@@ -769,18 +767,8 @@ static void acct_money_seed(struct account_data *acct)
           "per-character this session.", acct->name);
       return;
    }
-   acct->gold_slot = h.points.gold[0];
    acct->bank_slot = h.points.bank_gold[0];
    acct->money_live = TRUE;
-}
-
-long *acct_gold_ref(struct char_data *ch)
-{
-   if (!ch)
-      return NULL;
-   if (!ch->money_acct || !ch->money_acct->money_live)
-      return &ch->points.gold[0];
-   return &ch->money_acct->gold_slot;
 }
 
 long *acct_bank_ref(struct char_data *ch)

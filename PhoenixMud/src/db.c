@@ -4439,9 +4439,8 @@ void store_to_char(struct char_file_u * st, struct char_data * ch)
    ch->real_abils = st->abilities;
    ch->aff_abils = st->abilities;
    ch->points = st->points;
-   /* Mirror of the save side: a bound member's money lives in the account
-    * slot, so put the loaded figures where the character will read them. */
-   GET_GOLD(ch) = GET_GOLD_FILE(st);
+   /* Mirror of the save side: a bound member's BANK lives in the account
+    * slot, so put the loaded figure where the character will read it. */
    GET_BANK_GOLD(ch) = GET_BANK_GOLD_FILE(st);
    ch->char_specials.saved = st->char_specials_saved;
    ch->player_specials->saved = st->player_specials_saved;
@@ -4590,10 +4589,10 @@ void char_to_store(struct char_data * ch, struct char_file_u * st,
    st->level = GET_LEVEL(ch);
    st->abilities = ch->real_abils;
    st->points = ch->points;
-   /* The struct copy takes the character's OWN gold field, which is stale
-    * for a member spending the account's slot -- GET_GOLD resolves there,
-    * ch->points.gold[0] does not. Write what the character actually has. */
-   GET_GOLD_FILE(st) = GET_GOLD(ch);
+   /* The struct copy takes the character's own bank field, which is stale for
+    * a member spending the account's slot -- GET_BANK_GOLD resolves there,
+    * ch->points.bank_gold[0] does not. Carried gold needs no such fix: it IS
+    * the character's own field. */
    GET_BANK_GOLD_FILE(st) = GET_BANK_GOLD(ch);
    st->char_specials_saved = ch->char_specials.saved;
    st->player_specials_saved = ch->player_specials->saved;
