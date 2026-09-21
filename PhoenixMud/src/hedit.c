@@ -102,8 +102,10 @@ void hedit_save_internally(struct descriptor_data *d)
    */
    if (rnum >= 0)
       {
-      
+      int order = help_table[rnum].file_order;
+
       free_help(help_table + rnum);
+      help_table[rnum].file_order = order;
       help_table[rnum].min_level = OLC_HELP(d)->min_level;
       help_table[rnum].entry = str_dup(OLC_HELP(d)->entry);
       help_table[rnum].keywords = str_dup(OLC_HELP(d)->keywords);
@@ -117,6 +119,11 @@ void hedit_save_internally(struct descriptor_data *d)
       new_help_table[0].min_level = OLC_HELP(d)->min_level;
       new_help_table[0].entry = str_dup(OLC_HELP(d)->entry);
       new_help_table[0].keywords = str_dup(OLC_HELP(d)->keywords);
+      /* Saved first, as the insert at the top of the table implies. */
+      new_help_table[0].file_order = 0;
+      for (i = 0; i <= top_of_helpt; i++)
+         if (help_table[i].keywords && help_table[i].file_order <= new_help_table[0].file_order)
+            new_help_table[0].file_order = help_table[i].file_order - 1;
       
      /*
       * Count through help table.
@@ -136,9 +143,25 @@ void hedit_save_internally(struct descriptor_data *d)
 
 /*------------------------------------------------------------------------*/
 
+/* Orders help_table indices by their position in the help file. */
+static int help_file_order_cmp(const void *a, const void *b)
+{
+   int x = help_table[*(const int *) a].file_order;
+   int y = help_table[*(const int *) b].file_order;
+
+   return (x > y) - (x < y);
+}
+
+/*
+ * Writes the help file in its load order, not the table's. load_help sorts
+ * the table for lookup, and that sort does not return the same order when
+ * run on its own output, so writing the table order would reorder the file
+ * on every save and change which entry an ambiguous keyword finds after
+ * the next boot.
+ */
 void hedit_save_to_disk(void)
 {
-   int i;
+   int i, n, *order;
    FILE *fp;
    struct help_index_element *help;
    char *buf = get_buffer(256);
@@ -157,8 +180,14 @@ void hedit_save_to_disk(void)
       return;
       }
 
-   for (i = 0; i <= top_of_helpt; i++) 
+   CREATE(order, int, top_of_helpt + 1);
+   for (i = 0; i <= top_of_helpt; i++)
+      order[i] = i;
+   qsort(order, top_of_helpt + 1, sizeof(int), help_file_order_cmp);
+
+   for (n = 0; n <= top_of_helpt; n++)
       {
+      i = order[n];
       help = (help_table + i);
 
 #if defined(HEDIT_LIST)
@@ -193,6 +222,8 @@ void hedit_save_to_disk(void)
 	      help_keyword, buf1,
 	      help->min_level);
       }
+
+   free(order);
 
   /*
    * Write final line and close.

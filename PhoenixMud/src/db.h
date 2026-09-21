@@ -298,6 +298,7 @@ struct help_index_element {
    char	*keywords;
    char *entry;
    int  min_level;
+   int  file_order;    /* position in the help file; hedit saves in this order */
 };
 
 struct dg_quest
