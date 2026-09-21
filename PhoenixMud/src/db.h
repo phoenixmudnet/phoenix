@@ -163,6 +163,7 @@ void	char_to_store(struct char_data *ch, struct char_file_u *st,
 		      int save_time);
 void	store_to_char(struct char_file_u *st, struct char_data *ch);
 long	load_char(char *name, struct char_file_u *char_element);
+long	load_char_record(char *name, struct char_file_u *char_element);
 void	save_char(struct char_data *ch, room_rnum load_room);
 void	save_char_no_logon(struct char_data *ch, room_rnum load_room);
 void	init_char(struct char_data *ch);

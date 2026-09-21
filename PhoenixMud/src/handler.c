@@ -1761,12 +1761,6 @@ extern struct char_data *find_char(int n);
 /* Extract a ch completely from the world, and leave his stuff behind */
 void extract_char(struct char_data * ch)
 {
-   /* Release the account's live balance when the last member leaves: the
-    * slot must not outlive them, or the next member to enter joins a number
-    * nobody has reconciled with the record. Harmless for a mob, which never
-    * carries an account. */
-   account_money_unbind(ch);
-
    struct char_data *k, *temp;
    struct descriptor_data *d;
    struct obj_data *obj;
@@ -1919,6 +1913,11 @@ void extract_char(struct char_data * ch)
    if (!IS_NPC(ch))
       {
       save_char(ch, NOWHERE);
+      /* Release the account's live balance when the last member leaves: the
+       * slot must not outlive them, or the next member to enter joins a
+       * number nobody has reconciled with the record. After the save, which
+       * has to write the balance the character is leaving with. */
+      account_money_unbind(ch);
       if (GET_EQ(ch, WEAR_HEART))
          Crash_heartwornsave(ch);
       else

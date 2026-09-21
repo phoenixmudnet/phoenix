@@ -13,7 +13,8 @@
 *  second authentication path to keep correct.                            *
 *                                                                         *
 *  The account is NAMED AFTER ITS MAIN, recomputed rather than fixed at   *
-*  creation. See roster_outranks().                                       *
+*  creation. See roster_outranks(). The bank lives on a fixed HOLDER,     *
+*  which does not follow the name. See account_bank_holder().             *
 ************************************************************************ */
 
 #ifndef _ACCOUNT_H_
@@ -62,6 +63,10 @@
 
 struct account_data {
    char name[MAX_NAME_LENGTH + 1];                        /* the main */
+   /* The member whose record holds the bank. Empty = not yet chosen; the
+    * first read takes the name, which is where the bank was before this
+    * field existed. */
+   char holder[MAX_NAME_LENGTH + 1];
    char members[MAX_ACCT_MEMBERS][MAX_NAME_LENGTH + 1];
    int  num_members;
    int  max_online;                                       /* 0 = use default */
@@ -101,17 +106,29 @@ void account_pick_main(struct account_data *acct);
 void account_send_roster(struct descriptor_data *d);
 void account_set_password(struct account_data *acct, char *raw);
 
-/* Where a character's money lives. Returns the holder's NAME, which is the
- * account's own character, or the character itself when it is on no roster.
- * ONE record holds the balance and every other member stores 0 -- the
- * interchange turns every member pfile into a TS `gold` field, so a mirrored
- * balance crosses as N copies of the money. */
+/* Where a character's bank lives. Returns the account's holder, or the
+ * character itself when it is on no roster, banks on its own, or its account
+ * is not sharing a bank. ONE record holds the balance and every other member
+ * stores 0 -- the interchange turns every member pfile into a TS `goldBank`
+ * field, so a mirrored balance crosses as N copies of the money. */
 const char *account_purse_holder(char *char_name);
+
+/* The member whose record holds the account's bank, or NULL when no member
+ * can hold it. Moves the bank to a new holder when the current one has left
+ * the roster, been deleted, or entered the 105-126 band, but only while the
+ * old holder is out of the world. */
+char *account_bank_holder(struct account_data *acct);
 
 /* Account money at the persistence boundary. See the long note in account.c
  * for why this is not the GET_GOLD macro. */
 void account_money_load(struct char_file_u *f);
-void account_money_save(struct char_file_u *f);
+/* Write a character's record, and the holder's when the bank lives there.
+ * `ch` is the live character, or NULL for a record loaded with load_char. */
+void account_save_record(struct char_data *ch, struct char_file_u *st);
+/* Add `delta` to an offline character's bank wherever it lives. Stores
+ * max(0, result), puts the unclamped result in *after, and returns FALSE
+ * when the record cannot be read. */
+int  account_bank_adjust(char *char_name, long delta, long *after);
 
 /* Where a live character's BANK BALANCE actually lives. Returns a pointer to the
  * account's shared slot when this character is a sharing member of one, and

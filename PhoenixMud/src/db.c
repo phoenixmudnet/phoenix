@@ -3862,8 +3862,9 @@ char *get_name_by_id(long id)
    }
 
 
-/* Load a char, TRUE if loaded, FALSE if not */
-long load_char(char *name, struct char_file_u * char_element)
+/* Load a char's record exactly as stored, without the account's money.
+ * account.c reads rosters through this; load_char would recurse into it. */
+long load_char_record(char *name, struct char_file_u * char_element)
    {
    int player_i;
    if ((player_i = find_name(name)) >= 0)
@@ -3881,16 +3882,29 @@ long load_char(char *name, struct char_file_u * char_element)
 	 * latin-1 encoder truncates it to zero length. */
 	if (!tsplayer_load(char_element, name))
 	   load_char_ascii(char_element, name);
-	/* A member of an account reads the ACCOUNT's money, which lives on the
-	 * holder's record. Terminates at one level: the holder's own load sees
-	 * that it is the holder and returns. */
-	account_money_load(char_element);
       return (player_i);
       }
    else {
      log("load_char(%s) failed", name);
       return (-1);
    }
+   }
+
+/* Load a char, TRUE if loaded, FALSE if not */
+long load_char(char *name, struct char_file_u * char_element)
+   {
+   long player_i;
+   struct account_data *acct = account_of_char(name);
+
+   /* Before the read: moving the bank to a new holder writes this record. */
+   if (acct)
+      account_bank_holder(acct);
+   if ((player_i = load_char_record(name, char_element)) < 0)
+      return (-1);
+   /* A member of an account reads the ACCOUNT's bank, which lives on the
+    * holder's record. */
+   account_money_load(char_element);
+   return (player_i);
    
    }
 
@@ -3920,12 +3934,9 @@ void save_char_no_logon(struct char_data* ch, room_rnum load_room) {
          st.player_specials_saved.load_room = GET_ROOM_VNUM(load_room);
       }
 
-   /* Push a member's money to the holder and zero its own copy BEFORE the
-    * record is written, so what lands on disk is the one-writer shape the
-    * interchange needs. */
-   account_money_save(&st);
-
-   save_char_ascii(&st);
+   /* Writes the holder's record too when this is a member of an account:
+    * one record holds the bank and every other member stores 0. */
+   account_save_record(ch, &st);
 
    /*
      TODO: Why is this BEFORE updating the player table struct entry?
@@ -3977,12 +3988,9 @@ void save_char(struct char_data * ch, room_rnum load_room)
          st.player_specials_saved.load_room = GET_ROOM_VNUM(load_room);
       }
 
-   /* Push a member's money to the holder and zero its own copy BEFORE the
-    * record is written, so what lands on disk is the one-writer shape the
-    * interchange needs. */
-   account_money_save(&st);
-
-   save_char_ascii(&st);
+   /* Writes the holder's record too when this is a member of an account:
+    * one record holds the bank and every other member stores 0. */
+   account_save_record(ch, &st);
 
    /*
      TODO: Why is this BEFORE updating the player table struct entry?

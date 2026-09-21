@@ -20,6 +20,8 @@
 #include "account.h"
 
 extern struct descriptor_data *descriptor_list;
+extern struct char_data *character_list;
+void save_char_ascii(struct char_file_u *ch);
 
 struct account_data *account_list = NULL;
 int top_of_accountt = 0;
@@ -35,7 +37,11 @@ int account_default_max_online = 0;
 /*
  * etc/accounts, one account per line:
  *
- *     <main> <max_online> <member> [<member> ...]
+ *     <main> <max_online> [bank=<holder>] <member> [<member> ...]
+ *
+ * bank= names the member whose record holds the bank. A line without it
+ * (written before the field existed) takes the main, which is where the
+ * bank was then. No character name contains '='.
  *
  * ASCII on purpose. It is small, a god may need to repair it by hand, and
  * the TS side reads the same rosters out of world/accounts.json -- keeping
@@ -78,6 +84,11 @@ void boot_accounts(void)
          acct->max_online = atoi(p);
 
       while ((p = strtok(NULL, " \t\r\n")) && acct->num_members < MAX_ACCT_MEMBERS) {
+         if (!strncmp(p, "bank=", 5)) {
+            strncpy(acct->holder, p + 5, MAX_NAME_LENGTH);
+            acct->holder[MAX_NAME_LENGTH] = '\0';
+            continue;
+         }
          strncpy(acct->members[acct->num_members], p, MAX_NAME_LENGTH);
          acct->members[acct->num_members][MAX_NAME_LENGTH] = '\0';
          acct->num_members++;
@@ -104,6 +115,8 @@ void save_accounts(void)
       if (account_list[i].num_members <= 0)
          continue;
       fprintf(fl, "%s %d", account_list[i].name, account_list[i].max_online);
+      if (*account_list[i].holder)
+         fprintf(fl, " bank=%s", account_list[i].holder);
       for (j = 0; j < account_list[i].num_members; j++)
          fprintf(fl, " %s", account_list[i].members[j]);
       fprintf(fl, "\n");
@@ -206,6 +219,9 @@ int account_remove_char(struct account_data *acct, char *char_name)
    if (!str_cmp(acct->name, char_name))
       strcpy(acct->name, acct->members[0]);
    account_pick_main(acct);
+   /* If it held the bank, the bank moves to another member now, or once
+    * the character has left the world. */
+   account_bank_holder(acct);
    return TRUE;
 }
 
@@ -227,6 +243,7 @@ struct account_data *account_create_for(char *char_name)
    strncpy(acct->name, char_name, MAX_NAME_LENGTH);
    acct->name[MAX_NAME_LENGTH] = '\0';
    strcpy(acct->members[0], acct->name);
+   strcpy(acct->holder, acct->name);
    acct->num_members = 1;
    top_of_accountt++;
    return acct;
@@ -322,7 +339,8 @@ static int roster_outranks(struct char_file_u *a, struct char_file_u *b)
  * Renaming is safe at any time: nothing resolves an account by this name
  * except find_account, and login resolves an account from whichever
  * CHARACTER name was typed. A member name is unique across the MUD, so it
- * cannot collide.
+ * cannot collide. The bank does not follow the name; see
+ * account_bank_holder().
  */
 void account_pick_main(struct account_data *acct)
 {
@@ -334,7 +352,7 @@ void account_pick_main(struct account_data *acct)
       return;
 
    for (j = 0; j < acct->num_members; j++) {
-      if (load_char(acct->members[j], &cur) < 0)
+      if (load_char_record(acct->members[j], &cur) < 0)
          continue;                      /* unreadable cannot be the main */
       if (!have || roster_outranks(&cur, &best)) {
          best = cur;
@@ -350,21 +368,142 @@ void account_pick_main(struct account_data *acct)
 /*  Where the money lives                                              */
 /* ------------------------------------------------------------------ */
 
+/* In the world, link-dead included: a link-dead character is still in
+ * character_list and still saves its own record. */
+static struct char_data *acct_in_world(char *name)
+{
+   struct char_data *i;
+
+   for (i = character_list; i; i = i->next)
+      if (!IS_NPC(i) && !str_cmp(GET_PC_NAME(i), name))
+         return i;
+   return NULL;
+}
+
+static int acct_can_hold(struct char_file_u *f)
+{
+   return !IS_SET(f->char_specials_saved.act, PLR_DELETED)
+       && account_shares_property(f->level);
+}
+
+/*
+ * The member whose record holds the account's bank.
+ *
+ * Fixed once chosen, and NOT the main: the main is recomputed at every
+ * login, and a bank that followed it would be read from a record holding
+ * 0 the moment an alt outranked the old main, then saved over the real one.
+ *
+ * It moves when the holder can no longer hold it: off the roster, deleted,
+ * or in the 105-126 band, where a holder would put the mortals' savings in
+ * an immortal's hands (see account.h). It moves to the best-ranked member
+ * that can, and only while the old holder is out of the world, because a
+ * character in the world writes its own record at its next save and would
+ * put the balance back.
+ *
+ * NULL when no member can hold it, or when the holder's record cannot be
+ * read. Unreadable is not zero, so nothing is moved off it.
+ */
+char *account_bank_holder(struct account_data *acct)
+{
+   struct char_file_u old, cur, best;
+   char best_name[MAX_NAME_LENGTH + 1];
+   long amount;
+   int j, have = FALSE;
+
+   if (!acct)
+      return NULL;
+   if (!*acct->holder) {
+      strcpy(acct->holder, acct->name);
+      save_accounts();
+   }
+   if (load_char_record(acct->holder, &old) < 0) {
+      log("SYSERR: account %s bank holder %s has no readable record.",
+          acct->name, acct->holder);
+      return NULL;
+   }
+   if ((account_has_char(acct, acct->holder) && acct_can_hold(&old))
+       || acct_in_world(acct->holder))
+      return acct->holder;
+
+   for (j = 0; j < acct->num_members; j++) {
+      if (!str_cmp(acct->members[j], acct->holder))
+         continue;
+      if (load_char_record(acct->members[j], &cur) < 0 || !acct_can_hold(&cur))
+         continue;
+      if (!have || roster_outranks(&cur, &best)) {
+         best = cur;
+         strcpy(best_name, acct->members[j]);
+         have = TRUE;
+      }
+   }
+   if (!have)
+      return NULL;
+   if (best.points.bank_gold[0] != 0) {
+      /* It banks coins of its own, so the account was never consolidated.
+       * Merging two records is not crash-safe; left for a god. */
+      log("SYSERR: account %s bank holder %s cannot hold it, and %s banks %ld "
+          "of its own. Not moved.", acct->name, acct->holder, best_name,
+          best.points.bank_gold[0]);
+      return NULL;
+   }
+
+   amount = acct->money_live ? acct->bank_slot : old.points.bank_gold[0];
+   log("Account %s: bank holder %s -> %s, %ld coins.", acct->name,
+       acct->holder, best_name, amount);
+   /* The old record first: a crash between the two writes then loses the
+    * coins instead of leaving two copies of them. */
+   old.points.bank_gold[0] = 0;
+   save_char_ascii(&old);
+   best.points.bank_gold[0] = amount;
+   save_char_ascii(&best);
+   strcpy(acct->holder, best_name);
+   save_accounts();
+   return acct->holder;
+}
+
+/*
+ * The holder, if the account is sharing its bank; NULL if it is not.
+ *
+ * A sharing member other than the holder with coins of its own on its
+ * record means the account was never consolidated, or the member joined
+ * carrying money. Seeding it from the holder would zero those coins at its
+ * next save, so the account banks per-character until a god moves them.
+ */
+static char *acct_shared_holder(struct account_data *acct)
+{
+   char *holder = account_bank_holder(acct);
+   struct char_file_u f;
+   int j;
+
+   if (!holder)
+      return NULL;
+   for (j = 0; j < acct->num_members; j++) {
+      if (!str_cmp(acct->members[j], holder))
+         continue;
+      if (load_char_record(acct->members[j], &f) < 0 || !account_shares_property(f.level))
+         continue;
+      if (f.points.bank_gold[0] != 0) {
+         log("SYSERR: account %s is not consolidated: %s banks %ld of its own. "
+             "Members bank per-character until it is moved to %s.",
+             acct->name, acct->members[j], f.points.bank_gold[0], holder);
+         return NULL;
+      }
+   }
+   return holder;
+}
+
 const char *account_purse_holder(char *char_name)
 {
    struct account_data *acct = account_of_char(char_name);
+   char *holder;
+   struct char_file_u me;
 
-   if (!acct)
+   if (!acct || !(holder = acct_shared_holder(acct)))
       return char_name;
-   /* The 105-126 band overlaps nothing -- see the band comment in account.h.
-    * A character in it banks and carries on its own record. */
-   {
-      struct char_file_u me;
-      if (load_char(char_name, &me) >= 0
-          && !account_shares_property(me.level))
-         return char_name;
-   }
-   return acct->name;
+   if (str_cmp(holder, char_name) && load_char_record(char_name, &me) >= 0
+       && !account_shares_property(me.level))
+      return char_name;                 /* 105-126: see account.h */
+   return holder;
 }
 
 /* ------------------------------------------------------------------ */
@@ -479,7 +618,7 @@ void account_send_roster(struct descriptor_data *d)
    /* Count first: the Play span reads "1-N" and N is the DRAWN rows, which
     * skip tombstones -- so it cannot be num_members. */
    for (j = 0; j < d->account->num_members; j++)
-      if (load_char(d->account->members[j], &f) >= 0
+      if (load_char_record(d->account->members[j], &f) >= 0
           && !IS_SET(f.char_specials_saved.act, PLR_DELETED))
          total++;
 
@@ -501,7 +640,7 @@ void account_send_roster(struct descriptor_data *d)
    roster_rule(d);
 
    for (j = 0; j < d->account->num_members; j++) {
-      if (load_char(d->account->members[j], &f) < 0)
+      if (load_char_record(d->account->members[j], &f) < 0)
          continue;
       if (IS_SET(f.char_specials_saved.act, PLR_DELETED))
          continue;
@@ -578,7 +717,7 @@ void account_set_password(struct account_data *acct, char *raw)
       return;
 
    for (j = 0; j < acct->num_members; j++) {
-      if (load_char(acct->members[j], &f) < 0) {
+      if (load_char_record(acct->members[j], &f) < 0) {
          log("SYSERR: account %s member %s has no readable record; its password "
              "was NOT changed and that member now logs in on the old one.",
              acct->name, acct->members[j]);
@@ -621,107 +760,157 @@ void account_set_password(struct account_data *acct, char *raw)
  *     member sees one balance at login;
  *   - saving a non-holder writes 0 and pushes the value to the holder, so
  *     nothing -- not a restore, not the interchange, which turns every
- *     member record into a TS "gold" field -- can turn one balance into
+ *     member record into a TS "goldBank" field -- can turn one balance into
  *     several copies of it.
  *
- * WHAT THIS DOES NOT GIVE: two siblings in the world AT THE SAME TIME still
- * hold separate in-memory copies, so both can spend the same coins until
- * one saves. That is the dupe the TypeScript purse closes with a resident
- * balance, and closing it here needs the macro change above.
+ * Two siblings in the world at once share the live balance below instead.
  *
  * NOTE: keep this file ASCII. A non-ASCII byte written through a latin-1
  * encoder truncates it to zero length and the build then fails with a
  * misleading link error.
  */
 
-/* The 105-126 band overlaps nothing -- see account.h. */
-static int acct_member_shares(struct char_file_u *f)
-{
-   return account_shares_property(f->level);
-}
-
-/* Seed a freshly loaded record from the account's holder. */
+/* Seed a freshly loaded record with the account's bank. A record loaded
+ * while a member is in the world reads the live balance, which is the
+ * current one. */
 void account_money_load(struct char_file_u *f)
 {
    struct account_data *acct;
+   char *holder;
    struct char_file_u h;
 
-   if (!f || !*f->name)
+   if (!f || !*f->name || !(acct = account_of_char(f->name)))
       return;
-   if (!(acct = account_of_char(f->name)))
+   if (!account_shares_property(f->level))
+      return;                           /* 105-126: see account.h */
+   if (!(holder = acct_shared_holder(acct)) || !str_cmp(holder, f->name))
       return;
-   if (!str_cmp(acct->name, f->name))
-      return;                           /* this IS the holder */
-   if (!acct_member_shares(f))
-      return;
-   if (load_char(acct->name, &h) < 0) {
-      /* An unreadable holder is NOT zero: zero reads as "you are broke" and
-       * the next save would write that over the real balance. Leave the
-       * record's own figures alone and say so. */
-      log("SYSERR: account %s holder record unreadable; %s keeps its own "
-          "money this session.", acct->name, f->name);
-      return;
-   }
-   f->points.bank_gold[0] = h.points.bank_gold[0];
+   if (acct->money_live)
+      f->points.bank_gold[0] = acct->bank_slot;
+   else if (load_char_record(holder, &h) >= 0)
+      f->points.bank_gold[0] = h.points.bank_gold[0];
 }
 
-/* Push a member's money to the holder and zero its own copy. */
-void account_money_save(struct char_file_u *f)
+/* Write the bank to the holder's record and 0 to this one, debit first.
+ * Coins the bank gained came out of this character, so its record goes
+ * first; coins it lost went to this character, so the holder's does. A
+ * crash between the two writes then loses the transfer instead of minting
+ * it. A live holder writes the balance at its own save. */
+static void acct_push(struct account_data *acct, char *holder,
+                      struct char_file_u *st, long bank)
 {
-   struct account_data *acct;
    struct char_file_u h;
-   struct descriptor_data *d;
 
-   if (!f || !*f->name)
-      return;
-   if (!(acct = account_of_char(f->name)))
-      return;
-   if (!str_cmp(acct->name, f->name))
-      return;                           /* the holder keeps it */
-   if (!acct_member_shares(f))
-      return;
-
-   /* A live holder owns its record: writing a disk-loaded copy underneath
-    * it would roll back whatever it has not saved yet. It reads the same
-    * balance at its own next load, so there is nothing to fix. */
-   for (d = descriptor_list; d; d = d->next)
-      if (d->character && !IS_NPC(d->character)
-          && !str_cmp(GET_PC_NAME(d->character), acct->name))
-         return;
-
-   if (load_char(acct->name, &h) < 0) {
-      log("SYSERR: account %s holder record unreadable; %s keeps %ld gold on "
-          "its own record.", acct->name, f->name, f->points.gold[0]);
+   st->points.bank_gold[0] = 0;
+   if (acct_in_world(holder)) {
+      save_char_ascii(st);
       return;
    }
-
-   /*
-    * A PUSH IS ONLY SAFE IF THIS MEMBER WAS SEEDED.
-    *
-    * account_money_load runs at every load, so normally the member's
-    * figures ARE the account's and pushing them back is a no-op or a
-    * legitimate spend. The exception is a character ALREADY in the world
-    * when it joined the roster: it still carries its own purse, never
-    * having been seeded, and pushing that would overwrite the account's
-    * balance with a stranger's -- destroying money rather than moving it.
-    *
-    * A seeded member reads 0 (its previous save zeroed it) or matches the
-    * holder. One still holding pre-join money matches neither, so refuse
-    * and leave both records for a god to reconcile.
-    */
-   if (f->points.bank_gold[0] != 0 && h.points.bank_gold[0] != 0
-       && f->points.bank_gold[0] != h.points.bank_gold[0]) {
-      log("SYSERR: %s banks %ld that did not come from account %s (holder has "
-          "%ld) -- probably joined to the roster while in the world. NOT "
-          "pushed; reconcile by hand.",
-          f->name, f->points.bank_gold[0], acct->name, h.points.bank_gold[0]);
+   if (load_char_record(holder, &h) < 0) {
+      log("SYSERR: account %s bank holder %s has no readable record; %s keeps "
+          "%ld banked on its own.", acct->name, holder, st->name, bank);
+      st->points.bank_gold[0] = bank;
+      save_char_ascii(st);
       return;
    }
+   if (bank > h.points.bank_gold[0]) {
+      save_char_ascii(st);
+      h.points.bank_gold[0] = bank;
+      save_char_ascii(&h);
+   } else if (bank < h.points.bank_gold[0]) {
+      h.points.bank_gold[0] = bank;
+      save_char_ascii(&h);
+      save_char_ascii(st);
+   } else
+      save_char_ascii(st);
+}
 
-   h.points.bank_gold[0] = f->points.bank_gold[0];
-   save_char_ascii(&h);
+/*
+ * Write a character's record, and the holder's when the bank lives there.
+ *
+ *   - bound to the live balance: the balance is the account's, so it goes
+ *     to the holder and this record stores 0. Decided by the binding, not
+ *     the level, so a sibling promoted into 105-126 mid-session still hands
+ *     it back;
+ *   - NULL ch, a record read with load_char and edited (set file): seeded
+ *     from the account, so the same, and the edit lands on the account;
+ *   - live but unbound, before entering the game or after leaving it: a
+ *     non-holder cannot have moved the bank, so it writes 0 and pushes
+ *     nothing. Pushing its copy could only roll the account back.
+ *
+ * The 105-126 band and an account that is not sharing keep their own.
+ */
+void account_save_record(struct char_data *ch, struct char_file_u *st)
+{
+   struct account_data *acct = NULL;
+   char *holder;
 
-   f->points.bank_gold[0] = 0;
+   if (st && *st->name)
+      acct = account_of_char(st->name);
+   if (!acct) {
+      save_char_ascii(st);
+      return;
+   }
+   if (ch && !IS_NPC(ch) && ch->money_acct == acct) {
+      if (!(holder = account_bank_holder(acct)) || !str_cmp(holder, st->name))
+         save_char_ascii(st);
+      else
+         acct_push(acct, holder, st, st->points.bank_gold[0]);
+      return;
+   }
+   if (!account_shares_property(st->level) || !(holder = acct_shared_holder(acct))) {
+      save_char_ascii(st);
+      return;
+   }
+   if (!str_cmp(holder, st->name)) {
+      if (ch && acct->money_live)
+         st->points.bank_gold[0] = acct->bank_slot;
+      save_char_ascii(st);
+      return;
+   }
+   if (ch) {
+      st->points.bank_gold[0] = 0;
+      save_char_ascii(st);
+      return;
+   }
+   if (acct->money_live)
+      acct->bank_slot = st->points.bank_gold[0];
+   acct_push(acct, holder, st, st->points.bank_gold[0]);
+}
+
+/*
+ * Add to an offline character's bank: a player-shop sale, the monthly rent.
+ *
+ * load_char + GET_BANK_GOLD_FILE += + save_char_ascii would add to the
+ * member's own record, which holds 0 on an account; the holder's is where
+ * the bank is, and while a member is in the world the live balance is.
+ */
+int account_bank_adjust(char *char_name, long delta, long *after)
+{
+   struct account_data *acct = account_of_char(char_name);
+   char *holder;
+   struct char_file_u f;
+   long next;
+
+   if (load_char_record(char_name, &f) < 0)
+      return FALSE;
+   if (acct && account_shares_property(f.level) && (holder = acct_shared_holder(acct))) {
+      if (acct->money_live) {
+         next = acct->bank_slot + delta;
+         acct->bank_slot = MAX(0, next);
+         if (after)
+            *after = next;
+         return TRUE;
+      }
+      if (str_cmp(holder, char_name) && load_char_record(holder, &f) < 0)
+         return FALSE;
+   }
+   next = f.points.bank_gold[0] + delta;
+   f.points.bank_gold[0] = MAX(0, next);
+   save_char_ascii(&f);
+   if (after)
+      *after = next;
+   return TRUE;
 }
 
 /* ------------------------------------------------------------------ */
@@ -756,17 +945,15 @@ void account_money_save(struct char_file_u *f)
  * rather than guarded at each caller. */
 static void acct_money_seed(struct account_data *acct)
 {
+   char *holder;
    struct char_file_u h;
 
    if (!acct || acct->money_live)
       return;
-   if (load_char(acct->name, &h) < 0) {
-      /* Unreadable is NOT zero. Leave the slot dead so every member keeps
-       * banking to its own record this session. */
-      log("SYSERR: account %s holder record unreadable; members bank "
-          "per-character this session.", acct->name);
+   /* Unreadable is NOT zero. Leave the slot dead so every member keeps
+    * banking to its own record this session. */
+   if (!(holder = acct_shared_holder(acct)) || load_char_record(holder, &h) < 0)
       return;
-   }
    acct->bank_slot = h.points.bank_gold[0];
    acct->money_live = TRUE;
 }
@@ -790,14 +977,19 @@ long *acct_bank_ref(struct char_data *ch)
 void account_money_bind(struct char_data *ch)
 {
    struct account_data *acct;
+   char *holder;
 
    if (!ch || IS_NPC(ch))
       return;
    ch->money_acct = NULL;
    if (!(acct = account_of_char(GET_PC_NAME(ch))))
       return;
-   /* The 105-126 band overlaps nothing -- see account.h. */
-   if (!account_shares_property(GET_LEVEL(ch)))
+   /* The 105-126 band overlaps nothing -- see account.h -- except a holder
+    * that has not moved yet: its record holds the account's bank, and
+    * spending that as its own would be a second copy of the balance. */
+   holder = account_bank_holder(acct);
+   if (!account_shares_property(GET_LEVEL(ch))
+       && (!holder || str_cmp(holder, GET_PC_NAME(ch))))
       return;
    acct_money_seed(acct);
    if (!acct->money_live)
@@ -820,6 +1012,9 @@ void account_money_unbind(struct char_data *ch)
 
    if (!ch || IS_NPC(ch) || !(acct = ch->money_acct))
       return;
+   /* Its own field has been stale since it bound; a holder writes it at
+    * every later save. */
+   ch->points.bank_gold[0] = acct->bank_slot;
    ch->money_acct = NULL;
 
    for (d = descriptor_list; d; d = d->next)
@@ -865,7 +1060,7 @@ void account_knowledge_merge(struct char_data *ch)
    for (j = 0; j < acct->num_members; j++) {
       if (!str_cmp(acct->members[j], GET_PC_NAME(ch)))
          continue;                      /* own half is already in place */
-      if (load_char(acct->members[j], &f) < 0)
+      if (load_char_record(acct->members[j], &f) < 0)
          continue;                      /* unreadable sibling contributes nothing */
       for (i = 0; i < EXPLORED_BYTES; i++)
          ch->player_specials->explored_vnums[i] |= f.explored_vnums[i];
