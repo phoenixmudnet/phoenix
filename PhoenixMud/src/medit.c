@@ -754,7 +754,12 @@ void medit_save_to_disk(int zone_num)
             strip_string(buf1);
             strcpy(buf2, mob_prog->comlist);
             strip_string(buf2);
-            fprintf(mob_file, "%s %s~\n%s", medit_get_mprog_type(mob_prog),
+            /* The loaded arglist keeps the padding after the type word
+               (fread_string skips nothing), so a separator is written only
+               when it has none; adding one always grew the padding by a
+               space on every save. */
+            fprintf(mob_file, isspace((unsigned char) *buf1) ? "%s%s~\n%s"
+                    : "%s %s~\n%s", medit_get_mprog_type(mob_prog),
                     buf1, buf2);
             mob_prog = mob_prog->next;
             fprintf(mob_file, "~\n%s", (!mob_prog ? "|\n" : ""));
