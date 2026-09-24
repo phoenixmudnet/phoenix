@@ -5081,6 +5081,113 @@ ACMD(do_item_count)
 	}
 }
 
+/* One row of the pre-login who list. d is NULL for a link-dead character. */
+static void who_menu_row(struct char_data *ch, struct char_data *wch,
+			 struct descriptor_data *d, char *Imm_buf,
+			 char *Mort_buf, int *Wizards, int *Mortals)
+{
+	char *buf = get_buffer(MAX_STRING_LENGTH);
+
+	if (GET_LEVEL(wch) >= LVL_IMMORT) {
+		sprintf(Imm_buf + strlen(Imm_buf), "%s[%s] %s %s ",
+			CCYEL(ch, C_SPR),
+			WizLevels[GET_LEVEL(wch) - LVL_IMMORT],
+			GET_NAME(wch), GET_TITLE(wch));
+		(*Wizards)++;
+	} else {
+		/* 10/27/96, Echo - format has been changed slightly to reflect
+		 *   added levels, races, and classes.
+		 */
+		sprintf(Mort_buf + strlen(Mort_buf),
+			"[%3d %2.2s-%3.3s] %s %s ", GET_LEVEL(wch),
+			CLASS_ABBR(wch), RACE_ABBR(wch), GET_NAME(wch),
+			GET_TITLE(wch));
+		(*Mortals)++;
+	}
+
+	*buf = '\0';
+	if (GET_INVIS_LEV(wch))
+		sprintf(buf, "(i%d)", GET_INVIS_LEV(wch));
+	else if (AFF_FLAGGED(wch, AFF_INVISIBLE))
+		strcat(buf, "(invis)");
+
+	if (GET_CLAN(wch) > 0)
+		sprintf(buf + strlen(buf), "(%s)", GET_CLAN_NAME(wch));
+	if (GET_LEVEL(wch) == LVL_HERO)
+		strcat(buf, "&k&3(HERO)&n");
+	else if (GET_LEVEL(wch) == LVL_ANGEL)
+		strcat(buf, "&k&2(ANGEL)&n");
+	if (GET_LEVEL(wch) == LVL_AVATAR)
+		strcat(buf, "&k&6(AVATAR)&n");
+
+	if (PLR_FLAGGED(wch, PLR_MAILING))
+		strcat(buf, "(mailing)");
+	else if (PLR_FLAGGED(wch, PLR_WRITING) && d &&
+		 (STATE(d) != CON_MEDIT) &&
+		 (STATE(d) != CON_OEDIT) &&
+		 (STATE(d) != CON_REDIT) &&
+		 (STATE(d) != CON_SEDIT) &&
+		 (STATE(d) != CON_GEDIT) &&
+		 (STATE(d) != CON_PEDIT) &&
+		 (STATE(d) != CON_TRIGEDIT) &&
+		 (STATE(d) != CON_HEDIT) && (STATE(d) != CON_ZEDIT))
+		strcat(buf, "(writing)");
+
+	if (PRF_FLAGGED(wch, PRF_DEAF))
+		strcat(buf, "(deaf)");
+	if (PRF_FLAGGED(wch, PRF_NOTELL))
+		strcat(buf, "(notell)");
+	if (PRF_FLAGGED(wch, PRF_QUEST))
+		strcat(buf, "(quest)");
+	if (PLR_FLAGGED(wch, PLR_THIEF))
+		strcat(buf, "(THIEF)");
+	if (PLR_FLAGGED(wch, PLR_KILLER))
+		strcat(buf, "(KILLER)");
+	if (!d)
+		strcat(buf, "(linkless)");
+	else if (STATE(d) == CON_OEDIT)
+		strcat(buf, "(OLC - OEdit)");
+	else if (STATE(d) == CON_MEDIT)
+		strcat(buf, "(OLC - MEdit)");
+	else if (STATE(d) == CON_REDIT)
+		strcat(buf, "(OLC - REdit)");
+	else if (STATE(d) == CON_ZEDIT)
+		strcat(buf, "(OLC - ZEdit)");
+	else if (STATE(d) == CON_SEDIT)
+		strcat(buf, "(OLC - SEdit)");
+	else if (STATE(d) == CON_GEDIT)
+		strcat(buf, "(OLC - GEdit)");
+	else if (STATE(d) == CON_PEDIT)
+		strcat(buf, "(OLC - PEdit)");
+	else if (STATE(d) == CON_HEDIT)
+		strcat(buf, "(OLC - HEdit)");
+	else if (STATE(d) == CON_TRIGEDIT)
+		strcat(buf, "(OLC - TrigEdit)");
+	if (GET_LEVEL(wch) >= LVL_IMMORT)
+		strcat(buf, CCNRM(ch, C_SPR));
+	if (PRF2_FLAGGED(wch, PRF2_AFK))
+		strcat(buf, "(AFK)");
+	if (AFF_FLAGGED(wch, AFF_PLAGUE))
+		strcat(buf, "&G(PLAGUE !!)&n");
+
+	strcat(buf, "\r\n");
+
+	if (GET_LEVEL(wch) >= LVL_IMMORT) {
+		strcat(Imm_buf, buf);
+	} else {
+		strcat(Mort_buf, buf);
+	}
+	release_buffer(buf);
+}
+
+/* The account menu's who list is shown before login, so it has no observer
+   to test visibility against. It lists everyone in the world, link-dead
+   characters included, except an immortal wizinvis at LVL_IMMORT or above. */
+static bool who_menu_listed(struct char_data *wch)
+{
+	return GET_INVIS_LEV(wch) < LVL_IMMORT;
+}
+
 ACMD(who_to_menu)
 {
 	struct descriptor_data *d;
@@ -5114,98 +5221,30 @@ ACMD(who_to_menu)
 		else if (!(wch = d->character))
 			continue;
 
-		if (!CAN_SEE(ch, wch))
+		if (!who_menu_listed(wch))
 			continue;
 		if (GET_LEVEL(wch) < low || GET_LEVEL(wch) > high)
 			continue;
-		if (GET_LEVEL(wch) >= LVL_IMMORT) {
-			sprintf(Imm_buf + strlen(Imm_buf), "%s[%s] %s %s ",
-				CCYEL(ch, C_SPR),
-				WizLevels[GET_LEVEL(wch) - LVL_IMMORT],
-				GET_NAME(wch), GET_TITLE(wch));
-			Wizards++;
-		} else {
-			/* 10/27/96, Echo - format has been changed slightly to reflect
-			 *   added levels, races, and classes.
-			 */
-			sprintf(Mort_buf + strlen(Mort_buf),
-				"[%3d %2.2s-%3.3s] %s %s ", GET_LEVEL(wch),
-				CLASS_ABBR(wch), RACE_ABBR(wch), GET_NAME(wch),
-				GET_TITLE(wch));
-			Mortals++;
-		}
-
-		*buf = '\0';
-		if (GET_INVIS_LEV(wch))
-			sprintf(buf, "(i%d)", GET_INVIS_LEV(wch));
-		else if (AFF_FLAGGED(wch, AFF_INVISIBLE))
-			strcat(buf, "(invis)");
-
-		if (GET_CLAN(wch) > 0)
-			sprintf(buf + strlen(buf), "(%s)", GET_CLAN_NAME(wch));
-		if (GET_LEVEL(wch) == LVL_HERO)
-			strcat(buf, "&k&3(HERO)&n");
-		else if (GET_LEVEL(wch) == LVL_ANGEL)
-			strcat(buf, "&k&2(ANGEL)&n");
-		if (GET_LEVEL(wch) == LVL_AVATAR)
-			strcat(buf, "&k&6(AVATAR)&n");
-
-		if (PLR_FLAGGED(wch, PLR_MAILING))
-			strcat(buf, "(mailing)");
-		else if (PLR_FLAGGED(wch, PLR_WRITING) &&
-			 (STATE(d) != CON_MEDIT) &&
-			 (STATE(d) != CON_OEDIT) &&
-			 (STATE(d) != CON_REDIT) &&
-			 (STATE(d) != CON_SEDIT) &&
-			 (STATE(d) != CON_GEDIT) &&
-			 (STATE(d) != CON_PEDIT) &&
-			 (STATE(d) != CON_TRIGEDIT) &&
-			 (STATE(d) != CON_HEDIT) && (STATE(d) != CON_ZEDIT))
-			strcat(buf, "(writing)");
-
-		if (PRF_FLAGGED(wch, PRF_DEAF))
-			strcat(buf, "(deaf)");
-		if (PRF_FLAGGED(wch, PRF_NOTELL))
-			strcat(buf, "(notell)");
-		if (PRF_FLAGGED(wch, PRF_QUEST))
-			strcat(buf, "(quest)");
-		if (PLR_FLAGGED(wch, PLR_THIEF))
-			strcat(buf, "(THIEF)");
-		if (PLR_FLAGGED(wch, PLR_KILLER))
-			strcat(buf, "(KILLER)");
-		if (STATE(d) == CON_OEDIT)
-			strcat(buf, "(OLC - OEdit)");
-		else if (STATE(d) == CON_MEDIT)
-			strcat(buf, "(OLC - MEdit)");
-		else if (STATE(d) == CON_REDIT)
-			strcat(buf, "(OLC - REdit)");
-		else if (STATE(d) == CON_ZEDIT)
-			strcat(buf, "(OLC - ZEdit)");
-		else if (STATE(d) == CON_SEDIT)
-			strcat(buf, "(OLC - SEdit)");
-		else if (STATE(d) == CON_GEDIT)
-			strcat(buf, "(OLC - GEdit)");
-		else if (STATE(d) == CON_PEDIT)
-			strcat(buf, "(OLC - PEdit)");
-		else if (STATE(d) == CON_HEDIT)
-			strcat(buf, "(OLC - HEdit)");
-		else if (STATE(d) == CON_TRIGEDIT)
-			strcat(buf, "(OLC - TrigEdit)");
-		if (GET_LEVEL(wch) >= LVL_IMMORT)
-			strcat(buf, CCNRM(ch, C_SPR));
-		if (PRF2_FLAGGED(wch, PRF2_AFK))
-			strcat(buf, "(AFK)");
-		if (AFF_FLAGGED(wch, AFF_PLAGUE))
-			strcat(buf, "&G(PLAGUE !!)&n");
-
-		strcat(buf, "\r\n");
-
-		if (GET_LEVEL(wch) >= LVL_IMMORT) {
-			strcat(Imm_buf, buf);
-		} else {
-			strcat(Mort_buf, buf);
-		}
+		who_menu_row(ch, wch, d, Imm_buf, Mort_buf, &Wizards, &Mortals);
 	}			/* end of for */
+
+	/* Link-dead characters: in the world, but off descriptor_list. An
+	   immortal switched into a mob is not link-dead; its descriptor is on
+	   the mob and names it as d->original. */
+	for (wch = character_list; wch; wch = wch->next) {
+		struct descriptor_data *sd;
+
+		if (IS_NPC(wch) || wch->desc || !who_menu_listed(wch))
+			continue;
+		for (sd = descriptor_list; sd; sd = sd->next)
+			if (sd->original == wch)
+				break;
+		if (sd)
+			continue;
+		if (GET_LEVEL(wch) < low || GET_LEVEL(wch) > high)
+			continue;
+		who_menu_row(ch, wch, NULL, Imm_buf, Mort_buf, &Wizards, &Mortals);
+	}
 
 	*buf = '\0';
 	if (Wizards) {
