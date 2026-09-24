@@ -55,6 +55,20 @@ void redit_disp_menu(struct descriptor_data *d);
 void redit_parse(struct descriptor_data *d, char *arg); 
 void redit_setup_new(struct descriptor_data *d); 
 void redit_setup_existing(struct descriptor_data *d, int real_num); 
+/* Write a room's extra descriptions tail first, i.e. in file order. */
+static void redit_save_ex_descs(FILE *fp, struct extra_descr_data *ex_desc,
+				char *buf1)
+{
+	if (!ex_desc)
+		return;
+	redit_save_ex_descs(fp, ex_desc->next, buf1);
+	if (str_cmp(ex_desc->keyword, "undefined") == 0)
+		return;
+	strcpy(buf1, ex_desc->description);
+	strip_string(buf1);
+	fprintf(fp, "E\n%s~\n%s~\n", ex_desc->keyword, buf1);
+}
+
 void redit_save_to_disk(int zone); 
 void redit_save_internally(struct descriptor_data *d); 
 void free_room(struct room_data *room); 
@@ -572,18 +586,10 @@ void redit_save_to_disk(int zone_num)
 		       room->ore_types[counter2],
 		       room->ore_percent[counter2]);
 	    }
-	 if (room->ex_description)  
-	    { 
-	    for(ex_desc=room->ex_description;ex_desc;ex_desc=ex_desc->next)
-	       { 
-	      /*. Home straight, just deal with extras descriptions..*/ 
-	       if(str_cmp(ex_desc->keyword,"undefined")==0)
-		  continue;
-	       strcpy(buf1, ex_desc->description); 
-	       strip_string(buf1); 
-	       fprintf(fp, "E\n%s~\n%s~\n", ex_desc->keyword,buf1); 
-	       } 
-	    } 
+	 /* Extra descriptions in file order: parse_room prepends each one, so
+	    the list runs in reverse and is written tail first. Walking it head
+	    first swapped them on every save. */
+	 redit_save_ex_descs(fp, room->ex_description, buf1);
 	 if ((room->tele != NULL) && (room->tele->targ > 0)) 
 	    { 
 	    teleflag=get_buffer(SMALL_BUFSIZE);

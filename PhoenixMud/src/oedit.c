@@ -67,6 +67,26 @@ void oedit_disp_spells_menu(struct descriptor_data *d);
 void oedit_liquid_type(struct descriptor_data *d); 
 void oedit_setup_new(struct descriptor_data *d); 
 void oedit_setup_existing(struct descriptor_data *d, int real_num); 
+/* Write an object's extra descriptions tail first, i.e. in file order. */
+static void oedit_save_ex_descs(FILE *fp, struct extra_descr_data *ex_desc,
+				char *buf1)
+{
+	if (!ex_desc)
+		return;
+	oedit_save_ex_descs(fp, ex_desc->next, buf1);
+	/* Sanity check to prevent nasty protection faults */
+	if (!*ex_desc->keyword || !*ex_desc->description) {
+		mudlogf(BRF, LVL_BUILDER, TRUE,
+			"SYSERR: OLC: oedit_save_to_disk: Corrupt ex_desc!");
+		return;
+	}
+	if (str_cmp(ex_desc->keyword, "undefined") == 0)
+		return;
+	strcpy(buf1, ex_desc->description);
+	strip_string(buf1);
+	fprintf(fp, "E\n%s~\n%s~\n", ex_desc->keyword, buf1);
+}
+
 void oedit_save_to_disk(int zone); 
 void oedit_save_internally(struct descriptor_data *d); 
  
@@ -455,35 +475,10 @@ void oedit_save_to_disk(int zone_num)
 	/* 
 	 * Do we have extra descriptions? 
 	 */ 
-	 if (obj->ex_description) 
-	    { 
-	   /*
-	    * Yep, save them too 
-	    */ 
-	    for (ex_desc = obj->ex_description; ex_desc; ex_desc = ex_desc->next)  
-	       { 
-	      /*
-	       * Sanity check to prevent nasty protection faults 
-	       */ 
-	       if (!*ex_desc->keyword || !*ex_desc->description) 
-		  { 
-		  mudlogf(BRF, LVL_BUILDER, TRUE,
-			  "SYSERR: OLC: oedit_save_to_disk: Corrupt ex_desc!");
-		  continue; 
-		  } 
-	       if(str_cmp(ex_desc->keyword,"undefined")==0)
-		  continue;
-	       
-	       strcpy(buf1, ex_desc->description); 
-	       strip_string(buf1); 
-	       fprintf(fp,   "E\n" 
-		       "%s~\n" 
-		       "%s~\n", 
-		       ex_desc->keyword, 
-		       buf1 
-		  ); 
-	       } 
-	    } 
+	 /* Extra descriptions in file order: parse_object prepends each one,
+	    so the list runs in reverse and is written tail first. Walking it
+	    head first swapped them on every save. */
+	 oedit_save_ex_descs(fp, obj->ex_description, buf1); 
  
 	/*
 	 * Do we have affects? 
