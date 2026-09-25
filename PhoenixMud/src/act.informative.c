@@ -3459,6 +3459,207 @@ static void areas_load_unreachable(void)
   }
 }
 
+/* Would the room's enter trigger turn THIS player back?
+ *
+ * text/unreachable answers "can ANY mortal get in". The clan rooms behind
+ * trigger 1253 admit their own clan, so they are not on it, and the sweep
+ * routed every player through the Forsaken/Crusaders bar room (24038), where
+ * the script says "Keep your grubby hands out of there." Other doors depend on
+ * the level, the room you come from and the direction (the Newbie Library
+ * 20003, the Briarhurst gate 20152, the rope at 21638).
+ *
+ * So the script is dry-run for the player: the if/elseif/else structure, set
+ * and eval, and each condition through process_if, the evaluator the script
+ * itself runs on. Only a fixed set of variables is substituted -- the actor's
+ * level, vnum, room (the room the move starts from) and clan, %direction% and
+ * %cmd% -- plus the script's own locals. Anything else (a random roll, the
+ * actor's dex) cannot be known before the move, and the door is left open.
+ *
+ * enter_wtrigger runs the FIRST enter trigger whose narg roll passes, and
+ * sets %direction% to the side the actor came in from (rev_dir). Mirrored:
+ * the first enter trigger decides, and one below narg 100 is a chance, not a
+ * refusal. A wait lets the move through, whatever the script returns after. */
+#define AREAS_GATE_VARS   16
+#define AREAS_GATE_DEPTH  32
+
+extern int process_if(char *cond, void *go, struct script_data *sc,
+                      trig_data *trig, int type);
+extern void eval_expr(char *line, char *result, void *go,
+                      struct script_data *sc, trig_data *trig, int type);
+
+struct areas_gate_var {
+  char name[64];
+  char value[MAX_INPUT_LENGTH];
+  int unknown;
+};
+
+static void areas_gate_set(struct areas_gate_var *vars, int *n, const char *name,
+                           const char *value, int unknown)
+{
+  int i;
+
+  for (i = 0; i < *n; i++)
+    if (!str_cmp(vars[i].name, (char *) name))
+      break;
+  if (i == *n) {
+    if (*n >= AREAS_GATE_VARS)
+      return;
+    (*n)++;
+    snprintf(vars[i].name, sizeof(vars[i].name), "%s", name);
+  }
+  snprintf(vars[i].value, sizeof(vars[i].value), "%s", value);
+  vars[i].unknown = unknown;
+}
+
+/* Replace every %var% in `in`. Returns 0 when one cannot be known. */
+static int areas_gate_subst(const char *in, char *out, size_t outsz,
+                            struct areas_gate_var *vars, int n)
+{
+  size_t o = 0, len;
+  const char *end;
+  char name[64];
+  int i;
+
+  while (*in) {
+    if (*in != '%') {
+      if (o + 1 >= outsz)
+        return 0;
+      out[o++] = *in++;
+      continue;
+    }
+    if (!(end = strchr(in + 1, '%')) || (len = end - in - 1) >= sizeof(name))
+      return 0;
+    memcpy(name, in + 1, len);
+    name[len] = '\0';
+    for (i = 0; i < n; i++)
+      if (!str_cmp(vars[i].name, name))
+        break;
+    if (i == n || vars[i].unknown || o + strlen(vars[i].value) >= outsz)
+      return 0;
+    strcpy(out + o, vars[i].value);
+    o += strlen(vars[i].value);
+    in = end + 1;
+  }
+  out[o] = '\0';
+  return 1;
+}
+
+/* 1 = refused, 0 = let through, -1 = cannot tell. */
+static int areas_gate_verdict(struct char_data *ch, trig_data *t,
+                              room_rnum from, room_rnum to, int dir)
+{
+  static const int came_from[] = { SOUTH, WEST, NORTH, EAST, DOWN, UP };
+  struct areas_gate_var vars[AREAS_GATE_VARS];
+  int active[AREAS_GATE_DEPTH], taken[AREAS_GATE_DEPTH], outer[AREAS_GATE_DEPTH];
+  int nvars = 0, depth = 0, running, i, v;
+  struct cmdlist_element *c;
+  char line[MAX_INPUT_LENGTH], sub[MAX_INPUT_LENGTH], res[MAX_INPUT_LENGTH];
+  char word[32], *rest, *p;
+
+  sprintf(res, "%d", GET_LEVEL(ch));
+  areas_gate_set(vars, &nvars, "actor.level", res, 0);
+  areas_gate_set(vars, &nvars, "actor.vnum", "-1", 0);
+  sprintf(res, "%ld", (long) GET_ROOM_VNUM(from));
+  areas_gate_set(vars, &nvars, "actor.room", res, 0);
+  areas_gate_set(vars, &nvars, "actor.clan", GET_CLAN(ch) ? GET_CLAN_NAME(ch) : "", 0);
+  areas_gate_set(vars, &nvars, "direction", dirs[came_from[dir]], 0);
+  areas_gate_set(vars, &nvars, "cmd", "", 0);
+
+  for (c = t->cmdlist; c; c = c->next) {
+    if (!c->cmd)
+      continue;
+    snprintf(line, sizeof(line), "%s", c->cmd);
+    for (p = line; *p && isspace((int) *p); p++)
+      ;
+    if (!*p || *p == '*')
+      continue;
+    for (i = 0; p[i] && !isspace((int) p[i]) && i < (int) sizeof(word) - 1; i++)
+      word[i] = LOWER(p[i]);
+    word[i] = '\0';
+    for (rest = p + i; *rest && isspace((int) *rest); rest++)
+      ;
+    for (running = 1, i = 0; i < depth; i++)
+      running = running && active[i];
+
+    if (!strcmp(word, "if")) {
+      if (depth >= AREAS_GATE_DEPTH)
+        return -1;
+      if (!running) {
+        active[depth] = 0; taken[depth] = 1; outer[depth++] = 0;
+        continue;
+      }
+      if (!areas_gate_subst(rest, sub, sizeof(sub), vars, nvars))
+        return -1;
+      v = process_if(sub, &world[to], SCRIPT(&world[to]), t, WLD_TRIGGER);
+      active[depth] = v; taken[depth] = v; outer[depth++] = 1;
+    } else if (!strcmp(word, "elseif")) {
+      if (!depth)
+        return -1;
+      if (!outer[depth - 1] || taken[depth - 1]) {
+        active[depth - 1] = 0;
+        continue;
+      }
+      if (!areas_gate_subst(rest, sub, sizeof(sub), vars, nvars))
+        return -1;
+      v = process_if(sub, &world[to], SCRIPT(&world[to]), t, WLD_TRIGGER);
+      active[depth - 1] = v; taken[depth - 1] = v;
+    } else if (!strcmp(word, "else")) {
+      if (!depth)
+        return -1;
+      active[depth - 1] = outer[depth - 1] && !taken[depth - 1];
+      taken[depth - 1] = 1;
+    } else if (!strcmp(word, "end")) {
+      if (!depth)
+        return -1;
+      depth--;
+    } else if (!strcmp(word, "while") || !strcmp(word, "switch") || !strcmp(word, "case")
+               || !strcmp(word, "break") || !strcmp(word, "done") || !strcmp(word, "default")) {
+      if (running)
+        return -1;
+    } else if (!running) {
+      continue;
+    } else if (!strcmp(word, "return")) {
+      return (*rest == '0' && !isdigit((int) rest[1])) ? 1 : 0;
+    } else if (!strcmp(word, "wait") || !strcmp(word, "halt")) {
+      return 0;
+    } else if (!strcmp(word, "set") || !strcmp(word, "eval")) {
+      char vname[64];
+
+      for (i = 0; rest[i] && !isspace((int) rest[i]) && i < (int) sizeof(vname) - 1; i++)
+        vname[i] = rest[i];
+      vname[i] = '\0';
+      if (!*vname)
+        continue;
+      for (p = rest + i; *p && isspace((int) *p); p++)
+        ;
+      if (!areas_gate_subst(p, sub, sizeof(sub), vars, nvars)) {
+        areas_gate_set(vars, &nvars, vname, "", 1);
+        continue;
+      }
+      if (!strcmp(word, "eval")) {
+        eval_expr(sub, res, &world[to], SCRIPT(&world[to]), t, WLD_TRIGGER);
+        areas_gate_set(vars, &nvars, vname, res, 0);
+      } else
+        areas_gate_set(vars, &nvars, vname, sub, 0);
+    }
+    /* Anything else (wsend, echoes, damage) does not decide the move. */
+  }
+  return 0;
+}
+
+/* Does `to`, entered from `from` by moving `dir`, turn this player back? */
+static int areas_refuses(struct char_data *ch, room_rnum from, room_rnum to, int dir)
+{
+  trig_data *t;
+
+  if (!SCRIPT_CHECK(&world[to], WTRIG_ENTER))
+    return 0;
+  for (t = TRIGGERS(SCRIPT(&world[to])); t; t = t->next)
+    if (IS_SET(GET_TRIG_TYPE(t), WTRIG_ENTER))
+      return GET_TRIG_NARG(t) >= 100 && areas_gate_verdict(ch, t, from, to, dir) == 1;
+  return 0;
+}
+
 void areas_for_level(struct char_data *ch, int level, const char *name)
 {
   struct area_row *rows;
@@ -3511,6 +3712,8 @@ void areas_for_level(struct char_data *ch, int level, const char *name)
       if (to == NOWHERE || to < 0 || to > top_of_world || prev[to] != NOWHERE)
         continue;
       if (unreach_flags && unreach_flags[to])   /* no mortal entrance -- never route through */
+        continue;
+      if (areas_refuses(ch, cur, to, d))       /* turns THIS player back */
         continue;
       prev[to] = cur;
       stepdir[to] = d;
