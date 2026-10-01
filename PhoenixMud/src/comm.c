@@ -1377,9 +1377,89 @@ char* generate_fight_prompt(struct char_data *ch, char* tag, int hit, int maxhit
    return prompt;
 }
 
+/* PRF3_DAMAGEPROMPT.  Every combat event (gmcp_combat_event) is noted on
+ * the characters it concerns, and the next prompt lists them:
+ *
+ *    [Hit 12 15 | Took 5 | Heal +20 | Healed +30]
+ *
+ * Hit is damage you dealt, Took damage you took, Heal healing you cast on
+ * anyone, Healed healing someone else cast on you.  Damage you do to
+ * yourself (poison, plague and the other ticks damage() is handed with ch
+ * equal to victim) is not listed.  Only characters with the flag set keep a
+ * tally, so it costs nothing otherwise.                                    */
+#define PROMPT_TALLY_LENGTH 512
+
+static void prompt_tally_note(struct char_data *who, int list, int amt)
+{
+   struct prompt_tally *t;
+
+   if (who == NULL || IS_NPC(who) || !PRF3_FLAGGED(who, PRF3_DAMAGEPROMPT))
+      return;
+   t = &who->player_specials->tally;
+   if (t->count[list] < PROMPT_TALLY_SHOWN)
+      t->amount[list][t->count[list]] = amt;
+   t->count[list]++;
+}
+
+static void prompt_tally_event(struct char_data *ch, struct char_data *victim,
+                               const char *kind, int amt)
+{
+   if (ch == NULL || victim == NULL || amt <= 0)
+      return;
+   if (!strcmp(kind, "dam"))
+   {
+      if (ch == victim)
+         return;
+      prompt_tally_note(ch, PROMPT_TALLY_HIT, amt);
+      prompt_tally_note(victim, PROMPT_TALLY_TOOK, amt);
+   }
+   else if (!strcmp(kind, "heal"))
+   {
+      prompt_tally_note(ch, PROMPT_TALLY_HEAL, amt);
+      if (victim != ch)
+         prompt_tally_note(victim, PROMPT_TALLY_HEALED, amt);
+   }
+}
+
+/* Write the tally into out (at most size bytes including the NUL) and clear
+ * it.  Beside the fight tokens it takes a leading space, elsewhere a
+ * trailing one, like the tokens around it.  Returns the bytes written.     */
+static size_t prompt_tally_token(struct char_data *ch, char *out, size_t size, int fighting)
+{
+   static const char *label[PROMPT_TALLY_LISTS] = { "Hit", "Took", "Heal", "Healed" };
+   static const char *sign[PROMPT_TALLY_LISTS] = { "", "", "+", "+" };
+   struct prompt_tally *t = &ch->player_specials->tally;
+   char body[PROMPT_TALLY_LENGTH];
+   size_t len = 0;
+   int list, i, shown, sections = 0;
+
+   body[0] = '\0';
+   for (list = 0; list < PROMPT_TALLY_LISTS; list++)
+   {
+      if (t->count[list] <= 0)
+         continue;
+      len += snprintf(body + len, sizeof(body) - len, "%s%s",
+                      sections++ ? " | " : "", label[list]);
+      shown = MIN(t->count[list], PROMPT_TALLY_SHOWN);
+      for (i = 0; i < shown && len < sizeof(body); i++)
+         len += snprintf(body + len, sizeof(body) - len, " %s%d", sign[list], t->amount[list][i]);
+      if (t->count[list] > PROMPT_TALLY_SHOWN && len < sizeof(body))
+         len += snprintf(body + len, sizeof(body) - len, " +%d more", t->count[list] - PROMPT_TALLY_SHOWN);
+      if (len >= sizeof(body))
+         break;
+   }
+   memset(t, 0, sizeof(*t));
+
+   if (!sections || size == 0)
+      return 0;
+   len = snprintf(out, size, fighting ? " [%s]" : "[%s] ", body);
+   return MIN(len, size - 1);
+}
+
 char *make_prompt(struct descriptor_data *d)
 {
-   static char prompt[MAX_PROMPT_LENGTH + 1];
+   static char prompt[MAX_PROMPT_LENGTH + PROMPT_TALLY_LENGTH + 1];
+   size_t tally_len = 0;
 
    if (d->showstr_count) // paging through a long text
    {
@@ -1477,6 +1557,14 @@ char *make_prompt(struct descriptor_data *d)
          length += sprintf(prompt + length, " %s", generate_fight_prompt(d->character, "Enemy", GET_HIT(opponent), GET_MAX_HIT(opponent)));
       }
 
+      /* Room is kept for the "> " IAC GA tail written below. */
+      if (PRF3_FLAGGED(d->character, PRF3_DAMAGEPROMPT) && length + 4 < sizeof(prompt))
+      {
+         tally_len = prompt_tally_token(d->character, prompt + length,
+                                        sizeof(prompt) - length - 4, opponent != NULL);
+         length += tally_len;
+      }
+
       sprintf(prompt + length, "> %c%c", IAC, GA);
    }
    else if (STATE(d) == CON_PLAYING && IS_NPC(d->character)) /* switched prompt */
@@ -1500,7 +1588,7 @@ char *make_prompt(struct descriptor_data *d)
    else
       *prompt = '\0';
 
-   if (strlen(prompt) > MAX_PROMPT_LENGTH - 4)
+   if (strlen(prompt) - tally_len > MAX_PROMPT_LENGTH - 4)
    {
       mudlogf(CMP, LVL_IMMORT, TRUE, "%s's prompt is HUGE: %s",
               GET_NAME(d->character), prompt);
@@ -2482,6 +2570,7 @@ void gmcp_combat_event(struct char_data* ch, struct char_data* victim,
    int vhp = -1;
 
    if (ch == NULL || victim == NULL) return;
+   prompt_tally_event(ch, victim, kind, amt);
    if (ch->desc == NULL && victim->desc == NULL) return;   /* nobody to tell */
 
    gmcp_combat_seq++;
