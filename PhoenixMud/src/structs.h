@@ -432,11 +432,12 @@
    BIT NUMBERS ARE SHARED WITH THE TYPESCRIPT ENGINE.  A character's pref3
    travels in the pfile between the two, so a bit has to mean the same thing
    on both sides or a setting silently turns into a different setting on the
-   way across.  Only MOBCOLOR is implemented here; the other two are listed
-   so the allocation cannot drift while they are unimplemented.           */
+   way across.  DIMFARMED is listed so the allocation cannot drift while it
+   is unimplemented here.                                                  */
 #define PRF3_HIDEMASTERED (1 << 0) /* practice list hides mastered entries */
 #define PRF3_MOBCOLOR     (1 << 1) /* colour mobs by relative difficulty   */
 #define PRF3_DIMFARMED    (1 << 2) /* dim mobs whose xp you have worn down */
+#define PRF3_DAMAGEPROMPT (1 << 3) /* prompt lists your hits and heals     */
 /*** 2 Extra sets of 32 flags with pref2 and pref3  ****/
 
 /* Updated to match Phoenix */
@@ -1721,6 +1722,20 @@ struct char_special_data {
 
 #define HERO_TEST_SKILLS_FILE "etc/hero_skills"
 
+/* PRF3_DAMAGEPROMPT: this character's own hits and heals since the last
+   prompt, printed and cleared by make_prompt.  Never saved.               */
+#define PROMPT_TALLY_SHOWN  8     /* past this many a list says "+N more"  */
+#define PROMPT_TALLY_HIT    0     /* damage you dealt                      */
+#define PROMPT_TALLY_TOOK   1     /* damage you took                       */
+#define PROMPT_TALLY_HEAL   2     /* healing you cast, on anyone           */
+#define PROMPT_TALLY_HEALED 3     /* healing someone else cast on you      */
+#define PROMPT_TALLY_LISTS  4
+
+struct prompt_tally {
+   int count[PROMPT_TALLY_LISTS];
+   int amount[PROMPT_TALLY_LISTS][PROMPT_TALLY_SHOWN];
+};
+
 struct player_special_data {
    struct player_special_data_saved saved;
    /* WHAT THIS CHARACTER WALKED AND IDENTIFIED ITSELF.
@@ -1773,6 +1788,8 @@ struct player_special_data {
   int reimb_skills[250];
   int reimb_num_skills;
   int reimb_num_spells;
+
+  struct prompt_tally tally;   /* PRF3_DAMAGEPROMPT, see above */
 };
 
 /* Specials used by NPCs, not PCs */

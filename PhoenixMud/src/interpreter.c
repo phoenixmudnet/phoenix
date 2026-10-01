@@ -570,6 +570,7 @@ const struct command_info cmd_info[] = {
 	{"cwithdraw", POS_STANDING, do_not_here, 1, 0},
 
 	{"darken", POS_STANDING, do_darken, 0, 0},
+	{"damageprompt", POS_DEAD, do_gen_tog, 0, SCMD_DAMAGEPROMPT},
 	{"date", POS_DEAD, do_date, LVL_IMMORT, SCMD_DATE},
 	{"dc", POS_DEAD, do_dc, LVL_SERP, 0},
 	{"delay", POS_DEAD, do_delay_func, LVL_ADMIN, 0},

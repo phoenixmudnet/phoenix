@@ -1724,6 +1724,9 @@ ACMD(do_gen_tog)
          {"Practice will list every skill you know.\r\n",
           "Practice will hide skills you have completely mastered.\r\n"
          },
+         {"Your prompt will no longer show damage and healing numbers.\r\n",
+          "Your prompt will show the damage and healing since the last prompt.\r\n"
+         },
       };
 
 
@@ -1880,6 +1883,11 @@ ACMD(do_gen_tog)
       break;
    case SCMD_HIDEMASTERED:
       result = PRF_TOG_CHK3(ch, PRF3_HIDEMASTERED);
+      break;
+   case SCMD_DAMAGEPROMPT:
+      result = PRF_TOG_CHK3(ch, PRF3_DAMAGEPROMPT);
+      /* Numbers noted before the switch belong to neither setting. */
+      memset(&ch->player_specials->tally, 0, sizeof(ch->player_specials->tally));
       break;
    default:
       log("SYSERR: Unknown subcmd: %d in do_gen_toggle",subcmd);
