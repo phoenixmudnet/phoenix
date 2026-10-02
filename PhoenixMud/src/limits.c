@@ -388,14 +388,18 @@ void gain_exp(struct char_data * ch, long gain)
 
       /*
        * A scheduled experience window (events.c). Percent, so 200 is double
-       * and a live 100 is a visible no-op. Multiplicative with class and race
-       * for the reason zeal is: a flat addition is worth least to the classes
-       * that already gain slowest.
+       * and a live 100 is a visible no-op. The gain and the per-kill ceiling
+       * (max_gain, through the multiplier) both scale, so a player at the
+       * ceiling sees the event too; the two-level guild cap below does not
+       * move. Scaling the ceiling alone paid a player under it nothing.
        */
       {
         int evpct = event_value(EVENT_XP);
         if (evpct > 0)
+          {
           multiplier *= (float) evpct / 100.0f;
+          gain = (long)((float)gain * (float)evpct / 100.0f);
+          }
       }
 
       if (gain > 0)
