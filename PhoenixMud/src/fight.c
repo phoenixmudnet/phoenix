@@ -2118,6 +2118,21 @@ void perform_group_gain(struct char_data * ch, int base,
    else
       exp_after_lim = base;
 
+   /*
+    * A scheduled experience window (events.c): the share and the per-kill
+    * ceiling both scale by the percent, so a member already at the ceiling
+    * sees the event too. The two-level guild cap in gain_exp_regardless does
+    * not move.
+    */
+   {
+     int evpct = event_value(EVENT_XP);
+     if (evpct > 0)
+       {
+       exp_after_lim = (int)((float)exp_after_lim * (float)evpct / 100.0f);
+       max_gain = (int)((float)max_gain * (float)evpct / 100.0f);
+       }
+   }
+
    share = MIN(max_gain, MAX(1, exp_after_lim));
 
    if (share > 1)
