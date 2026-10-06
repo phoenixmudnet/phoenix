@@ -17,10 +17,9 @@
 #include "vnum.h"
 
 const char *circlemud_version = 
-"PhoenixMUD  version 4.1                        5/06\r\n"
-"PhoenixMUD  version 4.0  beta patchlevel 4     3/99\r\n"
-"CircleMUD   version 3.00 beta patchlevel 15    3/99\r\n"
-"DG Scripts  version 0.99 beta patchlevel 6    10/98\r\n"; 
+"PhoenixMUD\r\n"
+"Based on CircleMUD, itself a derivative of DikuMUD.\r\n"
+"DG Scripts by Thomas Arp.\r\n"; 
 #define DG_SCRIPT_VERSION 
 
 
