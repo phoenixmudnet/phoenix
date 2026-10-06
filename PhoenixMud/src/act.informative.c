@@ -2446,7 +2446,11 @@ ACMD(do_affects)
    send_to_char(ch, "You carry these affections: \r\n");
    for (af = ch->affected; af; af = af->next) 
       {
-      strcpy(sname, spells[af->type].spell_name);
+      /* An affect type outside the spell table (a damaged or imported
+         player file) has no name; spells[] holds MAX_SPELLS+5 entries. */
+      strcpy(sname, (af->type > 0 && af->type <= MAX_SPELLS &&
+                     spells[af->type].spell_name) ?
+                    spells[af->type].spell_name : "TYPE_UNDEFINED");
       strcat(sname, ":");
       send_to_char(ch, "   &C%-22s&n    affects &C%s&n by &C%ld&n for &C%d&n hours\r\n",
               (type ? sname : ""), (!VIS_AFF_FLAGS(af->location) ? 
