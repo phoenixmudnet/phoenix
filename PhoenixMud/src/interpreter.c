@@ -2176,6 +2176,38 @@ int perform_dupe_check(struct descriptor_data *d)
 /* deal with newcomers and other non-playing sockets */
 
 /*
+ * A character has just been made: enrol it and let the RETURN after its MOTD
+ * enter the game ("you just made them; play them"). An alt named from a
+ * roster joins that roster now; one made at the name prompt gets an account
+ * of its own, so a roster of one and a roster of six take the same path.
+ */
+static void acct_enrol_new(struct descriptor_data *d)
+{
+	if (d->account)
+		account_add_char(d->account, GET_PC_NAME(d->character));
+	else
+		d->account = account_create_for(GET_PC_NAME(d->character));
+	if (d->account) {
+		account_pick_main(d->account);
+		save_accounts();
+	}
+	d->acct_enter = 1;
+}
+
+/*
+ * Wherever the pre-account code went back to the old main menu, a login with
+ * an account goes back to its roster instead. Returns TRUE when it did.
+ */
+int acct_back_to_roster(struct descriptor_data *d)
+{
+	if (!d || !d->account)
+		return FALSE;
+	account_send_roster(d);
+	STATE(d) = CON_ACCT_MENU;
+	return TRUE;
+}
+
+/*
  * Swap the descriptor onto roster row `pick` (1-based, AS DRAWN).
  *
  * The row numbers are the ones the roster drew, which skip tombstoned
@@ -2184,27 +2216,18 @@ int perform_dupe_check(struct descriptor_data *d)
  *
  * Reads the pfile BEFORE freeing the current character: freeing first would
  * leave the descriptor with no character at all if the read failed.
+ *
+ * Returns TRUE on success, FALSE when the row's pfile cannot be read, and
+ * -1 when there is no such row.
  */
 static int acct_swap_to_row(struct descriptor_data *d, int pick)
 {
 	struct char_file_u f;
 	long pos;
-	int mi, shown = 0, chosen = -1;
+	int chosen;
 
-	if (!d->account || pick <= 0)
-		return FALSE;
-	for (mi = 0; mi < d->account->num_members; mi++) {
-		if (load_char(d->account->members[mi], &f) < 0)
-			continue;
-		if (IS_SET(f.char_specials_saved.act, PLR_DELETED))
-			continue;
-		if (++shown == pick) {
-			chosen = mi;
-			break;
-		}
-	}
-	if (chosen < 0)
-		return FALSE;
+	if ((chosen = account_row_member(d->account, pick)) < 0)
+		return -1;
 	if (!str_cmp(GET_PC_NAME(d->character), d->account->members[chosen]))
 		return TRUE;			/* already standing on it */
 	if ((pos = load_char(d->account->members[chosen], &f)) < 0)
@@ -2228,14 +2251,29 @@ static int acct_swap_to_row(struct descriptor_data *d, int pick)
  */
 static void acct_apply_verb(struct descriptor_data *d, int pick)
 {
-	if (!acct_swap_to_row(d, pick)) {
-		SEND_TO_Q(d, "That is not a character on this account.\r\n");
+	switch (acct_swap_to_row(d, pick)) {
+	case -1:
+		SEND_TO_Q(d, "That's not a character on this account.\r\n");
+		account_send_roster(d);
+		STATE(d) = CON_ACCT_MENU;
+		return;
+	case FALSE:
+		SEND_TO_Q(d, "That character's file could not be read.\r\n");
 		account_send_roster(d);
 		STATE(d) = CON_ACCT_MENU;
 		return;
 	}
 	switch (d->acct_verb) {
 	case 'X':
+		/* Show what is there, then start from empty: the new text
+		 * replaces the old rather than being appended to it. */
+		if (d->character->player.description) {
+			SEND_TO_Q(d, "Current description:\r\n%s",
+				  d->character->player.description);
+			/* kept for /a, which puts it back */
+			d->backstr = d->character->player.description;
+			d->character->player.description = NULL;
+		}
 		SEND_TO_Q(d, "Enter the text others see when they look at %s.\r\n",
 			  GET_PC_NAME(d->character));
 		SEND_TO_Q(d, "(/s saves /h for help)\r\n%c%c", IAC, GA);
@@ -2574,31 +2612,13 @@ void nanny(struct descriptor_data *d, char *argu)
 			GET_BAD_PWS(d->character) = 0;
 			d->bad_pws = 0;
 
-			/* ONE LOGIN, MANY CHARACTERS.
-			 *
-			 * The credential was just verified against the pfile of
-			 * whichever member name was typed, which is the whole
-			 * point of keeping the password in the pfiles and not in
-			 * the account: any member name is a valid way in and
-			 * there is no second authentication path to keep right.
-			 *
-			 * ADDITIVE ON PURPOSE. A character on no roster falls
-			 * straight through to the original one-step entry below,
-			 * so etc/accounts can be filled in incrementally without
-			 * a flag day. */
-			d->account = account_of_char(GET_PC_NAME(d->character));
-			if (d->account) {
-				account_pick_main(d->account);
-				/* Before any character enters: a holder that can
-				 * no longer hold the bank moves only while it is
-				 * out of the world. */
-				account_bank_holder(d->account);
-				save_accounts();
-				account_send_roster(d);
-				STATE(d) = CON_ACCT_MENU;
-				return;
-			}
-
+			/* A 'select' site ban refuses the login outright, BEFORE
+			 * the roster: the roster names every character on the
+			 * account, and someone who can authenticate but is not
+			 * allowed in from this host must not be shown that list.
+			 * It is asked again at the pick, because siteok is a
+			 * per-character flag and the chosen character need not
+			 * be the one typed. */
 			if (isbanned(d->host) == BAN_SELECT &&
 			    !PLR_FLAGGED(d->character, PLR_SITEOK)) {
 				SEND_TO_Q(d,
@@ -2607,6 +2627,52 @@ void nanny(struct descriptor_data *d, char *argu)
 				mudlogf(NRM, LVL_DGOD, TRUE,
 					"Connection attempt for %s denied from %s",
 					GET_PC_NAME(d->character), d->host);
+				return;
+			}
+
+			/* ONE LOGIN, MANY CHARACTERS.
+			 *
+			 * The credential was just verified against the pfile of
+			 * whichever member name was typed, which is the whole
+			 * point of keeping the password in the pfiles and not in
+			 * the account: any member name is a valid way in and
+			 * there is no second authentication path to keep right.
+			 *
+			 * EVERY CHARACTER HAS AN ACCOUNT. One on no roster gets an
+			 * account of one here, so a roster of one and a roster of
+			 * six take the same screen and there is no second login
+			 * flow to keep in step. It is minted in memory only:
+			 * etc/accounts is written when the roster changes, not on
+			 * every connect. */
+			d->account = account_of_char(GET_PC_NAME(d->character));
+			if (d->account) {
+				account_pick_main(d->account);
+				/* Before any character enters: a holder that can
+				 * no longer hold the bank moves only while it is
+				 * out of the world. */
+				account_bank_holder(d->account);
+				save_accounts();
+			} else
+				d->account = account_create_for(GET_PC_NAME(d->character));
+			if (d->account) {
+				/* The failure count was read and zeroed above; save
+				 * the zero, since the character typed need not be the
+				 * one played and nothing else would write it. */
+				if (load_result) {
+					if ((load_room = GET_LOADROOM(d->character)) != NOWHERE)
+						load_room = real_room(load_room);
+					else
+						load_room = NOWHERE;
+					save_char_no_logon(d->character, load_room);
+					SEND_TO_Q(d, "\r\n\r\n\007\007\007"
+						  "%s%d LOGIN FAILURE%s SINCE LAST SUCCESSFUL LOGIN.%s\r\n",
+						  CCRED(d->character, C_SPR), load_result,
+						  (load_result > 1) ? "S" : "",
+						  CCNRM(d->character, C_SPR));
+				}
+				d->acct_enter = 0;
+				account_send_roster(d);
+				STATE(d) = CON_ACCT_MENU;
 				return;
 			}
 
@@ -2714,9 +2780,9 @@ void nanny(struct descriptor_data *d, char *argu)
 			 * set. Walk the roster and keep them equal. */
 			if (d->account) {
 				account_set_password(d->account, argu);
-				SEND_TO_Q(d, "\r\nPassword changed for all %d character(s) "
-					     "on this account.\r\n",
-					  d->account->num_members);
+				if (d->account->num_members > 1)
+					SEND_TO_Q(d, "\r\nPassword changed on all %d characters.\r\n",
+						  d->account->num_members);
 			}
 			SEND_TO_Q(d, "\r\nDone.\r\n");
 			/* clear the screen */
@@ -2905,6 +2971,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			set_default_player_stats(d->character);
 			save_char(d->character, NOWHERE);
 
+			acct_enrol_new(d);
 			SEND_TO_Q(d, "%s", motd);
 			SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: %c%c", IAC, GA);
 			STATE(d) = CON_RMOTD;
@@ -3070,6 +3137,7 @@ void nanny(struct descriptor_data *d, char *argu)
       /** End of stat selection **/
 		save_char(d->character, NOWHERE);	/* save so dc doesn't kill stats */
 
+		acct_enrol_new(d);
 		SEND_TO_Q(d, "%s", motd);
 		SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: %c%c", IAC, GA);
 		STATE(d) = CON_RMOTD;
@@ -3081,6 +3149,23 @@ void nanny(struct descriptor_data *d, char *argu)
 		break;
 
 	case CON_RMOTD:	/* read CR after printing motd   */
+		/* With an account there is no second menu. The RETURN after a
+		 * pick's MOTD enters the game, as "1) ENTER the game" did; any
+		 * other RETURN (background, who) goes back to the roster. */
+		if (d->account) {
+			if (d->acct_enter) {
+				char enter[2] = "1";
+
+				d->acct_enter = 0;
+				STATE(d) = CON_MENU;
+				nanny(d, enter);
+				return;
+			}
+			SEND_TO_Q(d, "\r\n\e[H\e[J\e[r");
+			account_send_roster(d);
+			STATE(d) = CON_ACCT_MENU;
+			break;
+		}
 		SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 		if (port != 4999)
 			SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
@@ -3089,16 +3174,21 @@ void nanny(struct descriptor_data *d, char *argu)
 
 	case CON_ACCT_MENU:	/* the account roster: pick a character */
 		{
-		struct char_file_u tmp_f;
-		int pick, mi, shown = 0, chosen = -1;
+		int pick, mi, chosen = -1;
 
 		if (!d->account) {		/* roster vanished under us */
 			STATE(d) = CON_CLOSE;
 			return;
 		}
+		/* `0` still leaves, beside `Q`: two decades of muscle memory
+		 * type `0`. Only a bare 0, though -- "05" is not a choice. */
+		if (!strcmp(argu, "0")) {
+			SEND_TO_Q(d, "Goodbye.\r\n");
+			STATE(d) = CON_CLOSE;
+			return;
+		}
 		switch (UPPER(*argu)) {
 		case 'Q':
-		case '0':
 			SEND_TO_Q(d, "Goodbye.\r\n");
 			STATE(d) = CON_CLOSE;
 			return;
@@ -3146,37 +3236,29 @@ void nanny(struct descriptor_data *d, char *argu)
 				account_send_roster(d);
 				return;
 			}
-			SEND_TO_Q(d, "\r\nThis character joins your account and keeps "
-				     "the password you already use.\r\n"
-				     "Give me a name for it: %c%c", IAC, GA);
+			SEND_TO_Q(d, "\r\nName your new character: %c%c", IAC, GA);
 			STATE(d) = CON_ACCT_NEWCHAR;
 			return;
 		default:
 			break;
 		}
 
-		/* A NUMBER PICKS A CHARACTER. The row numbers are the ones the
-		 * roster drew, which skip tombstoned members -- so the count has
-		 * to be rebuilt the same way rather than indexing members[]
-		 * directly, or a deleted alt shifts every row below it. */
-		pick = atoi(argu);
-		if (pick <= 0) {
-			SEND_TO_Q(d, "That is not a character on this account.\r\n");
+		/* A NUMBER PICKS A CHARACTER, and only a number: "1abc" is not
+		 * row 1. The row numbers are the ones the roster drew, so the
+		 * count is rebuilt the same way (account_row_member) rather than
+		 * indexing members[] directly, or a deleted alt shifts every row
+		 * below it. */
+		for (mi = 0; argu[mi]; mi++)
+			if (!isdigit((unsigned char) argu[mi]))
+				break;
+		if (!*argu || argu[mi] || *argu == '0') {
+			SEND_TO_Q(d, "That's not a choice!\r\n");
 			account_send_roster(d);
 			return;
 		}
-		for (mi = 0; mi < d->account->num_members; mi++) {
-			if (load_char(d->account->members[mi], &tmp_f) < 0)
-				continue;
-			if (IS_SET(tmp_f.char_specials_saved.act, PLR_DELETED))
-				continue;
-			if (++shown == pick) {
-				chosen = mi;
-				break;
-			}
-		}
-		if (chosen < 0) {
-			SEND_TO_Q(d, "That is not a character on this account.\r\n");
+		pick = atoi(argu);
+		if ((chosen = account_row_member(d->account, pick)) < 0) {
+			SEND_TO_Q(d, "That's not a character on this account.\r\n");
 			account_send_roster(d);
 			return;
 		}
@@ -3206,7 +3288,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			 * descriptor with no character at all. */
 			if ((pick_pos = load_char(d->account->members[chosen],
 						 &pick_store)) < 0) {
-				SEND_TO_Q(d, "That character could not be read. Tell a god.\r\n");
+				SEND_TO_Q(d, "\r\nThat character's file could not be read.  Tell a god.\r\n");
 				account_send_roster(d);
 				return;
 			}
@@ -3221,8 +3303,26 @@ void nanny(struct descriptor_data *d, char *argu)
 		}
 
 		/* THE GATES BELONG TO THE CHARACTER, and at the password prompt
-		 * the character was not yet chosen -- so wizlock and the dupe
-		 * check run HERE, against whoever is actually being played. */
+		 * the character was not yet chosen -- so the site ban, the
+		 * link-load lock, wizlock and the dupe check run HERE, against
+		 * whoever is actually being played. */
+		if (isbanned(d->host) == BAN_SELECT &&
+		    !PLR_FLAGGED(d->character, PLR_SITEOK)) {
+			SEND_TO_Q(d, "\r\nSorry, this char has not been cleared for login from your site!\r\n");
+			STATE(d) = CON_CLOSE;
+			mudlogf(NRM, LVL_DGOD, TRUE,
+				"Connection attempt for %s denied from %s",
+				GET_PC_NAME(d->character), d->host);
+			return;
+		}
+		if (PLR_FLAGGED(d->character, PLR_LINKLOADED)) {
+			SEND_TO_Q(d, "\r\nSorry, this character is being link-loaded by an Implementor. Please log in again in a few minutes.\r\n");
+			STATE(d) = CON_CLOSE;
+			mudlogf(NRM, LVL_DGOD, TRUE,
+				"Connection attempted on link-loaded character %s "
+				"from %s", GET_PC_NAME(d->character), d->host);
+			return;
+		}
 		if (GET_LEVEL(d->character) < circle_restrict) {
 			SEND_TO_Q(d, "The game is temporarily restricted.. try again later.\r\n");
 			STATE(d) = CON_CLOSE;
@@ -3246,6 +3346,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			"%s [%s] has connected.", GET_PC_NAME(d->character), d->host);
 
 		SEND_TO_Q(d, "\r\n\n*** PRESS RETURN: %c%c", IAC, GA);
+		d->acct_enter = 1;		/* this RETURN enters the game */
 		STATE(d) = CON_RMOTD;
 		}
 		return;
@@ -3255,6 +3356,7 @@ void nanny(struct descriptor_data *d, char *argu)
 		struct char_file_u exists;
 		char inherited[MAX_PWD_LENGTH + 1];
 		char *nbuf, *nname;
+		long reuse_pos;
 
 		if (!d->account) {
 			STATE(d) = CON_CLOSE;
@@ -3274,13 +3376,16 @@ void nanny(struct descriptor_data *d, char *argu)
 		    || reserved_word(nbuf)
 		    || !Valid_Name(nname)) {
 			SEND_TO_Q(d, "Invalid name, please try another.\r\n"
-				     "Give me a name for it: %c%c", IAC, GA);
+				     "Name: %c%c", IAC, GA);
 			release_buffer(nbuf);
 			release_buffer(nname);
 			return;
 		}
-		if (load_char(nname, &exists) > -1) {
-			SEND_TO_Q(d, "That name is taken. Try another: %c%c", IAC, GA);
+		/* A TOMBSTONED name counts as free, as it does at the name
+		 * prompt: the new character takes over its pfile slot. */
+		if ((reuse_pos = load_char(nname, &exists)) > -1
+		    && !IS_SET(exists.char_specials_saved.act, PLR_DELETED)) {
+			SEND_TO_Q(d, "That name is taken.\r\nName: %c%c", IAC, GA);
 			release_buffer(nbuf);
 			release_buffer(nname);
 			return;
@@ -3302,23 +3407,22 @@ void nanny(struct descriptor_data *d, char *argu)
 		strcpy(d->character->player.name, CAP(nname));
 		strncpy(GET_PASSWD(d->character), inherited, MAX_PWD_LENGTH);
 		GET_PASSWD(d->character)[MAX_PWD_LENGTH] = '\0';
+		if (reuse_pos > -1)
+			GET_PFILEPOS(d->character) = reuse_pos;
 
-		/* Enrol it BEFORE chargen: if the player drops halfway the name
-		 * is already on the roster, which is recoverable. The reverse --
-		 * a finished character on no roster -- reads to the player as a
-		 * character that vanished. */
-		account_add_char(d->account, GET_PC_NAME(d->character));
-		save_accounts();
+		/* Not enrolled yet: it joins the roster when chargen finishes
+		 * (acct_enrol_new). Enrolled here, a player who typed a name and
+		 * walked away left a row with no pfile behind it. */
 
 		release_buffer(nbuf);
 		release_buffer(nname);
 
-		SEND_TO_Q(d, "New character.\r\n");
-		SEND_TO_Q(d, "\r\nIf you are new to PhoenixMud, we suggest using the "
-			     "most common home town\r\n");
-		SEND_TO_Q(d, "and the recommended stats for your race and class.\r\n");
-		SEND_TO_Q(d, "\r\nAre you new to PhoenixMud (Y/N)? %c%c", IAC, GA);
-		STATE(d) = CON_FIRST_TIME;
+		/* No "are you new" question: whoever is naming an alt is not.
+		 * The default (first-time) start applies, as at the TS menu. */
+		d->first_time = 1;
+		SEND_TO_Q(d, "\r\nThis character uses your account password.\r\n");
+		SEND_TO_Q(d, "\r\nWhat is your sex (M/F)? %c%c", IAC, GA);
+		STATE(d) = CON_QSEX;
 		}
 		return;
 
@@ -3645,6 +3749,8 @@ void nanny(struct descriptor_data *d, char *argu)
 			echo_on(d);
 			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			SEND_TO_Q(d, "\r\nIncorrect password.\r\n");
+			if (acct_back_to_roster(d))
+				return;
 			if (port != 4999)
 				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 			STATE(d) = CON_MENU;
@@ -3662,6 +3768,8 @@ void nanny(struct descriptor_data *d, char *argu)
 			    GET_PASSWD(d->character), MAX_PWD_LENGTH)) {
 			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			SEND_TO_Q(d, "\r\nIncorrect password.\r\n");
+			if (acct_back_to_roster(d))
+				break;
 			if (port != 4999)
 				SEND_TO_Q(d, "%s", MENU);
 			STATE(d) = CON_MENU;
@@ -3691,6 +3799,12 @@ void nanny(struct descriptor_data *d, char *argu)
 			if (GET_LEVEL(d->character) < LVL_GRGOD)
 				SET_BIT(PLR_FLAGS(d->character), PLR_DELETED);
 			save_char(d->character, NOWHERE);
+			/* And off the roster. The pfile stays (its idnum must
+			 * never be reused); the account must not keep a row for a
+			 * name nobody can play. */
+			if (d->account && PLR_FLAGGED(d->character, PLR_DELETED)
+			    && account_remove_char(d->account, GET_PC_NAME(d->character)))
+				save_accounts();
 			Crash_delete_file(GET_NAME(d->character));
 			SEND_TO_Q(d, "Character '%s' deleted!\r\n"
 				  "Goodbye.\r\n", GET_NAME(d->character));
@@ -3703,6 +3817,8 @@ void nanny(struct descriptor_data *d, char *argu)
 		} else {
 			SEND_TO_Q(d, "\e[H\e[J\e[r\e[1m\e[36m");
 			SEND_TO_Q(d, "\r\nCharacter not deleted.\r\n");
+			if (acct_back_to_roster(d))
+				break;
 			if (port != 4999)
 				SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 			STATE(d) = CON_MENU;
@@ -3722,6 +3838,8 @@ void nanny(struct descriptor_data *d, char *argu)
 			"E-mail: %s changed e-mail address to \"%s\".",
 			GET_NAME(d->character), GET_EMAIL(d->character));
 		save_char(d->character, IN_ROOM(d->character));
+		if (acct_back_to_roster(d))
+			break;
 		SEND_TO_Q(d, "%s%c%c", MENU, IAC, GA);
 		STATE(d) = CON_MENU;
 		break;

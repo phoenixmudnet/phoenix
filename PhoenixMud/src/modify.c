@@ -15,6 +15,7 @@
 #include "buffer.h"
 #include "utils.h" 
 #include "interpreter.h" 
+#include "account.h"
 #include "handler.h" 
 #include "db.h" 
 #include "comm.h" 
@@ -889,8 +890,19 @@ void string_add(struct descriptor_data *d, char *str)
 	 { 
 	 if (terminator != 1)
 	    SEND_TO_Q(d,"Description aborted.\r\n"); 
-	 SEND_TO_Q(d, "%s", MENU); 
-	 STATE(d) = CON_MENU; 
+	 if (d->account)
+	    {
+	    /* The description belongs to whichever member was picked; save
+	     * it, since the roster is not in the game and nothing else will. */
+	    save_char(d->character, NOWHERE);
+	    SEND_TO_Q(d, "\e[H\e[J\e[r");
+	    acct_back_to_roster(d);
+	    }
+	 else
+	    {
+	    SEND_TO_Q(d, "%s", MENU); 
+	    STATE(d) = CON_MENU; 
+	    }
 	 } 
       else if (STATE(d) == CON_TEXTED || STATE(d) == CON_ADD_NEWS)
 	 {

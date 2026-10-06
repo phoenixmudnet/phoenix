@@ -1939,9 +1939,13 @@ void extract_char(struct char_data * ch)
 
    if (!freed && ch->desc != NULL)
       {
-      STATE(ch->desc) = CON_MENU;
-      if(port!=4999)
-         SEND_TO_Q(ch->desc, "%s", MENU);
+      /* With an account, back to the roster, not the old menu. */
+      if (!acct_back_to_roster(ch->desc))
+         {
+         STATE(ch->desc) = CON_MENU;
+         if(port!=4999)
+            SEND_TO_Q(ch->desc, "%s", MENU);
+         }
       }
    else
       {
