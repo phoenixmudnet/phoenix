@@ -210,10 +210,20 @@ int account_remove_char(struct account_data *acct, char *char_name)
    acct->num_members--;
 
    if (acct->num_members <= 0) {
+      struct descriptor_data *dd;
       int i = acct - account_list;
       for (k = i; k < top_of_accountt - 1; k++)
          account_list[k] = account_list[k + 1];
       top_of_accountt--;
+      /* Every account after this one moved down a slot. A descriptor
+       * holding a pointer into the list must move with it, or it is left
+       * on its neighbour's roster. */
+      for (dd = descriptor_list; dd; dd = dd->next) {
+         if (dd->account == acct)
+            dd->account = NULL;
+         else if (dd->account > acct && dd->account < account_list + top_of_accountt + 1)
+            dd->account--;
+      }
       return TRUE;
    }
    if (!str_cmp(acct->name, char_name))
@@ -515,6 +525,8 @@ extern const float class_exp_multipliers[];
 extern const float race_exp_multipliers[];
 extern char *pc_race_types[];
 extern char *pc_class_types[];
+extern const char *scr_male_pc_class_types[];
+extern const char *scr_female_pc_class_types[];
 void save_char_ascii(struct char_file_u *ch);
 
 /*
@@ -606,21 +618,88 @@ static void roster_optline(struct descriptor_data *d, char *k1, char *l1,
  * 15-wide account field, all five columns and the 3x3 option block. The two
  * engines draw the same screen because a player crosses between them.
  */
+/* Is member j a row on the roster? A tombstoned member is not. A member
+ * whose record cannot be read IS: it is drawn as "(unreadable)" rather than
+ * dropped, because a character vanishing off the screen is the one failure a
+ * player cannot tell from a deletion. */
+static int acct_member_drawn(struct account_data *acct, int j)
+{
+   struct char_file_u f;
+
+   if (load_char_record(acct->members[j], &f) < 0)
+      return TRUE;
+   return !IS_SET(f.char_specials_saved.act, PLR_DELETED);
+}
+
+/* How many rows the roster draws. */
+int account_row_count(struct account_data *acct)
+{
+   int j, n = 0;
+
+   if (!acct)
+      return 0;
+   for (j = 0; j < acct->num_members; j++)
+      if (acct_member_drawn(acct, j))
+         n++;
+   return n;
+}
+
+/* The member index on roster row `row` (1-based), or -1. Rows are counted
+ * exactly as account_send_roster draws them, so a number always means the
+ * line the player is looking at. */
+int account_row_member(struct account_data *acct, int row)
+{
+   int j, n = 0;
+
+   if (!acct || row <= 0)
+      return -1;
+   for (j = 0; j < acct->num_members; j++)
+      if (acct_member_drawn(acct, j) && ++n == row)
+         return j;
+   return -1;
+}
+
+/* What the Next level column says for a character that cannot gain: the
+ * tier it holds, the quest it is waiting on, or that it is staff. The tier
+ * comes from remort count, as the guildmaster names it (guild.c:713-723). */
+static void roster_capped_label(char *out, size_t len, int level, int remorts)
+{
+   static const char *tier[] = { "Hero", "Angel", "Avatar", "Demi-God" };
+   int t = remorts < 0 ? 0 : remorts > 3 ? 3 : remorts;
+
+   if (level >= LVL_IMMORT)
+      snprintf(out, len, "immortal");
+   else if (level >= LVL_HERO)
+      snprintf(out, len, "%s", tier[t]);
+   else if (level == LVL_HERO - 1)
+      snprintf(out, len, "%s quest", tier[t]);
+   else
+      snprintf(out, len, "--");
+}
+
+/* A remorted base class shows its remort name (Elite Warrior, Priestess). */
+static const char *roster_class_name(struct char_file_u *f)
+{
+   int cls = (int) f->class;
+
+   if (cls < CLASS_KENSAI && f->player_specials_saved.times_remorted > 0)
+      return f->sex == SEX_FEMALE ? scr_female_pc_class_types[cls]
+                                  : scr_male_pc_class_types[cls];
+   return pc_class_types[cls] ? pc_class_types[cls] : "?";
+}
+
 void account_send_roster(struct descriptor_data *d)
 {
    struct char_file_u f;
    char nm[128], lv[16], nx[64], tag[32], span[16];
-   int j, shown = 0, total = 0;
+   int j, shown = 0, total;
 
    if (!d || !d->account)
       return;
 
-   /* Count first: the Play span reads "1-N" and N is the DRAWN rows, which
-    * skip tombstones -- so it cannot be num_members. */
-   for (j = 0; j < d->account->num_members; j++)
-      if (load_char_record(d->account->members[j], &f) >= 0
-          && !IS_SET(f.char_specials_saved.act, PLR_DELETED))
-         total++;
+   /* The Play span reads "1-N" and N is the DRAWN rows, which skip
+    * tombstones -- so it cannot be num_members. */
+   total = account_row_count(d->account);
 
    SEND_TO_Q(d, ACCT_FRAME "\r\n");
    SEND_TO_Q(d, "        ____________________________ \r\n");
@@ -640,11 +719,14 @@ void account_send_roster(struct descriptor_data *d)
    roster_rule(d);
 
    for (j = 0; j < d->account->num_members; j++) {
-      if (load_char_record(d->account->members[j], &f) < 0)
-         continue;
-      if (IS_SET(f.char_specials_saved.act, PLR_DELETED))
+      if (!acct_member_drawn(d->account, j))
          continue;
       shown++;
+      if (load_char_record(d->account->members[j], &f) < 0) {
+         snprintf(nm, sizeof(nm), "%d) %s", shown, d->account->members[j]);
+         roster_row(d, nm, "", "(unreadable)", "", "", "", FALSE);
+         continue;
+      }
       snprintf(nm, sizeof(nm), "%d) %s", shown, f.name);
       snprintf(lv, sizeof(lv), "%d", f.level);
 
@@ -657,7 +739,8 @@ void account_send_roster(struct descriptor_data *d)
                        f.level, f.player_specials_saved.times_remorted);
          long have = f.points.exp;
          if (f.level >= LVL_HERO - 1 || need <= 0)
-            strcpy(nx, "--");
+            roster_capped_label(nx, sizeof(nx), f.level,
+                                f.player_specials_saved.times_remorted);
          else {
             int pct = (have <= 0) ? 0 : (have >= need) ? 100 : (int) ((have * 100) / need);
             char bar[16];
@@ -669,13 +752,16 @@ void account_send_roster(struct descriptor_data *d)
          }
       }
 
+      /* The markers hang off the table's right edge: "main", and
+       * "playing" for a character already in the world. */
       tag[0] = '\0';
       if (!str_cmp(f.name, d->account->name))
          strcpy(tag, "main");
+      if (acct_in_world(f.name))
+         strcat(tag, *tag ? " playing" : "playing");
       roster_row(d, nm,
                  pc_race_types[(int) f.race] ? pc_race_types[(int) f.race] : "?",
-                 pc_class_types[(int) f.class] ? pc_class_types[(int) f.class] : "?",
-                 lv, nx, tag, FALSE);
+                 (char *) roster_class_name(&f), lv, nx, tag, FALSE);
    }
    if (!shown)
       roster_row(d, "(none yet)", "", "", "", "", "", FALSE);

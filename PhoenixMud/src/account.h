@@ -104,6 +104,10 @@ int  account_online_count(struct account_data *acct);
 
 void account_pick_main(struct account_data *acct);
 void account_send_roster(struct descriptor_data *d);
+int  account_row_count(struct account_data *acct);
+int  account_row_member(struct account_data *acct, int row);
+/* interpreter.c: send an account login back to its roster (TRUE if it has one) */
+int  acct_back_to_roster(struct descriptor_data *d);
 void account_set_password(struct account_data *acct, char *raw);
 
 /* Where a character's bank lives. Returns the account's holder, or the

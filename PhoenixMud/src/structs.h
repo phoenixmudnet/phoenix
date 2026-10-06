@@ -1969,15 +1969,19 @@ struct descriptor_data {
    struct char_data *original;	/* original char if switched		*/
    struct descriptor_data *snooping; /* Who is this char snooping	*/
    struct descriptor_data *snoop_by; /* And who is snooping this char	*/
-   /* The roster this login resolved to, or NULL for a character on no
-    * account -- which is the pre-account behaviour and stays supported.
-    * Not owned: it points into account_list and is cleared when the
-    * descriptor goes. */
+   /* The roster this login resolved to. Every character has one once its
+    * password is accepted (a solo character gets an account of one); NULL
+    * before that. Not owned: it points into account_list and is cleared
+    * when the descriptor goes. */
    struct account_data *account;
    /* Which per-character verb (D/X/E) is waiting on a row number, so the
     * pick and the action stay one exchange apart without a second state
     * machine. 0 = nothing pending. */
    char acct_verb;
+   /* Set when the MOTD on screen is the one shown after a character was
+    * picked or made: the RETURN that follows enters the game. Clear, that
+    * RETURN goes back to the roster. */
+   char acct_enter;
    struct descriptor_data *next; /* link to next descriptor		*/
    struct olc_data *olc;	     /*. OLC info - defined in olc.h   .*/
    char *storage;
