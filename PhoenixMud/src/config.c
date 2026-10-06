@@ -312,7 +312,7 @@ const char * GREETINGS =   /* -naj greetings 12/16/96 - changed this since i was
 "\x1B[36m                                                 \x1B[31m          (/   \\\\ / \\\\\\ \r\n"
 "\x1B[36m              M        U       D                 \x1B[31m               //  //\\\\\\\r\n"
 "\x1B[36m                                                 \x1B[31m              ((  ((   \\\\ \r\n"
-"\x1B[36m	   	    VERSION 4.0			  \x1B[31m \r\n"
+"\x1B[36m	   	    			  \x1B[31m \r\n"
 "\x1B[36m						  \x1B[31m \r\n"
 "\r\n"
 "\x1B[32m                Brought to you by:                \r\n" 
