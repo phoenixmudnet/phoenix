@@ -205,7 +205,7 @@ char *class_menu_choices[] =
     "  [P]aladin        --Holy warriors.\r\n",
     "  A[n]ti-Paladin   --Evil holy warriors.\r\n",
     "  [D]ruid          --Nature oriented clerics.\r\n",
-    "  M[e]rchant       --Master traders that trade their way to the top.\r\n\n",
+    "  Merchant - retired; not selectable from class menu.\r\n",
     "  Remort1  - not selectable from class menu.\r\n",
     "  Remort2  - not selectable from class menu.\r\n",
     "  Remort3  - not selectable from class menu.\r\n",
@@ -283,9 +283,8 @@ int parse_class_for_menu(char arg)
     case 'd':
       return CLASS_DRUID;
       break;
-    case 'e':
-      return CLASS_MERCHANT;
-      break;
+      /* case 'e': -- MERCHANT RETIRED: no race may be one (LEGAL_CLASS), and
+       * the menu never listed it; the key now answers like any other. */
     case '1': /* Remort class not selectable from class menu.   */
     case '2': /* Remort class not selectable from class menu.   */
     case '3': /* Remort class not selectable from class menu.   */
