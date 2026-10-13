@@ -17,6 +17,7 @@
 #include "structs.h"
 #include "obj_instance.h"
 #include "hero_state.h"
+#include "classweapon.h"
 #include "comm.h"
 #include "handler.h"
 #include "tsplayer.h"
@@ -2214,6 +2215,7 @@ int parse_xap_obj(char *filename, struct obj_data **obj,char *line,
       obj_apply_instance_facts(*obj, pr, &facts);
       }
    obj_facts_free(&facts);
+   cw_loaded(*obj);   /* a class weapon takes the form it was saved in */
    return TRUE;
    }
 

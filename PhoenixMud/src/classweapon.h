@@ -22,6 +22,8 @@ int  cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount);
 int  cw_damage_mod(struct char_data *ch, struct char_data *victim, int dam,
                    int attacktype);
 void cw_boss_killed(struct char_data *killer, struct char_data *victim);
+/* a copy just loaded from a file takes the form it was saved in */
+void cw_loaded(struct obj_data *obj);
 /* every two seconds: a tank or cast focus's pool pays out */
 void cw_focus_tick(void);
 
