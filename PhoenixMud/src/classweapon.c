@@ -31,6 +31,15 @@
 #include "classweapon.h"
 
 extern struct char_data *mob_proto;
+extern struct obj_data *obj_proto;
+extern struct str_app_type str_app[];
+int untrained_weapon_prof(struct char_data *ch, struct obj_data *obj);
+int get_prof(struct char_data *ch, struct obj_data *wielded);
+char *skill_name(int num);
+int invalid_class(struct char_data *ch, struct obj_data *obj);
+int invalid_race(struct char_data *ch, struct obj_data *obj);
+int invalid_align(struct char_data *ch, struct obj_data *obj);
+int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message);
 extern struct index_data *obj_index;
 extern const int exp_table[];
 extern const float class_exp_multipliers[];
@@ -67,6 +76,13 @@ int class_weapons = FALSE;
 #define FOCUS_HOT_HP         12
 #define FOCUS_HOT_MANA       12
 #define FOCUS_HOT_TICKS      3
+#define BLOWS_PER_WEAR       600
+#define INDESTRUCTIBLE_PTS   175
+#define INDESTRUCTIBLE_WEAR  2
+/* the form's combat flags a class weapon takes on: glow, hum, magic, bless,
+ * the three anti-alignments, two-handed, brittle, resistant */
+#define CW_FORM_FLAGS ((1 << 0) | (1 << 1) | (1 << 6) | (1 << 8) | (1 << 9) | (1 << 10) | \
+                       (1 << 11) | (1 << 16) | (1 << 20) | (1 << 21))
 #define BOSS_BAND            10
 #define BOSS_BAND_MIN        20
 
@@ -121,7 +137,7 @@ static const char *cw_service_stems[] =
 static const long cw_crafters[] = { 27498, 27497, 27496, 27499, 0 };
 
 /* the class weapon commands, opened at boot when the switch is on */
-static const char *cw_commands[] = { "temper", "focus", NULL };
+static const char *cw_commands[] = { "temper", "focus", "infuse", "shift", "refit", NULL };
 
 /* the focus: one at a time, each with its own growth points */
 static const char *cw_focus_names[HERO_NUM_FOCUS] = { NULL, "dps", "heal", "tank", "cast" };
@@ -427,6 +443,208 @@ static struct obj_data *cw_owned(struct char_data *ch)
    return NULL;
    }
 
+/* ---------------------------------------------------------------- forms */
+
+static int cw_held_kind(struct obj_data *obj);
+
+/* a weapon's life with shop repairs (the repairman's rules): the wears it
+ * takes and the repairs it gets, repaired whenever the next wear would
+ * leave it at half or below, until its maximum is spent */
+static void cw_shop_life(int points, int per, long *wears, long *repairs)
+   {
+   int max = points, cur = points;
+
+   *wears = *repairs = 0;
+   while (max >= 1)
+      {
+      if (cur - per < 0 || (double)(cur - per) / max <= 0.5)
+         {
+         if (cur == max)
+            {
+            cur -= per;
+            (*wears)++;
+            }
+         max -= ((double)cur / max > 0.5) ? 1 : 2;
+         cur = max;
+         (*repairs)++;
+         continue;
+         }
+      cur -= per;
+      (*wears)++;
+      }
+   }
+
+/* a form's life: its weapon's life with shop repairs in landed blows, cut
+ * into one charge a repair and one before the first; *refits how often it
+ * can be filled again */
+static long cw_form_charge(long vnum, long *refits)
+   {
+   obj_rnum r = real_object(vnum);
+   int points = r >= 0 ? GET_OBJ_OSLOTS(&obj_proto[r]) : 0, per = 4;
+   long wears, repairs, charge;
+
+   if (r >= 0 && IS_SET(GET_OBJ_EXTRA(&obj_proto[r]), ITEM_RESISTANT))
+      per = 2;
+   else if (r >= 0 && IS_SET(GET_OBJ_EXTRA(&obj_proto[r]), ITEM_BRITTLE))
+      per = 8;
+   if (points > 0)
+      cw_shop_life(points, per, &wears, &repairs);
+   else
+      cw_shop_life(INDESTRUCTIBLE_PTS, INDESTRUCTIBLE_WEAR, &wears, &repairs);
+   charge = (long)cw_floor((double)wears * BLOWS_PER_WEAR / (repairs + 1) + 0.5);
+   if (refits)
+      *refits = repairs;
+   return MAX(1, charge);
+   }
+
+static int cw_refits_left(struct hero_form *f)
+   {
+   long refits;
+
+   cw_form_charge(f->vnum, &refits);
+   return MAX(0, (int)refits - MAX(0, f->refits));
+   }
+
+/* the copy takes a base: the stats and traits of t, the class weapon's own
+ * name and descriptions kept */
+static void cw_apply_base(struct obj_data *obj, struct obj_data *t, struct obj_data *core)
+   {
+   int i;
+
+   GET_OBJ_TYPE(obj) = GET_OBJ_TYPE(t);
+   for (i = 0; i < NUM_OBJ_VAL_POSITIONS; i++)
+      GET_OBJ_VAL(obj, i) = GET_OBJ_VAL(t, i);
+   GET_OBJ_WEIGHT(obj) = GET_OBJ_WEIGHT(t);
+   GET_OBJ_COST(obj) = GET_OBJ_COST(t);
+   for (i = 0; i < MAX_OBJ_AFFECT; i++)
+      obj->affected[i] = t->affected[i];
+   for (i = 0; i < MAX_SPELL_AFFECT; i++)
+      obj->spell_affect[i] = t->spell_affect[i];
+   GET_OBJ_EXTRA(obj) = GET_OBJ_EXTRA(core) | (t == core ? 0 : (GET_OBJ_EXTRA(t) & CW_FORM_FLAGS));
+   GET_OBJ_ANTI(obj) = GET_OBJ_ANTI(t);
+   obj->obj_flags.bitvector = t->obj_flags.bitvector;
+   }
+
+/* rebuild the copy from its state: the form it is in (or its own), and the
+ * wearer's applies off and on again around it */
+static void cw_refresh(struct obj_data *obj)
+   {
+   struct hero_data *h = obj->hero;
+   struct char_data *wearer = obj->worn_by;
+   int pos = obj->worn_on;
+   obj_rnum cr, fr;
+
+   if (!h || (cr = real_object(h->core)) < 0)
+      return;
+   fr = h->form != HERO_CORE_FORM ? real_object(h->form) : -1;
+   if (h->form != HERO_CORE_FORM && fr < 0)
+      h->form = HERO_CORE_FORM;   /* a form gone from the world: its own */
+   if (wearer)
+      unequip_char(wearer, pos);
+   cw_apply_base(obj, fr >= 0 ? &obj_proto[fr] : &obj_proto[cr], &obj_proto[cr]);
+   if (wearer)
+      equip_char(wearer, obj, pos);
+   }
+
+/* a loaded copy (rent, house, corpse) takes the form it was saved in */
+void cw_loaded(struct obj_data *obj)
+   {
+   if (obj && obj->hero && obj->hero->form != HERO_CORE_FORM && !obj->worn_by)
+      cw_refresh(obj);
+   }
+
+/* could the character use this as the class weapon's form: wield it (or,
+ * for a held class weapon, hold it), as they stand; NULL when so */
+static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
+                                   struct obj_data *o, char *why)
+   {
+   obj_rnum cr = real_object(h->core);
+   int held = cr >= 0 && cw_held_kind(&obj_proto[cr]);
+   int t = GET_OBJ_VAL(o, 3);
+
+   if (held)
+      {
+      if (!CAN_WEAR(o, ITEM_WEAR_HOLD) || !(GET_OBJ_TYPE(o) == ITEM_ARMOR ||
+          GET_OBJ_TYPE(o) == ITEM_WORN || GET_OBJ_TYPE(o) == ITEM_TREASURE ||
+          GET_OBJ_TYPE(o) == ITEM_OTHER))
+         sprintf(why, "%s is not something your class weapon can take the form of: it takes "
+                 "things held, never weapons, lights, wands, staves or containers.",
+                 o->short_description);
+      else if (GET_LEVEL(ch) < LVL_IMMORT &&   /* as equip_char lets an immortal */
+               (invalid_class(ch, o) || invalid_race(ch, o) || invalid_align(ch, o)))
+         sprintf(why, "%s is not for your kind to hold.", o->short_description);
+      else if (!can_wear_lr(ch, o, FALSE))
+         sprintf(why, "You are not experienced enough to use %s.", o->short_description);
+      else
+         return NULL;
+      return why;
+      }
+   if (GET_OBJ_TYPE(o) != ITEM_WEAPON && GET_OBJ_TYPE(o) != ITEM_FIREWEAPON)
+      sprintf(why, "%s is no weapon.", o->short_description);
+   else if (GET_OBJ_WEIGHT(o) > str_app[STRENGTH_APPLY_INDEX(ch)].wield_w)
+      sprintf(why, "%s is too heavy for you to use.", o->short_description);
+   else if ((IS_CLERIC(ch) || IS_DRUID(ch)) && (t == 2 || t == 3 || t == 6 || t == 7 ||
+            t == 8 || t == 9 || t == 10 || t == 13 || t == 15))
+      strcpy(why, "The Gods that grant your powers forbid you to cut flesh!!");
+   else if (IS_MAGIC_USER(ch) && (t == 3 || t == 10 || t == 13 || t == 15))
+      strcpy(why, "That weapon would interfere with your magic!");
+   else if (untrained_weapon_prof(ch, o))
+      sprintf(why, "You have no training with %s weapons.", skill_name(get_prof(ch, o)));
+   else if (GET_LEVEL(ch) < LVL_IMMORT &&   /* as equip_char lets an immortal */
+               (invalid_class(ch, o) || invalid_race(ch, o) || invalid_align(ch, o)))
+      sprintf(why, "%s is not for your kind to wield.", o->short_description);
+   else if (!can_wear_lr(ch, o, FALSE))
+      sprintf(why, "You are not experienced enough to use %s.", o->short_description);
+   else
+      return NULL;
+   return why;
+   }
+
+/* "Forms: core, the Holy Avenger 80% (95 refits), a dwarven hammer spent (0 refits)." */
+static void cw_form_list(struct obj_data *obj, char *out)
+   {
+   struct hero_data *h = obj->hero;
+   obj_rnum r;
+   long full;
+   int i;
+
+   if (!h->num_forms)
+      {
+      r = real_object(h->core);
+      strcpy(out, r >= 0 && cw_held_kind(&obj_proto[r])
+             ? "It knows no forms yet; infuse something you hold at a smith."
+             : "It knows no forms yet; infuse a weapon at a smith.");
+      return;
+      }
+   strcpy(out, "Forms: core");
+   for (i = 0; i < h->num_forms; i++)
+      {
+      r = real_object(h->forms[i].vnum);
+      full = cw_form_charge(h->forms[i].vnum, NULL);
+      sprintf(out + strlen(out), ", %s ", r >= 0 ? obj_proto[r].short_description : "something lost");
+      if (h->forms[i].charge > 0)
+         sprintf(out + strlen(out), "%d%%",
+                 (int)MIN(100, cw_floor(100.0 * h->forms[i].charge / full + 0.5)));
+      else
+         strcat(out, "spent");
+      sprintf(out + strlen(out), " (%d refits)", cw_refits_left(&h->forms[i]));
+      }
+   strcat(out, ".");
+   }
+
+/* a form the weapon knows, by a word of that weapon's name */
+static struct hero_form *cw_find_form(struct hero_data *h, char *arg)
+   {
+   obj_rnum r;
+   int i;
+
+   for (i = 0; i < h->num_forms; i++)
+      if ((r = real_object(h->forms[i].vnum)) >= 0 &&
+          (isname(arg, obj_proto[r].name) || strstr(obj_proto[r].short_description, arg)))
+         return &h->forms[i];
+   return NULL;
+   }
+
 /* ---------------------------------------------------------------- bosses */
 
 static uint32_t cw_mix(long a, long b)
@@ -640,6 +858,27 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
       p->mana = obj->hero->focus == HERO_FOCUS_CAST ? per : 0;
       p->ticks = FOCUS_HOT_TICKS;
       }
+   /* a borrowed form spends its charge, a blow at a time */
+   if (obj->hero->form != HERO_CORE_FORM)
+      {
+      struct hero_form *f = NULL;
+      int i;
+
+      for (i = 0; i < obj->hero->num_forms; i++)
+         if (obj->hero->forms[i].vnum == obj->hero->form)
+            f = &obj->hero->forms[i];
+      if (f && f->charge > 0)
+         f->charge--;
+      if (!f || f->charge <= 0)
+         {
+         obj->hero->form = HERO_CORE_FORM;
+         cw_refresh(obj);
+         send_to_char(ch, "&Y%s's borrowed form is spent and it is back to its own form: %s.&n\r\n",
+                      obj->short_description, f && cw_refits_left(f) > 0
+                      ? "refit it at a smith's station to use it again"
+                      : "it is worn out; infuse another of that weapon to make it new");
+         }
+      }
    cw_grow(ch, obj, POINTS_PER_HIT);
    }
 
@@ -770,10 +1009,39 @@ void cw_give_first(struct char_data *ch)
 /* one weapon for life, through remorts: its bonus is the class the
  * character is, and its own form is that class's weapon. The character is
  * naked to remort, so it is carried, not worn. */
+/* the copy becomes another template's: its name, descriptions and wear
+ * flags follow, and the world's count of each */
+static void cw_switch_template(struct obj_data *o, long vnum)
+   {
+   obj_rnum old = GET_OBJ_RNUM(o), nr = real_object(vnum);
+
+   if (nr < 0 || old == nr)
+      return;
+   if (old >= 0)
+      {
+      if (o->name == obj_proto[old].name)
+         o->name = obj_proto[nr].name;
+      if (o->description == obj_proto[old].description)
+         o->description = obj_proto[nr].description;
+      if (o->short_description == obj_proto[old].short_description)
+         o->short_description = obj_proto[nr].short_description;
+      if (o->action_description == obj_proto[old].action_description)
+         o->action_description = obj_proto[nr].action_description;
+      if (o->ex_description == obj_proto[old].ex_description)
+         o->ex_description = obj_proto[nr].ex_description;
+      obj_index[old].number--;
+      }
+   o->item_number = nr;
+   obj_index[nr].number++;
+   o->obj_flags.wear_flags = obj_proto[nr].obj_flags.wear_flags;
+   }
+
 void cw_reclass(struct char_data *ch)
    {
    struct obj_data *o;
+   obj_rnum fr;
    long next;
+   char why[256];
 
    if (!class_weapons || IS_NPC(ch))
       return;
@@ -784,7 +1052,15 @@ void cw_reclass(struct char_data *ch)
       o->hero->cls = GET_CLASS(ch);
       next = cw_first[(int)GET_CLASS(ch)];
       if (next > 0 && real_object(next) >= 0)
+         {
          o->hero->core = next;
+         cw_switch_template(o, next);
+         }
+      /* a form the new class may not use goes back to the weapon's own */
+      if (o->hero->form != HERO_CORE_FORM &&
+          ((fr = real_object(o->hero->form)) < 0 || cw_form_refusal(ch, o->hero, &obj_proto[fr], why)))
+         o->hero->form = HERO_CORE_FORM;
+      cw_refresh(o);
       }
    }
 
@@ -1038,6 +1314,191 @@ ACMD(do_focus)
    release_buffer(line);
    }
 
+/* ---------------------------------------------------------------- the smith */
+
+static struct obj_data *cw_carried(struct char_data *ch)
+   {
+   struct obj_data *o;
+
+   for (o = ch->carrying; o; o = o->next_content)
+      if (cw_mine(o, ch))
+         return o;
+   return NULL;
+   }
+
+/* infuse <weapon>: at a smith's station, the carried class weapon absorbs a
+ * weapon (for a held one, something held) the character could use as they
+ * stand; it becomes a form at full charge, or a known form is made new */
+ACMD(do_infuse)
+   {
+   struct obj_data *hero, *other;
+   struct hero_data *h;
+   struct hero_form *f;
+   char *arg = get_buffer(MAX_INPUT_LENGTH), *why = get_buffer(512);
+   char word[MAX_INPUT_LENGTH], what[MAX_STRING_LENGTH];
+   long vnum;
+   int i, known;
+
+   one_argument(argument, arg);
+   if (!class_weapons)
+      send_to_char(ch, "Huh?!?\r\n");
+   else if (!*arg)
+      send_to_char(ch, "Infuse what? A weapon you carry (for a Monk, something you hold), into "
+                   "your class weapon, at a smith's station.\r\n");
+   else if (!cw_at_smith(ch))
+      send_to_char(ch, "There is no smith's station here: a forge, a smithy, or a smith at his "
+                   "work.\r\n");
+   else if (!(hero = cw_carried(ch)))
+      send_to_char(ch, "Your class weapon must be carried, not in your hands, to absorb "
+                   "anything.\r\n");
+   else if (!(other = get_obj_in_list_vis(ch, arg, ch->carrying)))
+      send_to_char(ch, "You are not carrying %s %s.\r\n", AN(arg), arg);
+   else if (other == hero || other->hero)
+      send_to_char(ch, "A class weapon cannot absorb itself or another class weapon.\r\n");
+   else if (other->bound_idnum > 0 && other->bound_idnum != GET_IDNUM(ch))
+      send_to_char(ch, "%s is %s's.\r\n", other->short_description, other->bound_name);
+   else if (cw_form_refusal(ch, (h = hero->hero), other, why))
+      send_to_char(ch, "%s\r\n", why);
+   else if ((vnum = GET_OBJ_VNUM(other)) == h->core)
+      send_to_char(ch, "%s is the weapon's own form already.\r\n", other->short_description);
+   else
+      {
+      for (f = NULL, i = 0; i < h->num_forms; i++)
+         if (h->forms[i].vnum == vnum)
+            f = &h->forms[i];
+      if (!f && h->num_forms >= HERO_MAX_FORMS)
+         send_to_char(ch, "%s can hold no more forms.\r\n", hero->short_description);
+      else
+         {
+         strcpy(what, other->short_description);
+         one_argument(other->name, word);
+         obj_from_char(other);
+         extract_obj(other);
+         known = (f != NULL);
+         if (!f)
+            f = &h->forms[h->num_forms++];
+         f->vnum = vnum;
+         f->charge = cw_form_charge(vnum, NULL);
+         f->refits = 0;   /* another of the same weapon: a new life */
+         if (known)
+            send_to_char(ch, "&Y%s absorbs %s: the form is new again.&n\r\n",
+                         hero->short_description, what);
+         else
+            send_to_char(ch, "&Y%s absorbs %s: it can take that form now. shift %s.&n\r\n",
+                         hero->short_description, what, word);
+         }
+      }
+   release_buffer(arg);
+   release_buffer(why);
+   }
+
+/* shift <form> | shift core: the carried class weapon takes a form it has
+ * absorbed, with its levels and bonus on top; shift alone lists them */
+ACMD(do_shift)
+   {
+   struct obj_data *obj;
+   struct hero_data *h;
+   struct hero_form *f;
+   obj_rnum r;
+   char *arg = get_buffer(MAX_INPUT_LENGTH), *buf = get_buffer(MAX_STRING_LENGTH);
+   char why[512];
+
+   one_argument(argument, arg);
+   if (!class_weapons)
+      send_to_char(ch, "Huh?!?\r\n");
+   else if (!(obj = cw_carried(ch)))
+      send_to_char(ch, "Your class weapon must be carried, not in your hands, to shift.\r\n");
+   else if (!*arg)
+      {
+      cw_form_list(obj, buf);
+      send_to_char(ch, "shift <form>: %s\r\n", buf);
+      }
+   else if (!str_cmp(arg, "core") || !str_cmp(arg, "own") || !str_cmp(arg, "self"))
+      {
+      if ((h = obj->hero)->form == HERO_CORE_FORM)
+         send_to_char(ch, "%s is in its own form.\r\n", obj->short_description);
+      else
+         {
+         h->form = HERO_CORE_FORM;
+         cw_refresh(obj);
+         send_to_char(ch, "&Y%s is back to its own form.&n\r\n", obj->short_description);
+         }
+      }
+   else if (!(f = cw_find_form((h = obj->hero), arg)) || (r = real_object(f->vnum)) < 0)
+      {
+      cw_form_list(obj, buf);
+      send_to_char(ch, "%s knows no form called '%s'. %s\r\n", obj->short_description, arg, buf);
+      }
+   else if (f->charge <= 0)
+      send_to_char(ch, cw_refits_left(f) > 0
+                   ? "The form of %s is spent; refit it at a smith's station.\r\n"
+                   : "The form of %s is worn out; infuse another of that weapon to make it new.\r\n",
+                   obj_proto[r].short_description);
+      else if (cw_form_refusal(ch, h, &obj_proto[r], why))
+      send_to_char(ch, "Not as you stand: %s\r\n", why);
+   else
+      {
+      h->form = f->vnum;
+      cw_refresh(obj);
+      send_to_char(ch, "&Y%s takes the form of %s, with your levels and bonus on top; charge %d%%.&n\r\n",
+                   obj->short_description, obj_proto[r].short_description,
+                   (int)MIN(100, cw_floor(100.0 * f->charge / cw_form_charge(f->vnum, NULL) + 0.5)));
+      }
+   release_buffer(arg);
+   release_buffer(buf);
+   }
+
+/* refit <form>: at a smith's station, a spent form filled to a full charge
+ * again, as often as its weapon would have been repaired over its life */
+ACMD(do_refit)
+   {
+   struct obj_data *obj;
+   struct hero_form *f;
+   obj_rnum r;
+   char *arg = get_buffer(MAX_INPUT_LENGTH), *buf = get_buffer(MAX_STRING_LENGTH);
+   long full;
+   int left;
+
+   one_argument(argument, arg);
+   if (!(obj = cw_carried(ch)))
+      obj = cw_in_hand(ch);
+   if (!class_weapons)
+      send_to_char(ch, "Huh?!?\r\n");
+   else if (!obj)
+      send_to_char(ch, "You have no class weapon to refit.\r\n");
+   else if (!cw_at_smith(ch))
+      send_to_char(ch, "There is no smith's station here: a forge, a smithy, or a smith at his "
+                   "work.\r\n");
+   else if (!*arg)
+      {
+      cw_form_list(obj, buf);
+      send_to_char(ch, "Refit which form? %s\r\n", buf);
+      }
+   else if (!(f = cw_find_form(obj->hero, arg)) || (r = real_object(f->vnum)) < 0)
+      {
+      cw_form_list(obj, buf);
+      send_to_char(ch, "%s knows no form called '%s'. %s\r\n", obj->short_description, arg, buf);
+      }
+   else if (f->charge >= (full = cw_form_charge(f->vnum, NULL)))
+      send_to_char(ch, "The form of %s is at full charge.\r\n", obj_proto[r].short_description);
+   else if ((left = cw_refits_left(f)) <= 0)
+      send_to_char(ch, "The form of %s has been refit as often as that weapon could be repaired; "
+                   "infuse another of it to make it new.\r\n", obj_proto[r].short_description);
+   else
+      {
+      f->refits = MAX(0, f->refits) + 1;
+      f->charge = full;
+      if (left - 1 == 0)
+         send_to_char(ch, "&YThe form of %s is refit to a full charge; it cannot be refit again.&n\r\n",
+                      obj_proto[r].short_description);
+      else
+         send_to_char(ch, "&YThe form of %s is refit to a full charge; it can be refit %d more "
+                      "time%s.&n\r\n", obj_proto[r].short_description, left - 1, left - 1 == 1 ? "" : "s");
+      }
+   release_buffer(arg);
+   release_buffer(buf);
+   }
+
 /* ---------------------------------------------------------------- identify */
 
 static void cw_commas(char *out, long n)
@@ -1080,6 +1541,21 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
       }
    cw_focus_line(h, line);
    sprintf(buf + strlen(buf), "%s\r\n", line);
+   if (h->form != HERO_CORE_FORM)
+      {
+      obj_rnum r = real_object(h->form);
+
+      sprintf(buf + strlen(buf), "In the form of %s.\r\n",
+              r >= 0 ? obj_proto[r].short_description : "something lost");
+      }
+   if (h->num_forms)
+      {
+      char *list = get_buffer(MAX_STRING_LENGTH);
+
+      cw_form_list(obj, list);
+      sprintf(buf + strlen(buf), "%s\r\n", list);
+      release_buffer(list);
+      }
    }
 
 int cw_bound_ok(struct char_data *ch, struct obj_data *obj, int message)
