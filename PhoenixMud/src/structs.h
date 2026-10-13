@@ -1280,6 +1280,14 @@ struct obj_data {
    
    int  material;		/* Ponder--whats this made of? */
    bool touched;
+
+   /* The class weapon and what binds an object to one character
+    * (hero_state.c): NULL or 0 on every prototype and plain object. */
+   struct hero_data *hero;
+   struct obj_attune_data *attune;
+   long bound_idnum;
+   char bound_name[MAX_NAME_LENGTH + 1];
+   long checkpoint_of;            /* a boss's essence: the boss's vnum */
 };
 /* ======================================================================= */
 

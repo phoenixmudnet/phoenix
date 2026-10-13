@@ -1,0 +1,244 @@
+/***********************************************************************
+*  File: hero_state.c                                                  *
+*  Usage: the class weapon's per-copy state and an object's binding,   *
+*         and the H lines a rent record carries them in                *
+*                                                                      *
+*  Every line is short (under 128 characters), starts with H and is    *
+*  skipped by a binary that does not know it:                          *
+*                                                                      *
+*    HB <idnum> <name>            bound to one character               *
+*    HC <boss vnum>               the essence a boss marked            *
+*    HT <points> <hits> <hour> <hour hits> <hour points>  attunement   *
+*    HW <class> <core> <level> <essences> <cleared> <waiting> <form>   *
+*       <focus>                   the class weapon                     *
+*    HF <vnum> <charge> <refits>  a form it knows                      *
+*    HH <level>                   a level a lock held it at            *
+*    HP <dps> <heal> <tank> <cast>  each focus's own points            *
+*    HG <key>                     a grant applied to it                *
+*                                                                      *
+*  Self-contained (no game globals) so the tests link it alone.        *
+***********************************************************************/
+
+#include "../localHeader/conf.h"
+#include "../localHeader/sysdep.h"
+#include "structs.h"
+#include "utils.h"
+#include "hero_state.h"
+
+static void *hero_calloc(size_t n, size_t size)
+   {
+   void *p = calloc(n, size);
+
+   if (!p)
+      {
+      perror("malloc failure");
+      abort();
+      }
+   return p;
+   }
+
+struct hero_data *hero_create(void)
+   {
+   struct hero_data *h = hero_calloc(1, sizeof(struct hero_data));
+
+   h->waiting = HERO_NOT_LOCKED;
+   h->form = HERO_CORE_FORM;
+   h->focus = HERO_FOCUS_NONE;
+   return h;
+   }
+
+struct obj_attune_data *attune_create(void)
+   {
+   return hero_calloc(1, sizeof(struct obj_attune_data));
+   }
+
+void obj_hero_free(struct obj_data *obj)
+   {
+   if (!obj)
+      return;
+   if (obj->hero)
+      free(obj->hero);
+   if (obj->attune)
+      free(obj->attune);
+   obj->hero = NULL;
+   obj->attune = NULL;
+   obj->bound_idnum = 0;
+   obj->bound_name[0] = '\0';
+   obj->checkpoint_of = 0;
+   }
+
+void obj_hero_copy(struct obj_data *dst, const struct obj_data *src)
+   {
+   if (!dst || !src || dst == src)
+      return;
+   obj_hero_free(dst);
+   if (src->hero)
+      {
+      dst->hero = hero_calloc(1, sizeof(struct hero_data));
+      *dst->hero = *src->hero;
+      }
+   if (src->attune)
+      {
+      dst->attune = hero_calloc(1, sizeof(struct obj_attune_data));
+      *dst->attune = *src->attune;
+      }
+   dst->bound_idnum = src->bound_idnum;
+   strncpy(dst->bound_name, src->bound_name, MAX_NAME_LENGTH);
+   dst->bound_name[MAX_NAME_LENGTH] = '\0';
+   dst->checkpoint_of = src->checkpoint_of;
+   }
+
+int obj_hero_write(FILE *fp, const struct obj_data *obj)
+   {
+   const struct hero_data *h = obj->hero;
+   const struct obj_attune_data *a = obj->attune;
+   int i, err = 0;
+
+   if (obj->bound_idnum > 0)
+      if (fprintf(fp, "HB %ld %s\n", obj->bound_idnum,
+                  obj->bound_name[0] ? obj->bound_name : "-") < 0)
+         err = -1;
+   if (obj->checkpoint_of > 0)
+      if (fprintf(fp, "HC %ld\n", (long)obj->checkpoint_of) < 0)
+         err = -1;
+   if (a)
+      if (fprintf(fp, "HT %.4f %ld %ld %ld %ld\n", a->points, a->hits,
+                  a->hour, a->hour_hits, a->hour_points) < 0)
+         err = -1;
+   if (!h)
+      return err;
+   if (fprintf(fp, "HW %d %ld %d %d %d %ld %ld %d\n", h->cls, h->core,
+               h->level, h->essences, h->cleared, h->waiting, h->form,
+               h->focus) < 0)
+      err = -1;
+   for (i = 0; i < h->num_forms && i < HERO_MAX_FORMS; i++)
+      if (fprintf(fp, "HF %ld %ld %d\n", h->forms[i].vnum,
+                  h->forms[i].charge, h->forms[i].refits) < 0)
+         err = -1;
+   for (i = 0; i < h->num_holds && i < HERO_MAX_HOLDS; i++)
+      if (fprintf(fp, "HH %d\n", h->holds[i]) < 0)
+         err = -1;
+   if (h->focus_points[HERO_FOCUS_DPS] > 0 ||
+       h->focus_points[HERO_FOCUS_HEAL] > 0 ||
+       h->focus_points[HERO_FOCUS_TANK] > 0 ||
+       h->focus_points[HERO_FOCUS_CAST] > 0)
+      if (fprintf(fp, "HP %.4f %.4f %.4f %.4f\n",
+                  h->focus_points[HERO_FOCUS_DPS],
+                  h->focus_points[HERO_FOCUS_HEAL],
+                  h->focus_points[HERO_FOCUS_TANK],
+                  h->focus_points[HERO_FOCUS_CAST]) < 0)
+         err = -1;
+   for (i = 0; i < h->num_grants && i < HERO_MAX_GRANTS; i++)
+      if (fprintf(fp, "HG %s\n", h->grants[i]) < 0)
+         err = -1;
+   return err;
+   }
+
+static struct hero_data *hero_of(struct obj_data *obj)
+   {
+   if (!obj->hero)
+      obj->hero = hero_create();
+   return obj->hero;
+   }
+
+int obj_hero_read_line(struct obj_data *obj, const char *line)
+   {
+   struct hero_data *h;
+   long l1, l2, l3, l4;
+   int i1, i2, i3, i4, i5, i6;
+   double d1, d2, d3, d4;
+   char word[HERO_GRANT_LEN + 1];
+
+   if (!obj || !line || line[0] != 'H' || !line[1] || line[2] != ' ')
+      return FALSE;
+   switch (line[1])
+      {
+      case 'B':
+         if (sscanf(line, "HB %ld %20s", &l1, word) == 2 && l1 > 0)
+            {
+            obj->bound_idnum = l1;
+            if (strcmp(word, "-"))
+               {
+               strncpy(obj->bound_name, word, MAX_NAME_LENGTH);
+               obj->bound_name[MAX_NAME_LENGTH] = '\0';
+               }
+            }
+         return TRUE;
+      case 'C':
+         if (sscanf(line, "HC %ld", &l1) == 1 && l1 > 0)
+            obj->checkpoint_of = l1;
+         return TRUE;
+      case 'T':
+         if (sscanf(line, "HT %lf %ld %ld %ld %ld", &d1, &l1, &l2, &l3, &l4) == 5)
+            {
+            if (!obj->attune)
+               obj->attune = attune_create();
+            obj->attune->points = d1;
+            obj->attune->hits = l1;
+            obj->attune->hour = l2;
+            obj->attune->hour_hits = l3;
+            obj->attune->hour_points = l4;
+            }
+         return TRUE;
+      case 'W':
+         if (sscanf(line, "HW %d %ld %d %d %d %ld %ld %d", &i1, &l1, &i2, &i3,
+                    &i4, &l2, &l3, &i5) == 8)
+            {
+            h = hero_of(obj);
+            h->cls = i1;
+            h->core = l1;
+            h->level = i2;
+            h->essences = i3;
+            h->cleared = i4;
+            h->waiting = l2;
+            h->form = l3;
+            h->focus = (i5 >= HERO_FOCUS_NONE && i5 < HERO_NUM_FOCUS)
+                       ? i5 : HERO_FOCUS_NONE;
+            }
+         return TRUE;
+      case 'F':
+         if (sscanf(line, "HF %ld %ld %d", &l1, &l2, &i6) == 3)
+            {
+            h = hero_of(obj);
+            if (h->num_forms < HERO_MAX_FORMS)
+               {
+               h->forms[h->num_forms].vnum = l1;
+               h->forms[h->num_forms].charge = l2 < 0 ? 0 : l2;
+               h->forms[h->num_forms].refits = i6 < 0 ? HERO_REFITS_UNSET : i6;
+               h->num_forms++;
+               }
+            }
+         return TRUE;
+      case 'H':
+         if (sscanf(line, "HH %d", &i1) == 1)
+            {
+            h = hero_of(obj);
+            if (h->num_holds < HERO_MAX_HOLDS)
+               h->holds[h->num_holds++] = i1;
+            }
+         return TRUE;
+      case 'P':
+         if (sscanf(line, "HP %lf %lf %lf %lf", &d1, &d2, &d3, &d4) == 4)
+            {
+            h = hero_of(obj);
+            h->focus_points[HERO_FOCUS_DPS] = d1;
+            h->focus_points[HERO_FOCUS_HEAL] = d2;
+            h->focus_points[HERO_FOCUS_TANK] = d3;
+            h->focus_points[HERO_FOCUS_CAST] = d4;
+            }
+         return TRUE;
+      case 'G':
+         if (sscanf(line, "HG %47s", word) == 1)
+            {
+            h = hero_of(obj);
+            if (h->num_grants < HERO_MAX_GRANTS)
+               {
+               strncpy(h->grants[h->num_grants], word, HERO_GRANT_LEN - 1);
+               h->grants[h->num_grants][HERO_GRANT_LEN - 1] = '\0';
+               h->num_grants++;
+               }
+            }
+         return TRUE;
+      }
+   return TRUE;   /* an H line of a later version: skipped */
+   }
