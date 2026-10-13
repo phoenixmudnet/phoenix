@@ -62,6 +62,11 @@ int class_weapons = FALSE;
 #define SHARE_R              0.08
 #define HERO_WEAPON_BONUS    0.33
 #define ANCHOR_BOOST         0.05
+#define FOCUS_DPS            0.25
+#define FOCUS_HEAL           0.25
+#define FOCUS_HOT_HP         12
+#define FOCUS_HOT_MANA       12
+#define FOCUS_HOT_TICKS      3
 #define BOSS_BAND            10
 #define BOSS_BAND_MIN        20
 
@@ -116,7 +121,19 @@ static const char *cw_service_stems[] =
 static const long cw_crafters[] = { 27498, 27497, 27496, 27499, 0 };
 
 /* the class weapon commands, opened at boot when the switch is on */
-static const char *cw_commands[] = { "temper", NULL };
+static const char *cw_commands[] = { "temper", "focus", NULL };
+
+/* the focus: one at a time, each with its own growth points */
+static const char *cw_focus_names[HERO_NUM_FOCUS] = { NULL, "dps", "heal", "tank", "cast" };
+static const char *cw_focus_words[HERO_NUM_FOCUS] =
+   { NULL, "strikes harder", "heals stronger", "mends you with each blow",
+     "feeds your mana with each blow" };
+
+/* the over-time pools a tank or cast focus fills: by character */
+struct cw_pool { long idnum; int hp, mana, ticks; struct cw_pool *next; };
+static struct cw_pool *cw_pools = NULL;
+SPECIAL(repair_guy);
+extern struct descriptor_data *descriptor_list;
 
 /* ---------------------------------------------------------------- tables */
 
@@ -251,7 +268,7 @@ static long cw_level_cost(int n)
    return (long)cw_floor(LEVEL_COST_A * cw_pow((double)n, 1.5) + 0.5);
    }
 
-static int cw_level_for(long points)
+static int cw_level_for(double points)
    {
    int n = 0;
 
@@ -341,6 +358,15 @@ static void cw_bonus_line(struct hero_data *h, char *out)
 static long cw_points(struct obj_data *obj)
    {
    return obj->attune ? (long)cw_floor(obj->attune->points) + obj->attune->hits : 0;
+   }
+
+/* the share of the full focus the one in use has reached: its own points,
+ * on the weapon's level curve; 0 with none chosen */
+static double cw_focus_share(struct hero_data *h)
+   {
+   if (h->focus <= HERO_FOCUS_NONE || h->focus >= HERO_NUM_FOCUS)
+      return 0;
+   return cw_share(cw_level_for(h->focus_points[h->focus]));
    }
 
 /* how much a growth point counts at the owner's remort tier (1 at a single
@@ -592,8 +618,65 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
    if (!class_weapons || IS_NPC(ch))
       return;
    obj = (wielded && cw_mine(wielded, ch)) ? wielded : cw_held(ch);
-   if (obj)
-      cw_grow(ch, obj, POINTS_PER_HIT);
+   if (!obj)
+      return;
+   /* a tank or cast focus: each blow refreshes the over-time pool */
+   if (obj->hero->focus == HERO_FOCUS_TANK || obj->hero->focus == HERO_FOCUS_CAST)
+      {
+      struct cw_pool *p;
+      int per = MAX(1, (int)cw_floor((obj->hero->focus == HERO_FOCUS_TANK ? FOCUS_HOT_HP :
+                    FOCUS_HOT_MANA) * cw_focus_share(obj->hero) + 0.5));
+
+      for (p = cw_pools; p && p->idnum != GET_IDNUM(ch); p = p->next)
+         ;
+      if (!p)
+         {
+         CREATE(p, struct cw_pool, 1);
+         p->idnum = GET_IDNUM(ch);
+         p->next = cw_pools;
+         cw_pools = p;
+         }
+      p->hp = obj->hero->focus == HERO_FOCUS_TANK ? per : 0;
+      p->mana = obj->hero->focus == HERO_FOCUS_CAST ? per : 0;
+      p->ticks = FOCUS_HOT_TICKS;
+      }
+   cw_grow(ch, obj, POINTS_PER_HIT);
+   }
+
+/* every two seconds: the pools pay out */
+void cw_focus_tick(void)
+   {
+   struct cw_pool *p, *next, *prev = NULL;
+   struct descriptor_data *d;
+   struct char_data *ch;
+
+   if (!class_weapons || !cw_pools)
+      return;
+   for (p = cw_pools; p; p = next)
+      {
+      next = p->next;
+      for (ch = NULL, d = descriptor_list; d && !ch; d = d->next)
+         if (STATE(d) == CON_PLAYING && d->character && GET_IDNUM(d->character) == p->idnum)
+            ch = d->character;
+      if (ch && p->ticks > 0)
+         {
+         if (p->hp > 0 && GET_HIT(ch) < GET_MAX_HIT(ch))
+            GET_HIT(ch) = MIN(GET_MAX_HIT(ch), GET_HIT(ch) + p->hp);
+         if (p->mana > 0 && GET_MANA(ch) < GET_MAX_MANA(ch))
+            GET_MANA(ch) = MIN(GET_MAX_MANA(ch), GET_MANA(ch) + p->mana);
+         p->ticks--;
+         }
+      if (!ch || p->ticks <= 0)
+         {
+         if (prev)
+            prev->next = next;
+         else
+            cw_pools = next;
+         free(p);
+         continue;
+         }
+      prev = p;
+      }
    }
 
 void cw_note_cast(struct char_data *ch)
@@ -617,6 +700,8 @@ int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
       cw_grow(ch, obj, POINTS_PER_HEAL);
    if (cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
       a *= cw_mult(KIND_HEAL, s);
+   if (obj->hero->focus == HERO_FOCUS_HEAL)
+      a *= 1.0 + FOCUS_HEAL * cw_focus_share(obj->hero);
    return (int)cw_floor(a);
    }
 
@@ -629,9 +714,13 @@ int cw_damage_mod(struct char_data *ch, struct char_data *victim, int dam,
 
    if (!class_weapons || !melee_or_skill || dam <= 0)
       return dam;
-   if (ch && (obj = cw_in_hand(ch)) &&
-       cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_OUT)
-      mul *= cw_mult(KIND_OUT, s);
+   if (ch && (obj = cw_in_hand(ch)))
+      {
+      if (cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_OUT)
+         mul *= cw_mult(KIND_OUT, s);
+      if (obj->hero->focus == HERO_FOCUS_DPS)
+         mul *= 1.0 + FOCUS_DPS * cw_focus_share(obj->hero);
+      }
    if (victim && (obj = cw_in_hand(victim)) &&
        cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_IN)
       mul *= cw_mult(KIND_IN, s);
@@ -856,6 +945,99 @@ ACMD(do_temper)
    release_buffer(line);
    }
 
+/* ---------------------------------------------------------------- focus */
+
+/* "Its focus: it strikes harder (63% of the full focus). Kept: heal 34%." */
+static void cw_focus_line(struct hero_data *h, char *out)
+   {
+   char tail[160] = "";
+   int f, n = 0;
+
+   for (f = HERO_FOCUS_DPS; f < HERO_NUM_FOCUS; f++)
+      if (f != h->focus && h->focus_points[f] > 0)
+         sprintf(tail + strlen(tail), "%s%s %d%%", n++ ? ", " : " Kept: ", cw_focus_names[f],
+                 (int)cw_floor(cw_share(cw_level_for(h->focus_points[f])) * 100 + 0.5));
+   if (n)
+      strcat(tail, ".");
+   if (h->focus > HERO_FOCUS_NONE && h->focus < HERO_NUM_FOCUS)
+      sprintf(out, "Its focus: it %s (%d%% of the full focus).%s", cw_focus_words[h->focus],
+              (int)cw_floor(cw_focus_share(h) * 100 + 0.5), tail);
+   else
+      sprintf(out, "No focus chosen yet: focus <dps|heal|tank|cast>.%s", tail);
+   }
+
+/* a smith's station: in this game, a room where a repairman works */
+static int cw_at_smith(struct char_data *ch)
+   {
+   struct char_data *k;
+
+   for (k = world[IN_ROOM(ch)].people; k; k = k->next_in_room)
+      if (IS_NPC(k) && GET_MOB_RNUM(k) >= 0 && mob_index[GET_MOB_RNUM(k)].func == repair_guy &&
+          AWAKE(k) && !FIGHTING(k))
+         return TRUE;
+   return FALSE;
+   }
+
+/* focus [dps|heal|tank|cast]: the first anywhere, a change at a smith's
+ * station. Only the focus in use grows; one returned to keeps what it had;
+ * the first chosen starts with the weapon's growth. */
+ACMD(do_focus)
+   {
+   struct obj_data *obj = NULL, *o;
+   struct hero_data *h;
+   char *arg = get_buffer(MAX_INPUT_LENGTH), *line = get_buffer(512);
+   int f, was;
+
+   one_argument(argument, arg);
+   for (o = ch->carrying; o && !obj; o = o->next_content)
+      if (cw_mine(o, ch))
+         obj = o;
+   if (!obj)
+      obj = cw_in_hand(ch);
+   if (!class_weapons)
+      send_to_char(ch, "Huh?!?\r\n");
+   else if (!obj)
+      send_to_char(ch, "You have no class weapon in hand.\r\n");
+   else
+      {
+      h = obj->hero;
+      for (f = HERO_FOCUS_DPS; f < HERO_NUM_FOCUS && str_cmp(arg, (char *)cw_focus_names[f]); f++)
+         ;
+      if (!*arg)
+         {
+         cw_focus_line(h, line);
+         send_to_char(ch, "&Y%s&n\r\n", line);
+         }
+      else if (f >= HERO_NUM_FOCUS)
+         send_to_char(ch, "focus <dps|heal|tank|cast>: dps, it strikes harder; heal, it heals "
+                      "stronger; tank, it mends you with each blow; cast, it feeds your mana with "
+                      "each blow.\r\n");
+      else if (h->focus == f)
+         send_to_char(ch, "The focus of %s is already %s.\r\n", obj->short_description,
+                      cw_focus_names[f]);
+      else if (h->focus != HERO_FOCUS_NONE && !cw_at_smith(ch))
+         send_to_char(ch, "A focus is changed at a smith's station: a forge, a smithy, or a "
+                      "smith at his work.\r\n");
+      else
+         {
+         was = h->focus;
+         h->focus = f;
+         if (was == HERO_FOCUS_NONE)
+            {
+            h->focus_points[f] = MAX(h->focus_points[f], (double)cw_points(obj));
+            send_to_char(ch, "&Y%s takes its focus: it %s, more as it grows.&n\r\n",
+                         obj->short_description, cw_focus_words[f]);
+            }
+         else
+            send_to_char(ch, "&Y%s turns its focus to %s: it %s. Each focus keeps what it has "
+                         "gained; only the one in use grows.&n\r\n", obj->short_description,
+                         cw_focus_names[f], cw_focus_words[f]);
+         }
+      }
+   release_buffer(arg);
+   release_buffer(line);
+   }
+
 /* ---------------------------------------------------------------- identify */
 
 static void cw_commas(char *out, long n)
@@ -896,6 +1078,8 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
       sprintf(buf + strlen(buf), "Locked: it needs %s. Go there and slay it to win its "
               "essence.\r\n", line);
       }
+   cw_focus_line(h, line);
+   sprintf(buf + strlen(buf), "%s\r\n", line);
    }
 
 int cw_bound_ok(struct char_data *ch, struct obj_data *obj, int message)

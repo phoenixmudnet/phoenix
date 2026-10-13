@@ -41,6 +41,7 @@
 #include "constants.h"
 #include "dg_scripts.h"
 #include "spells.h"
+#include "classweapon.h"
  
 #include <arpa/telnet.h> 
  
@@ -1139,6 +1140,9 @@ void heartbeat()
    
    if (!(pulse % (5 * PASSES_PER_SEC)))
       check_fishing();
+
+   if (!(pulse % (2 * PASSES_PER_SEC)))   /* the class weapon's focus pools */
+      cw_focus_tick();
 
    if(!(pulse % PASSES_PER_SEC))
       time_info.minutes++;
