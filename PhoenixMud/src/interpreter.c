@@ -371,6 +371,9 @@ ACMD(do_focus);
 ACMD(do_infuse);
 ACMD(do_shift);
 ACMD(do_refit);
+ACMD(do_claim);
+ACMD(do_classweapon);
+ACMD(do_remortreward);
 ACMD(do_test);
 ACMD(do_time);
 ACMD(do_title);
@@ -1252,6 +1255,9 @@ struct command_info cmd_info[] = {
 	{"infuse", POS_STANDING, do_infuse, LVL_IMPLII + 1, 0},
 	{"shift", POS_RESTING, do_shift, LVL_IMPLII + 1, 0},
 	{"refit", POS_STANDING, do_refit, LVL_IMPLII + 1, 0},
+	{"claim", POS_RESTING, do_claim, LVL_IMPLII + 1, 0},
+	{"classweapon", POS_DEAD, do_classweapon, LVL_IMPLII + 1, 0},
+	{"remortreward", POS_DEAD, do_remortreward, LVL_IMPLII + 1, 0},
 	{"\n", 0, 0, 0, 0}
 };				/* this must be last */
 

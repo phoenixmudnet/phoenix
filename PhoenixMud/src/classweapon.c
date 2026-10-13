@@ -137,7 +137,19 @@ static const char *cw_service_stems[] =
 static const long cw_crafters[] = { 27498, 27497, 27496, 27499, 0 };
 
 /* the class weapon commands, opened at boot when the switch is on */
-static const char *cw_commands[] = { "temper", "focus", "infuse", "shift", "refit", NULL };
+static const char *cw_commands[] = { "temper", "focus", "infuse", "shift", "refit", "claim", NULL };
+/* the staff's, opened to immortals */
+static const char *cw_staff_commands[] = { "classweapon", "remortreward", NULL };
+
+/* the rewards ledger (etc/remort_rewards): the pieces set out at the last
+ * mortal level for each class, and what each character has had */
+#define CLAIM_LEVEL       104
+#define CLAIM_KEEPER      27499
+#define MAX_104_PIECES    8
+struct cw_grant { long idnum; long weapon_at; long claim104; long claimed_at; struct cw_grant *next; };
+static struct cw_grant *cw_grants = NULL;
+static long cw_104[NUM_CLASSES][MAX_104_PIECES];
+static int cw_104_n[NUM_CLASSES];
 
 /* the focus: one at a time, each with its own growth points */
 static const char *cw_focus_names[HERO_NUM_FOCUS] = { NULL, "dps", "heal", "tank", "cast" };
@@ -256,6 +268,78 @@ static void cw_build_pool(void)
          }
    }
 
+static void cw_read_ledger(void)
+   {
+   FILE *fl;
+   char line[512], *p;
+   struct cw_grant *g;
+   long v, a, b, c, d;
+   int cls, n;
+
+   memset(cw_104_n, 0, sizeof(cw_104_n));
+   while (cw_grants)
+      {
+      g = cw_grants->next;
+      free(cw_grants);
+      cw_grants = g;
+      }
+   if (!(fl = fopen("etc/remort_rewards", "r")))
+      return;
+   while (fgets(line, sizeof(line), fl))
+      if (sscanf(line, "reward104 %d%n", &cls, &n) == 1 && cls >= 0 && cls < NUM_CLASSES)
+         for (p = line + n; cw_104_n[cls] < MAX_104_PIECES && sscanf(p, " %ld%n", &v, &n) == 1; p += n)
+            cw_104[cls][cw_104_n[cls]++] = v;
+      else if (sscanf(line, "granted %ld %ld %ld %ld %ld", &a, &b, &c, &d, &v) >= 4)
+         {
+         CREATE(g, struct cw_grant, 1);
+         g->idnum = a;
+         g->weapon_at = b;
+         g->claim104 = c;
+         g->claimed_at = d;
+         g->next = cw_grants;
+         cw_grants = g;
+         }
+   fclose(fl);
+   }
+
+static void cw_write_ledger(void)
+   {
+   FILE *fl;
+   struct cw_grant *g;
+   int c, i;
+
+   if (!(fl = fopen("etc/remort_rewards.tmp", "w")))
+      return;
+   for (c = 0; c < NUM_CLASSES; c++)
+      if (cw_104_n[c])
+         {
+         fprintf(fl, "reward104 %d", c);
+         for (i = 0; i < cw_104_n[c]; i++)
+            fprintf(fl, " %ld", cw_104[c][i]);
+         fprintf(fl, "\n");
+         }
+   for (g = cw_grants; g; g = g->next)
+      fprintf(fl, "granted %ld %ld %ld %ld\n", g->idnum, g->weapon_at, g->claim104, g->claimed_at);
+   fclose(fl);
+   rename("etc/remort_rewards.tmp", "etc/remort_rewards");
+   }
+
+static struct cw_grant *cw_grant_of(long idnum, int create)
+   {
+   struct cw_grant *g;
+
+   for (g = cw_grants; g; g = g->next)
+      if (g->idnum == idnum)
+         return g;
+   if (!create)
+      return NULL;
+   CREATE(g, struct cw_grant, 1);
+   g->idnum = idnum;
+   g->next = cw_grants;
+   cw_grants = g;
+   return g;
+   }
+
 void classweapon_boot(void)
    {
    int i, j;
@@ -264,10 +348,15 @@ void classweapon_boot(void)
    if (!class_weapons)
       return;
    cw_build_pool();
+   cw_read_ledger();
    for (i = 0; cw_commands[i]; i++)
       for (j = 0; *cmd_info[j].command != '\n'; j++)
          if (!strcmp(cmd_info[j].command, cw_commands[i]))
             cmd_info[j].minimum_level = 0;
+   for (i = 0; cw_staff_commands[i]; i++)
+      for (j = 0; *cmd_info[j].command != '\n'; j++)
+         if (!strcmp(cmd_info[j].command, cw_staff_commands[i]))
+            cmd_info[j].minimum_level = LVL_IMMORT;
    log("Class weapons: on (%d bosses in the pool).", cw_pool_size);
    }
 
@@ -975,18 +1064,52 @@ static int cw_held_kind(struct obj_data *obj)
    return CAN_WEAR(obj, ITEM_WEAR_HOLD) && !CAN_WEAR(obj, ITEM_WEAR_WIELD);
    }
 
-void cw_give_first(struct char_data *ch)
+/* the class weapon into a Hero's hands: at the pass, by a claim or by the
+ * staff; once a character, kept in the ledger. force hands it again to one
+ * who has had it (lost, say); never a second to one who has it on them. */
+static int cw_grant_weapon(struct char_data *ch, int force, int at_pass, char *why)
    {
    struct obj_data *obj;
+   struct cw_grant *g;
    long vnum;
 
-   if (!class_weapons || IS_NPC(ch) || GET_CLASS(ch) < 0 || GET_CLASS(ch) >= NUM_CLASSES)
-      return;
+   if (IS_NPC(ch) || GET_CLASS(ch) < 0 || GET_CLASS(ch) >= NUM_CLASSES)
+      {
+      strcpy(why, "no such character");
+      return FALSE;
+      }
+   if (!at_pass && GET_LEVEL(ch) < LVL_HERO && REMORT_LEVEL(ch) < 1)
+      {
+      sprintf(why, "%s has not passed the Hero test", GET_NAME(ch));
+      return FALSE;
+      }
+   if ((obj = cw_owned(ch)))
+      {
+      g = cw_grant_of(GET_IDNUM(ch), TRUE);
+      if (!g->weapon_at)
+         {
+         g->weapon_at = (long)time(0);
+         cw_write_ledger();
+         }
+      sprintf(why, "%s already has %s", GET_NAME(ch), obj->short_description);
+      return FALSE;
+      }
+   if (!force && (g = cw_grant_of(GET_IDNUM(ch), FALSE)) && g->weapon_at)
+      {
+      sprintf(why, "%s has had the class weapon; force to hand it again", GET_NAME(ch));
+      return FALSE;
+      }
    vnum = cw_first[(int)GET_CLASS(ch)];
-   if (vnum <= 0 || real_object(vnum) < 0 || cw_owned(ch))
-      return;
-   if (!(obj = read_object(vnum, VIRTUAL)))
-      return;
+   if (vnum <= 0)
+      {
+      sprintf(why, "the %s has no class weapon set", pc_class_types[(int)GET_CLASS(ch)]);
+      return FALSE;
+      }
+   if (real_object(vnum) < 0 || !(obj = read_object(vnum, VIRTUAL)))
+      {
+      sprintf(why, "the %s's weapon is not in the world", pc_class_types[(int)GET_CLASS(ch)]);
+      return FALSE;
+      }
    obj->bound_idnum = GET_IDNUM(ch);
    strncpy(obj->bound_name, GET_NAME(ch), MAX_NAME_LENGTH);
    obj->bound_name[MAX_NAME_LENGTH] = '\0';
@@ -1004,6 +1127,20 @@ void cw_give_first(struct char_data *ch)
       send_to_char(ch, "You receive %s, your class weapon, bound to you. It gains levels as "
                    "you fight with it, and takes the form of any weapon you infuse into it at "
                    "a smith.\r\n", obj->short_description);
+   g = cw_grant_of(GET_IDNUM(ch), TRUE);
+   g->weapon_at = (long)time(0);
+   cw_write_ledger();
+   strcpy(why, obj->short_description);
+   return TRUE;
+   }
+
+void cw_give_first(struct char_data *ch)
+   {
+   char why[256];
+
+   if (!class_weapons || IS_NPC(ch))
+      return;
+   cw_grant_weapon(ch, FALSE, TRUE, why);
    }
 
 /* one weapon for life, through remorts: its bonus is the class the
@@ -1087,6 +1224,29 @@ void cw_login(struct char_data *ch)
             o->attune->hour = cw_mud_hour();
             }
          }
+   /* the 104 piece the ledger says was claimed, unbound by a round trip */
+   {
+   struct cw_grant *g = cw_grant_of(GET_IDNUM(ch), FALSE);
+   int i;
+
+   if (g && g->claim104 > 0)
+      {
+      for (o = ch->carrying; o; o = o->next_content)
+         if (!o->bound_idnum && GET_OBJ_VNUM(o) == g->claim104)
+            {
+            o->bound_idnum = GET_IDNUM(ch);
+            strncpy(o->bound_name, GET_NAME(ch), MAX_NAME_LENGTH);
+            o->bound_name[MAX_NAME_LENGTH] = '\0';
+            }
+      for (i = 0; i < NUM_WEARS; i++)
+         if ((o = GET_EQ(ch, i)) && !o->bound_idnum && GET_OBJ_VNUM(o) == g->claim104)
+            {
+            o->bound_idnum = GET_IDNUM(ch);
+            strncpy(o->bound_name, GET_NAME(ch), MAX_NAME_LENGTH);
+            o->bound_name[MAX_NAME_LENGTH] = '\0';
+            }
+      }
+   }
    cw_reclass(ch);
    }
 
@@ -1497,6 +1657,301 @@ ACMD(do_refit)
       }
    release_buffer(arg);
    release_buffer(buf);
+   }
+
+/* ---------------------------------------------------------------- claims */
+
+static struct char_data *cw_keeper_here(struct char_data *ch)
+   {
+   struct char_data *k;
+
+   for (k = world[IN_ROOM(ch)].people; k; k = k->next_in_room)
+      if (IS_NPC(k) && GET_MOB_VNUM(k) == CLAIM_KEEPER && AWAKE(k) && !FIGHTING(k))
+         return k;
+   return NULL;
+   }
+
+/* the class weapon a claim would meet */
+#define CLAIM_OWED     0
+#define CLAIM_NOT_HERO 1
+#define CLAIM_HAD      2
+#define CLAIM_HAS      3
+#define CLAIM_NONE     4
+static int cw_weapon_claim(struct char_data *ch)
+   {
+   struct cw_grant *g;
+
+   if (GET_LEVEL(ch) < LVL_HERO && REMORT_LEVEL(ch) < 1)
+      return CLAIM_NOT_HERO;
+   if (cw_owned(ch))
+      return CLAIM_HAS;
+   if ((g = cw_grant_of(GET_IDNUM(ch), FALSE)) && g->weapon_at)
+      return CLAIM_HAD;
+   return cw_first[(int)GET_CLASS(ch)] > 0 ? CLAIM_OWED : CLAIM_NONE;
+   }
+
+/* the 104 pieces this character may choose from: only those the world has */
+static int cw_104_options(struct char_data *ch, long *out)
+   {
+   int c = GET_CLASS(ch), i, n = 0;
+
+   if (c < 0 || c >= NUM_CLASSES)
+      return 0;
+   for (i = 0; i < cw_104_n[c]; i++)
+      if (real_object(cw_104[c][i]) >= 0)
+         out[n++] = cw_104[c][i];
+   return n;
+   }
+
+/* claim [weapon | <number>]: before the Legendary Purveyor, a class weapon
+ * owed from before it was handed out, then the piece set out at the last
+ * mortal level for the character's class */
+ACMD(do_claim)
+   {
+   char *arg = get_buffer(MAX_INPUT_LENGTH), why[256];
+   long opts[MAX_104_PIECES];
+   struct cw_grant *g;
+   struct obj_data *obj;
+   int c, n, i, pick, wants_weapon;
+
+   one_argument(argument, arg);
+   wants_weapon = !str_cmp(arg, "weapon");
+   if (!class_weapons)
+      send_to_char(ch, "Huh?!?\r\n");
+   else if (!cw_keeper_here(ch))
+      send_to_char(ch, "Claims are made before the Legendary Purveyor of Mystical Wares, east of "
+                   "a small pool in Talam.\r\n");
+   else if ((!*arg || wants_weapon) && (c = cw_weapon_claim(ch)) == CLAIM_OWED)
+      {
+      if (cw_grant_weapon(ch, FALSE, FALSE, why))
+         mudlogf(NRM, LVL_IMMORT, TRUE, "%s claims the class weapon (%s).", GET_NAME(ch), why);
+      else
+         send_to_char(ch, "The Purveyor has nothing for you yet.\r\n");
+      }
+   else if (wants_weapon)
+      {
+      if (c == CLAIM_NOT_HERO)
+         send_to_char(ch, "The class weapon is for those who have passed the Hero test.\r\n");
+      else if (c == CLAIM_HAD)
+         send_to_char(ch, "You have had your class weapon. If it is lost, an immortal can "
+                      "replace it.\r\n");
+      else if (c == CLAIM_HAS)
+         send_to_char(ch, "You have your class weapon already.\r\n");
+      else
+         send_to_char(ch, "No class weapon is set out for %s yet.\r\n",
+                      pc_class_types[(int)GET_CLASS(ch)]);
+      }
+   else if (GET_LEVEL(ch) < CLAIM_LEVEL)
+      send_to_char(ch, "The reward is set out for those who reach %d.\r\n", CLAIM_LEVEL);
+   else if (GET_LEVEL(ch) >= LVL_IMMORT)
+      send_to_char(ch, "The reward is set out for mortals at %d.\r\n", CLAIM_LEVEL);
+   else if ((g = cw_grant_of(GET_IDNUM(ch), FALSE)) && g->claim104 > 0 && real_object(g->claim104) >= 0)
+      send_to_char(ch, "You have claimed your reward.\r\n");
+   else if (!(n = cw_104_options(ch, opts)))
+      send_to_char(ch, "Nothing is set out for %s yet.\r\n", pc_class_types[(int)GET_CLASS(ch)]);
+   else if (!*arg)
+      {
+      send_to_char(ch, "&cSet out for a %s of %d: one piece, yours alone.&n\r\n\r\n",
+                   pc_class_types[(int)GET_CLASS(ch)], CLAIM_LEVEL);
+      for (i = 0; i < n; i++)
+         send_to_char(ch, " %d) %s\r\n", i + 1, obj_proto[real_object(opts[i])].short_description);
+      send_to_char(ch, "\r\n&Kclaim <number> takes it; it is bound to you and no one else can "
+                   "use it.&n\r\n");
+      }
+   else if ((pick = atoi(arg)) < 1)
+      send_to_char(ch, "claim <number>\r\n");
+   else if (pick > n)
+      send_to_char(ch, "Choose 1 to %d.\r\n", n);
+   else if (!(obj = read_object(opts[pick - 1], VIRTUAL)))
+      send_to_char(ch, "Piece %ld is not in the world; tell an immortal.\r\n", opts[pick - 1]);
+   else
+      {
+      obj->bound_idnum = GET_IDNUM(ch);
+      strncpy(obj->bound_name, GET_NAME(ch), MAX_NAME_LENGTH);
+      obj->bound_name[MAX_NAME_LENGTH] = '\0';
+      obj_to_char(obj, ch);
+      g = cw_grant_of(GET_IDNUM(ch), TRUE);
+      g->claim104 = opts[pick - 1];
+      g->claimed_at = (long)time(0);
+      cw_write_ledger();
+      send_to_char(ch, "You take %s. It is bound to you.\r\n", obj->short_description);
+      }
+   release_buffer(arg);
+   }
+
+/* write etc/class_weapons back: the switch is on, or nobody could run this */
+static void cw_write_table(void)
+   {
+   FILE *fl;
+   int c;
+
+   if (!(fl = fopen("etc/class_weapons.tmp", "w")))
+      return;
+   fprintf(fl, "enabled 1\n");
+   for (c = 0; c < NUM_CLASSES; c++)
+      fprintf(fl, "first %d %ld\n", c, cw_first[c]);
+   fprintf(fl, "essence %ld\ncheckpoint %.4f %d\n", cw_essence, cw_chance, cw_max_per_100);
+   fclose(fl);
+   rename("etc/class_weapons.tmp", "etc/class_weapons");
+   }
+
+static int cw_class_of(char *word)
+   {
+   int c;
+
+   if (isdigit(*word))
+      return atoi(word);
+   for (c = 0; c < NUM_CLASSES && *pc_class_types[c] != '\n'; c++)
+      if (is_abbrev(word, pc_class_types[c]))
+         return c;
+   return -1;
+   }
+
+/* classweapon: the tables -- each class's weapon, the essence, the lock rule */
+ACMD(do_classweapon)
+   {
+   char *a1 = get_buffer(MAX_INPUT_LENGTH), *a2 = get_buffer(MAX_INPUT_LENGTH);
+   char *rest = get_buffer(MAX_INPUT_LENGTH);
+   obj_rnum r;
+   double d;
+   long v;
+   int c, n;
+
+   half_chop(argument, a1, rest);
+   if (!*a1)
+      {
+      send_to_char(ch, "&cThe class weapons (a Hero's, bound; grows by hits (%d), attack spells "
+                   "(%d) and heals (%d) in hand, at most %d a MUD hour, scaled by remort tier; a "
+                   "lock %d%% a level, %d in a hundred; the essence comes from a locked weapon's "
+                   "boss, slain):&n\r\n", POINTS_PER_HIT, POINTS_PER_CAST, POINTS_PER_HEAL,
+                   POINTS_PER_MUD_HOUR, (int)cw_floor(cw_chance * 100 + 0.5), cw_max_per_100);
+      r = real_object(cw_essence);
+      send_to_char(ch, " essence [%ld] %s\r\n", cw_essence,
+                   cw_essence > 0 && r >= 0 ? obj_proto[r].short_description : "(none set)");
+      for (c = 0; c < NUM_CLASSES; c++)
+         if (cw_first[c] > 0)
+            {
+            r = real_object(cw_first[c]);
+            send_to_char(ch, " %-12s [%ld] %s\r\n", pc_class_types[c], cw_first[c],
+                         r >= 0 ? obj_proto[r].short_description : "(not in the world)");
+            }
+      }
+   else if (!str_cmp(a1, "essence"))
+      {
+      one_argument(rest, a2);
+      cw_essence = !str_cmp(a2, "none") ? 0 : atol(a2);
+      cw_write_table();
+      mudlogf(NRM, LVL_IMMORT, TRUE, "(GC) %s sets the class weapon essence to %ld.", GET_NAME(ch), cw_essence);
+      send_to_char(ch, "The essence is %ld.\r\n", cw_essence);
+      }
+   else if (!str_cmp(a1, "checkpoint"))
+      {
+      if (sscanf(rest, "%lf %d", &d, &n) != 2)
+         send_to_char(ch, "classweapon checkpoint <chance 0..1> <most in a hundred levels>\r\n");
+      else
+         {
+         cw_chance = MAX(0.0, MIN(1.0, d));
+         cw_max_per_100 = MAX(0, n);
+         cw_write_table();
+         mudlogf(NRM, LVL_IMMORT, TRUE, "(GC) %s sets the class weapon locks to %.4f, %d.", GET_NAME(ch), cw_chance, cw_max_per_100);
+         send_to_char(ch, "Locks: %d%% a level, at most %d in a hundred.\r\n",
+                      (int)cw_floor(cw_chance * 100 + 0.5), cw_max_per_100);
+         }
+      }
+   else if ((c = cw_class_of(a1)) >= 0 && c < NUM_CLASSES)
+      {
+      half_chop(rest, a2, rest);
+      if (str_cmp(a2, "first") || !*rest)
+         send_to_char(ch, "classweapon <class> first <vnum>|none\r\n");
+      else
+         {
+         v = !str_cmp(rest, "none") ? 0 : atol(rest);
+         cw_first[c] = v;
+         cw_write_table();
+         mudlogf(NRM, LVL_IMMORT, TRUE, "(GC) %s sets the %s's class weapon to %ld.", GET_NAME(ch), pc_class_types[c], v);
+         send_to_char(ch, "The %s's class weapon is %ld.\r\n", pc_class_types[c], v);
+         }
+      }
+   else
+      send_to_char(ch, "classweapon | classweapon <class> first <vnum>|none | classweapon essence "
+                   "<vnum>|none | classweapon checkpoint <chance> <most in a hundred>\r\n");
+   release_buffer(a1);
+   release_buffer(a2);
+   release_buffer(rest);
+   }
+
+/* remortreward: the 104 pieces each class may claim, the ledger, and a
+ * class weapon granted to a player who is here */
+ACMD(do_remortreward)
+   {
+   char *a1 = get_buffer(MAX_INPUT_LENGTH), *a2 = get_buffer(MAX_INPUT_LENGTH);
+   char *a3 = get_buffer(MAX_INPUT_LENGTH), *rest = get_buffer(MAX_INPUT_LENGTH), why[256];
+   struct char_data *victim;
+   struct cw_grant *g;
+   char *p;
+   long v;
+   int c, i, n;
+
+   half_chop(argument, a1, rest);
+   if (!str_cmp(a1, "grant"))
+      {
+      half_chop(rest, a2, rest);
+      half_chop(rest, a3, rest);
+      if (!*a2 || str_cmp(a3, "weapon"))
+         send_to_char(ch, "remortreward grant <player> weapon [force]\r\n");
+      else if (!(victim = get_player_vis(ch, a2, FIND_CHAR_WORLD)))
+         send_to_char(ch, "%s is not in the world; grants go to a player who is here.\r\n", a2);
+      else if (!cw_grant_weapon(victim, !str_cmp(rest, "force"), FALSE, why))
+         send_to_char(ch, "No: %s.\r\n", why);
+      else
+         {
+         mudlogf(NRM, LVL_IMMORT, TRUE, "(GC) %s grants %s the class weapon%s", GET_NAME(ch),
+                 GET_NAME(victim), !str_cmp(rest, "force") ? " (force)" : "");
+         send_to_char(ch, "%s has %s.\r\n", GET_NAME(victim), why);
+         }
+      }
+   else if (!str_cmp(a1, "104"))
+      {
+      half_chop(rest, a2, rest);
+      if (!*a2)
+         {
+         for (c = 0; c < NUM_CLASSES; c++)
+            if (cw_104_n[c])
+               {
+               send_to_char(ch, " %-12s", pc_class_types[c]);
+               for (i = 0; i < cw_104_n[c]; i++)
+                  send_to_char(ch, " [%ld]", cw_104[c][i]);
+               send_to_char(ch, "\r\n");
+               }
+         send_to_char(ch, "remortreward 104 <class> <vnum> [<vnum>...] | none\r\n");
+         }
+      else if ((c = cw_class_of(a2)) < 0 || c >= NUM_CLASSES)
+         send_to_char(ch, "No class '%s'.\r\n", a2);
+      else
+         {
+         cw_104_n[c] = 0;
+         if (str_cmp(rest, "none"))
+            for (p = rest; cw_104_n[c] < MAX_104_PIECES && sscanf(p, " %ld%n", &v, &n) == 1; p += n)
+               if (v > 0)
+                  cw_104[c][cw_104_n[c]++] = v;
+         cw_write_ledger();
+         mudlogf(NRM, LVL_IMMORT, TRUE, "(GC) %s sets the %s's 104 pieces.", GET_NAME(ch), pc_class_types[c]);
+         send_to_char(ch, "The %s may claim %d piece%s.\r\n", pc_class_types[c], cw_104_n[c],
+                      cw_104_n[c] == 1 ? "" : "s");
+         }
+      }
+   else if (!str_cmp(a1, "list"))
+      {
+      for (g = cw_grants; g; g = g->next)
+         send_to_char(ch, " #%-6ld weapon %s  104 %s\r\n", g->idnum, g->weapon_at ? "had" : "-",
+                      g->claim104 > 0 ? "claimed" : "-");
+      }
+   else
+      send_to_char(ch, "remortreward list | 104 [<class> <vnums>|none] | grant <player> weapon [force]\r\n");
+   release_buffer(a1);
+   release_buffer(a2);
+   release_buffer(a3);
+   release_buffer(rest);
    }
 
 /* ---------------------------------------------------------------- identify */
