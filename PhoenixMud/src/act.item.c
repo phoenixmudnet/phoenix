@@ -25,6 +25,7 @@
 #include "constants.h"
 #include "assemblies.h"
 #include "vnum.h"
+#include "classweapon.h"
 
 /* extern variables */
 extern struct room_data *world;
@@ -2028,6 +2029,9 @@ int hands_full(struct char_data *ch)
 */
 int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message)
    {
+   /* a bound piece serves its one character */
+   if (!cw_bound_ok(ch, obj, message))
+      return 0;
    /* immortals can wear anything */
    if (GET_LEVEL(ch) >= LVL_IMMORT)
       return 1;

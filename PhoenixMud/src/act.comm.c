@@ -24,6 +24,7 @@
 #include "constants.h"
 #include "dg_scripts.h"
 #include "queue.h"
+#include "classweapon.h"
 
 #define MAX_NOTE_LENGTH 1000 /* arbitrary */
 
@@ -988,7 +989,7 @@ ACMD(do_auction)
       return;
       }
 
-   if (IS_OBJ_STAT(obj, ITEM_NOAUC))
+   if (IS_OBJ_STAT(obj, ITEM_NOAUC) || obj->bound_idnum > 0)
       {
       send_to_char(ch, "You cannot auction that.\r\n");
       return;

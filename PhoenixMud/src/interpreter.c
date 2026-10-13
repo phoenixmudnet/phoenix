@@ -31,6 +31,7 @@
 #include "queue.h"		/*  begin add - Bon 07/25/97 */
 #include "constants.h"
 #include "dg_scripts.h"
+#include "classweapon.h"
 
 #include <arpa/telnet.h> 
 
@@ -365,6 +366,7 @@ ACMD(do_tame);
 ACMD(do_tedit);
 ACMD(do_teleport);
 ACMD(do_tell);
+ACMD(do_temper);
 ACMD(do_test);
 ACMD(do_time);
 ACMD(do_title);
@@ -460,7 +462,8 @@ ACMD(do_shop);
  */
 
 
-const struct command_info cmd_info[] = {
+/* not const: classweapon_boot opens its commands when the switch is on */
+struct command_info cmd_info[] = {
 	{"RESERVED", 0, 0, 0, 0}
 	,			/* this must be first -- for specprocs */
 	/* directions must come before other commands but after RESERVED */
@@ -1239,6 +1242,8 @@ const struct command_info cmd_info[] = {
 	{"yehaw", POS_STANDING, do_action, 0, 0},
 	{"yodel", POS_CHANT, do_action, 0, 0},
 
+	/* the class weapon (classweapon.c): out of reach until boot opens it */
+	{"temper", POS_STANDING, do_temper, LVL_IMPLII + 1, 0},
 	{"\n", 0, 0, 0, 0}
 };				/* this must be last */
 
@@ -3521,6 +3526,7 @@ void nanny(struct descriptor_data *d, char *argu)
 			account_knowledge_merge(d->character);
 			char_to_room(d->character, load_room);
 			load_result = Crash_load(d->character);
+			cw_login(d->character);
 			/* Crash_load re-equips saved gear; a negative-apply
 			 * item (e.g. a -mana muzzle) lowers the affected max
 			 * BELOW the current pool saved while the gear was off

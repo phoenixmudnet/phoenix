@@ -27,6 +27,7 @@
 #include "clan.h"
 #include "constants.h"
 #include "account.h"
+#include "classweapon.h"
 
 /* extern variables */
 extern struct zone_data *zone_table;
@@ -582,6 +583,11 @@ ACMD(do_shop)
     }
     if (IS_OBJ_STAT(obj, ITEM_NORENT)) {
       send_to_char(ch, "You can't sell no-rent items.\r\n");
+      return;
+    }
+    if (obj->bound_idnum > 0) {
+      send_to_char(ch, "%s is bound to %s; it is nobody's to sell.\r\n",
+                   obj->short_description, obj->bound_name);
       return;
     }
     if (GET_OBJ_TYPE(obj) == ITEM_KEY) {

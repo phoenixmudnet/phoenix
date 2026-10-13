@@ -22,7 +22,7 @@ circle/compile:
 	mkdir -p circle/compile
 
 build/circle: $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o $@
+	$(CC) $(CFLAGS) $(OBJS) -o $@ -lm
 
 # Compile each .c into .o
 build/%.o: $(SRCDIR)/%.c | build
