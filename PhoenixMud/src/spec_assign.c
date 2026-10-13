@@ -195,6 +195,20 @@ proctype get_mob_spec_proc(char *func_name)
    return mob_specs[i].func;
 }
 
+/* the name a mob special is listed under, or NULL (the class weapon's boss
+ * pool leaves services out by name) */
+const char *mob_spec_name(SPECIAL(*f))
+{
+   int i;
+
+   if(!f)
+      return NULL;
+   for(i=0;strcmp(mob_specs[i].name,"Unknown, exists");i++)
+      if(mob_specs[i].func==f)
+         return mob_specs[i].name;
+   return NULL;
+}
+
 void list_mob_spec_procs(struct char_data *ch,char *arg)
 {
    int i;

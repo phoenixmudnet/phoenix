@@ -25,6 +25,7 @@
 #include "dg_scripts.h"
 #include "constants.h"
 #include "interpreter.h"
+#include "classweapon.h"
  
 extern struct room_data *world; 
 extern struct obj_data *object_list; 
@@ -2157,6 +2158,9 @@ void mag_points(int level, struct char_data * ch, struct char_data * victim,
 	  break; 
  
       } 
+   /* the class weapon in hand: a heal on someone hurt grows it, and a
+    * healing class's bonus */
+   hitp = cw_heal_mod(ch, victim, hitp);
    old_hit=GET_HIT(victim);
    GET_HIT(victim) = MIN(GET_MAX_HIT(victim), GET_HIT(victim) + hitp); 
    GET_MOVE(victim) = MIN(GET_MAX_MOVE(victim), GET_MOVE(victim) + move); 

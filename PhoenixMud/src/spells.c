@@ -26,6 +26,7 @@
 #include "queue.h"
 #include "screen.h"
 #include "constants.h"
+#include "classweapon.h"
 
 extern struct room_data *world;
 extern struct obj_data *object_list;
@@ -931,6 +932,14 @@ void id_obj_to_char(struct char_data *ch, struct obj_data *obj)
       send_to_char(ch, "Race/Class Restrict: %s\r\n",buf2);
       }
 
+   {  /* a binding and the class weapon's lines */
+   char *cwbuf = get_buffer(MAX_STRING_LENGTH);
+   *cwbuf = '\0';
+   cw_identify_lines(obj, cwbuf);
+   if (*cwbuf)
+      send_to_char(ch, "%s", cwbuf);
+   release_buffer(cwbuf);
+   }
    send_to_char(ch, "Weight: %d, Value: %d\r\n",
                 GET_OBJ_WEIGHT(obj), GET_OBJ_COST(obj));
    switch (GET_OBJ_TYPE(obj))

@@ -23,6 +23,7 @@
 #include "db.h"
 #include "dg_scripts.h"
 #include "vnum.h"
+#include "classweapon.h"
 
 extern struct spell_info_type *spells;
 int valid_class_align(struct char_data *ch);
@@ -2473,6 +2474,10 @@ void update_casting_time(struct char_data *ch)
 
          call_magic(ch, tch, tobj, tdr, tdr2,spellnum,CAST_LEVEL(ch),
                     CAST_SPELL);
+         /* an attack spell that left the caster fighting: the class
+          * weapon in hand grows */
+         if (!IS_NPC(ch) && spells[spellnum].violent == VIOLENT && FIGHTING(ch))
+            cw_note_cast(ch);
          reset_casting_data(ch);
          }
       }

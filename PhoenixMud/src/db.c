@@ -36,6 +36,7 @@
 #include "constants.h"
 #include "assemblies.h"
 #include "gremort_exam.h"
+#include "classweapon.h"
 
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -451,6 +452,9 @@ void boot_db(void)
       log("   Rooms.");
       assign_rooms();
       }
+
+   /* the class weapon: off unless etc/class_weapons turns it on */
+   classweapon_boot();
 
    log("Booting assembled objects.");
    assemblyBootAssemblies();

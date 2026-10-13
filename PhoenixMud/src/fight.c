@@ -25,6 +25,7 @@
 #include "dg_scripts.h"
 #include "constants.h"
 #include "events.h"
+#include "classweapon.h"
 
 /* Structures */
 struct char_data *combat_list = NULL; /* head of l-list of fighting chars */
@@ -1875,6 +1876,8 @@ void raw_kill(struct char_data * ch, struct char_data *killer)
   
   if (!MOB2_FLAGGED(ch, MOB2_COMPONENT))
     make_corpse(ch, killer);
+  /* a locked class weapon's boss falls to its owner: the essence */
+  cw_boss_killed(killer, ch);
   
   if (  (!ROOM_FLAGGED(IN_ROOM(ch), ROOM_PKILL) && !Z_FLAGGED(IN_ROOM(ch),Z_PKILL)) && !(PLR_FLAGGED(ch, PLR_PK) && PLR_FLAGGED(killer, PLR_PK) && abs(GET_LEVEL(ch)-GET_LEVEL(killer))<=10)   )
   {
@@ -2930,6 +2933,9 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
          }
       release_buffer(buf);
       }
+   /* the class weapon's bonus: melee and skills, never a spell */
+   dam = cw_damage_mod(ch, victim, dam, ch != victim && (IS_WEAPON(attacktype) ||
+         (attacktype > 0 && attacktype <= MAX_SPELLS && spells[attacktype].is_spell == IS_SKILL)));
    dam = MAX(MIN(dam, max_damage), 0);
    /*    log("%-20.20s did %5d dam to %s",GET_NAME(ch),dam,GET_NAME(victim)); */
    GET_HIT(victim) -= dam;
@@ -3784,6 +3790,9 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
          }
       else
          dam = damage(ch, victim, dam, w_type,0);
+      /* a blow landed: the class weapon in hand (or held) grows */
+      if (dam > 0 || dam == -1)
+         cw_note_hit(ch, wielded);
       }
 
    /* check if the victim has a hitprcnt trigger */

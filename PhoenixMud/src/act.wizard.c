@@ -34,6 +34,7 @@
 #include "assemblies.h"
 #include "gremort_exam.h"
 #include "account.h"
+#include "classweapon.h"
 
 #define ZCMD zone_table[zone].cmd[cmd_no]
 
@@ -9220,6 +9221,7 @@ ACMD(do_gremort)
          GET_LEVEL(victim)++;
          send_info("[ INFO ] %s is now a HERO!!!!!\r\n",GET_NAME(victim));
          advance_level(victim,TRUE);
+         cw_give_first(victim);
          }
       else if(REMORT_LEVEL(victim) == SINGLE_REMORT)
          {

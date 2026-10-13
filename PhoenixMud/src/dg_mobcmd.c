@@ -42,6 +42,7 @@
 #include "constants.h"
 #include "screen.h"
 #include "gremort_exam.h"
+#include "classweapon.h"
 
 extern struct descriptor_data *descriptor_list;
 extern room_rnum find_target_room(char_data * ch, char *rawroomstr);
@@ -1715,6 +1716,7 @@ ACMD(do_mgremort)
     GET_LEVEL(victim)++;
     advance_level(victim, TRUE);
     send_info("[ INFO ] %s is now a HERO!!!!!\r\n", GET_NAME(victim));
+    cw_give_first(victim);
   } else if (REMORT_LEVEL(victim) == SINGLE_REMORT) {
     GET_LEVEL(victim) += 2;
     advance_level(victim, FALSE);

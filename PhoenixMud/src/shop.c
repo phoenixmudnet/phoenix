@@ -27,6 +27,7 @@
 #include "shop.h"
 #include "constants.h"
 #include "dg_scripts.h"
+#include "classweapon.h"
 
 /* External variables */
 extern struct index_data *mob_index;
@@ -337,6 +338,9 @@ int trade_with(struct obj_data * item, int shop_nr)
       return (OBJECT_NOVAL);
 
    if (IS_OBJ_STAT(item, ITEM_NOSELL))
+      return (OBJECT_NOTOK);
+
+   if (item->bound_idnum > 0)   /* a bound piece is nobody's to sell */
       return (OBJECT_NOTOK);
 
    if (item->contains != NULL)

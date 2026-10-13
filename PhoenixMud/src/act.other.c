@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include "clan.h"
 #include "constants.h"
+#include "classweapon.h"
 
 /* extern variables */
 extern struct zone_data *zone_table;
@@ -2118,6 +2119,7 @@ ACMD(do_remort)
          break;
          } /* end switch */
 
+      cw_reclass(ch);
       send_info("[ INFO ] %s has just remorted %s %s!!\r\n",
                 GET_NAME(ch), same?"SAME-CLASS":"into a",
                 same ? scr_male_pc_class_types[(int)GET_CLASS(ch)] : pc_class_types[(int)GET_CLASS(ch)]);
@@ -2195,6 +2197,7 @@ ACMD(do_remort)
          break;
       }
 
+      cw_reclass(ch);
       send_info("[ INFO ] %s has just remorted into a %s!!\r\n",GET_NAME(ch),
                 pc_race_types[GET_RACE(ch)]);
       send_to_char(ch, "%s", OK);
