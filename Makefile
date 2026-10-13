@@ -40,7 +40,12 @@ clean:
 build/obj_instance_test: PhoenixMud/tests/obj_instance_test.c build/obj_instance.o | build
 	$(CC) $(CFLAGS) $^ -o $@
 
-test: build/obj_instance_test
+# The class weapon's state and an object's binding through rent lines (hero_state.c)
+build/hero_state_test: PhoenixMud/tests/hero_state_test.c build/hero_state.o | build
+	$(CC) $(CFLAGS) $^ -o $@
+
+test: build/obj_instance_test build/hero_state_test
 	./build/obj_instance_test
+	./build/hero_state_test
 
 .PHONY: test clean

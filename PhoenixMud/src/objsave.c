@@ -16,6 +16,7 @@
 
 #include "structs.h"
 #include "obj_instance.h"
+#include "hero_state.h"
 #include "comm.h"
 #include "handler.h"
 #include "tsplayer.h"
@@ -2173,12 +2174,20 @@ int parse_xap_obj(char *filename, struct obj_data **obj,char *line,
             ex_tail=new_ex;
             facts.has_exdesc=TRUE;
             }
+         else if(*line == 'H')
+            obj_hero_read_line(*obj, line);   /* hero_state.c */
          /* unknown tags fall through: a later version's facts */
          if(!get_line(fl,line))
             break;
          }
       release_buffer(buf3);
       }
+
+   /* the class weapon's lines and a binding (hero_state.c): in a
+    * version-1/2 file they follow the record's own lines */
+   while(!feof(fl) && *line == 'H' && obj_hero_read_line(*obj, line))
+      if(!get_line(fl,line))
+         break;
 
    if(nr != NOTHING && !obj_full_snapshot_vnum(nr))
       {  /* prototype + facts; a version-1/2 snapshot derives its facts

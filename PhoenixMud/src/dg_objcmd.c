@@ -23,6 +23,7 @@
 #include "db.h"
 #include "buffer.h"
 #include "constants.h"
+#include "hero_state.h"
 
 extern struct room_data *world;
 extern struct index_data *obj_index;
@@ -355,6 +356,12 @@ OCMD(do_otransform)
       tmpobj.next_content = obj->next_content;
       tmpobj.next = obj->next;
       tmpobj.obj_flags.timer = obj->obj_flags.timer;
+      /* the copy's own: a class weapon's state and a binding */
+      tmpobj.hero = obj->hero;
+      tmpobj.attune = obj->attune;
+      tmpobj.bound_idnum = obj->bound_idnum;
+      memcpy(tmpobj.bound_name, obj->bound_name, sizeof(tmpobj.bound_name));
+      tmpobj.checkpoint_of = obj->checkpoint_of;
       memcpy(obj, &tmpobj, sizeof(*obj));
 
       if (wearer)

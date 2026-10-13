@@ -16,6 +16,7 @@
 
 #include "structs.h"
 #include "obj_instance.h"
+#include "hero_state.h"
 #include "buffer.h"
 #include "utils.h"
 #include "db.h"
@@ -4972,6 +4973,7 @@ void free_obj(struct obj_data * obj)
             }
       }
 
+   obj_hero_free(obj);
    free(obj);
    }
 
@@ -5476,6 +5478,9 @@ int my_obj_save_to_disk(FILE *fp, struct obj_data *obj, int locate)
       error = obj_save_fact_lines(fp, obj, &obj_proto[GET_OBJ_RNUM(obj)]);
       if(error<0)
          reterror=error;
+      error = obj_hero_write(fp, obj);
+      if(error<0)
+         reterror=error;
       release_buffer(buf1);
       if(reterror<0)
          return reterror;
@@ -5484,6 +5489,9 @@ int my_obj_save_to_disk(FILE *fp, struct obj_data *obj, int locate)
 
    if(!(IS_OBJ_STAT(obj,ITEM_UNIQUE_SAVE)))
       {
+      error = obj_hero_write(fp, obj);
+      if(error<0)
+         reterror=error;
       release_buffer(buf1);
       if(reterror<0)
          return reterror;
