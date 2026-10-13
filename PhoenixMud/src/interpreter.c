@@ -367,6 +367,7 @@ ACMD(do_tedit);
 ACMD(do_teleport);
 ACMD(do_tell);
 ACMD(do_temper);
+ACMD(do_focus);
 ACMD(do_test);
 ACMD(do_time);
 ACMD(do_title);
@@ -1244,6 +1245,7 @@ struct command_info cmd_info[] = {
 
 	/* the class weapon (classweapon.c): out of reach until boot opens it */
 	{"temper", POS_STANDING, do_temper, LVL_IMPLII + 1, 0},
+	{"focus", POS_RESTING, do_focus, LVL_IMPLII + 1, 0},
 	{"\n", 0, 0, 0, 0}
 };				/* this must be last */
 

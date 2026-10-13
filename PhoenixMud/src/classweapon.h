@@ -22,6 +22,8 @@ int  cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount);
 int  cw_damage_mod(struct char_data *ch, struct char_data *victim, int dam,
                    int attacktype);
 void cw_boss_killed(struct char_data *killer, struct char_data *victim);
+/* every two seconds: a tank or cast focus's pool pays out */
+void cw_focus_tick(void);
 
 /* identify: the binding and the class weapon's lines, appended to buf */
 void cw_identify_lines(struct obj_data *obj, char *buf);
