@@ -28,6 +28,7 @@
 #include "handler.h"
 #include "db.h"
 #include "hero_state.h"
+#include "repair_life.h"
 #include "classweapon.h"
 
 extern struct char_data *mob_proto;
@@ -79,6 +80,7 @@ int class_weapons = FALSE;
 #define BLOWS_PER_WEAR       600
 #define INDESTRUCTIBLE_PTS   175
 #define INDESTRUCTIBLE_WEAR  2
+#define MASTER_REFORGE       250000
 /* the form's combat flags a class weapon takes on: glow, hum, magic, bless,
  * the three anti-alignments, two-handed, brittle, resistant */
 #define CW_FORM_FLAGS ((1 << 0) | (1 << 1) | (1 << 6) | (1 << 8) | (1 << 9) | (1 << 10) | \
@@ -161,6 +163,7 @@ static const char *cw_focus_words[HERO_NUM_FOCUS] =
 struct cw_pool { long idnum; int hp, mana, ticks; struct cw_pool *next; };
 static struct cw_pool *cw_pools = NULL;
 SPECIAL(repair_guy);
+int get_repair_cost(struct obj_data *obj, struct char_data *keeper, struct char_data *ch);
 extern struct descriptor_data *descriptor_list;
 
 /* ---------------------------------------------------------------- tables */
@@ -536,62 +539,107 @@ static struct obj_data *cw_owned(struct char_data *ch)
 
 static int cw_held_kind(struct obj_data *obj);
 
-/* a weapon's life with shop repairs (the repairman's rules): the wears it
- * takes and the repairs it gets, repaired whenever the next wear would
- * leave it at half or below, until its maximum is spent */
-static void cw_shop_life(int points, int per, long *wears, long *repairs)
+/* a form's weapon at the smiths: its slots, what a wear takes, and
+ * whether a repairman may touch it; an indestructible one lives as the most
+ * durable weapon in the world does */
+static void cw_weapon_wear(long vnum, int *points, int *per, int *no_repair)
    {
-   int max = points, cur = points;
+   obj_rnum r = real_object(vnum);
 
-   *wears = *repairs = 0;
-   while (max >= 1)
+   *points = r >= 0 ? GET_OBJ_OSLOTS(&obj_proto[r]) : 0;
+   *per = 4;
+   *no_repair = r >= 0 && IS_SET(GET_OBJ_EXTRA(&obj_proto[r]), ITEM_NO_REPAIR);
+   if (r >= 0 && IS_SET(GET_OBJ_EXTRA(&obj_proto[r]), ITEM_RESISTANT))
+      *per = 2;
+   else if (r >= 0 && IS_SET(GET_OBJ_EXTRA(&obj_proto[r]), ITEM_BRITTLE))
+      *per = 8;
+   if (*points <= 0)
       {
-      if (cur - per < 0 || (double)(cur - per) / max <= 0.5)
-         {
-         if (cur == max)
-            {
-            cur -= per;
-            (*wears)++;
-            }
-         max -= ((double)cur / max > 0.5) ? 1 : 2;
-         cur = max;
-         (*repairs)++;
-         continue;
-         }
-      cur -= per;
-      (*wears)++;
+      *points = INDESTRUCTIBLE_PTS;
+      *per = INDESTRUCTIBLE_WEAR;
+      *no_repair = FALSE;
       }
    }
 
-/* a form's life: its weapon's life with shop repairs in landed blows, cut
- * into one charge a repair and one before the first; *refits how often it
- * can be filled again */
-static long cw_form_charge(long vnum, long *refits)
+/* a form's life is its weapon's whole life at the smiths (repair_life.c):
+ * the repairs and reforges in all; *charge, the blows in the charge after k
+ * of them; *at, where the weapon would stand at the k-th */
+static int cw_form_life(long vnum, int k, long *charge, struct repair_service *at)
    {
-   obj_rnum r = real_object(vnum);
-   int points = r >= 0 ? GET_OBJ_OSLOTS(&obj_proto[r]) : 0, per = 4;
-   long wears, repairs, charge;
+   int points, per, no_repair;
 
-   if (r >= 0 && IS_SET(GET_OBJ_EXTRA(&obj_proto[r]), ITEM_RESISTANT))
-      per = 2;
-   else if (r >= 0 && IS_SET(GET_OBJ_EXTRA(&obj_proto[r]), ITEM_BRITTLE))
-      per = 8;
-   if (points > 0)
-      cw_shop_life(points, per, &wears, &repairs);
-   else
-      cw_shop_life(INDESTRUCTIBLE_PTS, INDESTRUCTIBLE_WEAR, &wears, &repairs);
-   charge = (long)cw_floor((double)wears * BLOWS_PER_WEAR / (repairs + 1) + 0.5);
-   if (refits)
-      *refits = repairs;
-   return MAX(1, charge);
+   cw_weapon_wear(vnum, &points, &per, &no_repair);
+   return repair_life(points, per, no_repair, BLOWS_PER_WEAR, k, charge, at);
+   }
+
+/* the blows in a new form's charge */
+static long cw_form_charge(long vnum)
+   {
+   long charge = 1;
+
+   cw_form_life(vnum, 0, &charge, NULL);
+   return charge;
+   }
+
+/* the blows in this form's full charge, where it stands in its life */
+static long cw_full_charge(struct hero_form *f)
+   {
+   long charge = 1;
+
+   cw_form_life(f->vnum, MAX(0, f->refits), &charge, NULL);
+   return charge;
    }
 
 static int cw_refits_left(struct hero_form *f)
    {
-   long refits;
+   return MAX(0, cw_form_life(f->vnum, 0, NULL, NULL) - MAX(0, f->refits));
+   }
 
-   cw_form_charge(f->vnum, &refits);
-   return MAX(0, (int)refits - MAX(0, f->refits));
+/* the repair or reforge the form's next refit stands for: FALSE when none
+ * is left */
+static int cw_next_refit(struct hero_form *f, struct repair_service *at)
+   {
+   return MAX(0, f->refits) < cw_form_life(f->vnum, MAX(0, f->refits), NULL, at);
+   }
+
+/* what a spent form needs, for the messages */
+static const char *cw_spent_hint(struct hero_form *f)
+   {
+   struct repair_service at;
+
+   if (!f || !cw_next_refit(f, &at))
+      return "it is worn out; infuse another of that weapon to make it new";
+   return at.master ? "a master smith must reforge it to use it again"
+                    : "refit it at a smith's station to use it again";
+   }
+
+/* the gold for a form's next refit: what keeper charges for the repair or
+ * reforge it stands for (get_repair_cost, on a copy of the weapon as it
+ * would stand then) */
+static int cw_refit_price(struct char_data *ch, struct char_data *keeper,
+                          struct hero_form *f, struct repair_service *at)
+   {
+   obj_rnum r = real_object(f->vnum);
+   struct obj_data *o;
+   int cost, reductions;
+
+   if (r >= 0 && GET_OBJ_OSLOTS(&obj_proto[r]) > 0)
+      {
+      o = read_object(f->vnum, VIRTUAL);
+      GET_OBJ_OSLOTS(o) = at->orig;
+      GET_OBJ_TSLOTS(o) = at->max;
+      GET_OBJ_CSLOTS(o) = at->cur;
+      cost = get_repair_cost(o, keeper, ch);
+      extract_obj(o);
+      return cost;
+      }
+   /* an indestructible weapon, priced as the weapon it lives as */
+   reductions = (int)(((float)INDESTRUCTIBLE_PTS - at->orig) / ((float)INDESTRUCTIBLE_PTS * 0.1));
+   if (at->master)
+      cost = (int)(MASTER_REFORGE * (1 + 0.5 * reductions));
+   else
+      cost = (reductions + 1) * at->orig * (at->max - at->cur);
+   return price_adjust(ch, keeper, cost);
    }
 
 /* the copy takes a base: the stats and traits of t, the class weapon's own
@@ -689,10 +737,13 @@ static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
    return why;
    }
 
-/* "Forms: core, the Holy Avenger 80% (95 refits), a dwarven hammer spent (0 refits)." */
-static void cw_form_list(struct obj_data *obj, char *out)
+/* "Forms: core, the Holy Avenger 80% (95 refits), a dwarven hammer spent (0 refits)."
+ * With a buyer and the repairman he deals with, each form's next price. */
+static void cw_form_list(struct obj_data *obj, char *out, struct char_data *buyer,
+                         struct char_data *keeper)
    {
    struct hero_data *h = obj->hero;
+   struct repair_service at;
    obj_rnum r;
    long full;
    int i;
@@ -709,14 +760,18 @@ static void cw_form_list(struct obj_data *obj, char *out)
    for (i = 0; i < h->num_forms; i++)
       {
       r = real_object(h->forms[i].vnum);
-      full = cw_form_charge(h->forms[i].vnum, NULL);
+      full = cw_full_charge(&h->forms[i]);
       sprintf(out + strlen(out), ", %s ", r >= 0 ? obj_proto[r].short_description : "something lost");
       if (h->forms[i].charge > 0)
          sprintf(out + strlen(out), "%d%%",
                  (int)MIN(100, cw_floor(100.0 * h->forms[i].charge / full + 0.5)));
       else
          strcat(out, "spent");
-      sprintf(out + strlen(out), " (%d refits)", cw_refits_left(&h->forms[i]));
+      if (buyer && keeper && cw_next_refit(&h->forms[i], &at))
+         sprintf(out + strlen(out), " (%d refits, the next %d gold%s)", cw_refits_left(&h->forms[i]),
+                 cw_refit_price(buyer, keeper, &h->forms[i], &at), at.master ? " at a master smith" : "");
+      else
+         sprintf(out + strlen(out), " (%d refits)", cw_refits_left(&h->forms[i]));
       }
    strcat(out, ".");
    }
@@ -963,9 +1018,7 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
          obj->hero->form = HERO_CORE_FORM;
          cw_refresh(obj);
          send_to_char(ch, "&Y%s's borrowed form is spent and it is back to its own form: %s.&n\r\n",
-                      obj->short_description, f && cw_refits_left(f) > 0
-                      ? "refit it at a smith's station to use it again"
-                      : "it is worn out; infuse another of that weapon to make it new");
+                      obj->short_description, cw_spent_hint(f));
          }
       }
    cw_grow(ch, obj, POINTS_PER_HIT);
@@ -1402,16 +1455,45 @@ static void cw_focus_line(struct hero_data *h, char *out)
       sprintf(out, "No focus chosen yet: focus <dps|heal|tank|cast>.%s", tail);
    }
 
-/* a smith's station: in this game, a room where a repairman works */
-static int cw_at_smith(struct char_data *ch)
+/* would this repairman turn the piece away as outside his trade
+ * (repair_guy's specialist check) */
+static int cw_outside_trade(struct char_data *keeper, struct obj_data *piece)
+   {
+   int weap = MOB2_FLAGGED(keeper, MOB2_WEAPONSMITH) ? (ITEM_WEAR_WIELD | ITEM_WEAR_HOLD) : 0;
+   int armr = MOB2_FLAGGED(keeper, MOB2_ARMORER) ?
+              (ITEM_WEAR_BODY | ITEM_WEAR_HEAD | ITEM_WEAR_LEGS | ITEM_WEAR_FEET | ITEM_WEAR_HANDS |
+               ITEM_WEAR_ARMS | ITEM_WEAR_SHIELD | ITEM_WEAR_ABOUT | ITEM_WEAR_WAIST |
+               ITEM_WEAR_BACK | ITEM_WEAR_FACE) : 0;
+   int jewl = MOB2_FLAGGED(keeper, MOB2_JEWELER) ?
+              (ITEM_WEAR_HOLD | ITEM_WEAR_FINGER | ITEM_WEAR_NECK | ITEM_WEAR_WRIST |
+               ITEM_WEAR_EAR | ITEM_WEAR_WAIST | ITEM_WEAR_FACE | ITEM_WEAR_ABOUT |
+               ITEM_WEAR_HEAD) : 0;
+
+   return (weap && !CAN_WEAR(piece, weap)) || (armr && !CAN_WEAR(piece, armr)) ||
+          (jewl && !CAN_WEAR(piece, jewl));
+   }
+
+/* a repairman at work here (a smith's station, in this game); a master who
+ * works on that piece when master is set (one who reforges) */
+static struct char_data *cw_repairman(struct char_data *ch, struct obj_data *piece, int master)
    {
    struct char_data *k;
 
    for (k = world[IN_ROOM(ch)].people; k; k = k->next_in_room)
-      if (IS_NPC(k) && GET_MOB_RNUM(k) >= 0 && mob_index[GET_MOB_RNUM(k)].func == repair_guy &&
-          AWAKE(k) && !FIGHTING(k))
-         return TRUE;
-   return FALSE;
+      {
+      if (!IS_NPC(k) || GET_MOB_RNUM(k) < 0 || mob_index[GET_MOB_RNUM(k)].func != repair_guy ||
+          !AWAKE(k) || FIGHTING(k))
+         continue;
+      if (master && (!MOB_FLAGGED(k, MOB_MASTER) || (piece && cw_outside_trade(k, piece))))
+         continue;
+      return k;
+      }
+   return NULL;
+   }
+
+static int cw_at_smith(struct char_data *ch)
+   {
+   return cw_repairman(ch, NULL, FALSE) != NULL;
    }
 
 /* focus [dps|heal|tank|cast]: the first anywhere, a change at a smith's
@@ -1538,7 +1620,7 @@ ACMD(do_infuse)
          if (!f)
             f = &h->forms[h->num_forms++];
          f->vnum = vnum;
-         f->charge = cw_form_charge(vnum, NULL);
+         f->charge = cw_form_charge(vnum);
          f->refits = 0;   /* another of the same weapon: a new life */
          if (known)
             send_to_char(ch, "&Y%s absorbs %s: the form is new again.&n\r\n",
@@ -1570,7 +1652,7 @@ ACMD(do_shift)
       send_to_char(ch, "Your class weapon must be carried, not in your hands, to shift.\r\n");
    else if (!*arg)
       {
-      cw_form_list(obj, buf);
+      cw_form_list(obj, buf, NULL, NULL);
       send_to_char(ch, "shift <form>: %s\r\n", buf);
       }
    else if (!str_cmp(arg, "core") || !str_cmp(arg, "own") || !str_cmp(arg, "self"))
@@ -1586,15 +1668,13 @@ ACMD(do_shift)
       }
    else if (!(f = cw_find_form((h = obj->hero), arg)) || (r = real_object(f->vnum)) < 0)
       {
-      cw_form_list(obj, buf);
+      cw_form_list(obj, buf, NULL, NULL);
       send_to_char(ch, "%s knows no form called '%s'. %s\r\n", obj->short_description, arg, buf);
       }
    else if (f->charge <= 0)
-      send_to_char(ch, cw_refits_left(f) > 0
-                   ? "The form of %s is spent; refit it at a smith's station.\r\n"
-                   : "The form of %s is worn out; infuse another of that weapon to make it new.\r\n",
-                   obj_proto[r].short_description);
-      else if (cw_form_refusal(ch, h, &obj_proto[r], why))
+      send_to_char(ch, "The form of %s is spent; %s.\r\n", obj_proto[r].short_description,
+                   cw_spent_hint(f));
+   else if (cw_form_refusal(ch, h, &obj_proto[r], why))
       send_to_char(ch, "Not as you stand: %s\r\n", why);
    else
       {
@@ -1602,22 +1682,46 @@ ACMD(do_shift)
       cw_refresh(obj);
       send_to_char(ch, "&Y%s takes the form of %s, with your levels and bonus on top; charge %d%%.&n\r\n",
                    obj->short_description, obj_proto[r].short_description,
-                   (int)MIN(100, cw_floor(100.0 * f->charge / cw_form_charge(f->vnum, NULL) + 0.5)));
+                   (int)MIN(100, cw_floor(100.0 * f->charge / cw_full_charge(f) + 0.5)));
       }
    release_buffer(arg);
    release_buffer(buf);
    }
 
-/* refit <form>: at a smith's station, a spent form filled to a full charge
- * again, as often as its weapon would have been repaired over its life */
+/* the masters who reforge, by name: "the Master Weaponsmith, the Master
+ * Armourer, or the Master Goldsmith" */
+static void cw_masters_line(char *out)
+   {
+   static const long masters[] = { 27498, 27497, 27496, 0 };
+   mob_rnum m;
+   int i, n = 0;
+
+   *out = '\0';
+   for (i = 0; masters[i]; i++)
+      {
+      if ((m = real_mobile(masters[i])) < 0)
+         continue;
+      if (n)
+         strcat(out, masters[i + 1] ? ", " : ", or ");
+      strcat(out, mob_proto[m].player.short_descr);
+      n++;
+      }
+   if (!n)
+      strcpy(out, "the master smiths");
+   }
+
+/* refit <form>: a spent form filled to a full charge again, standing for
+ * the next repair of its weapon's life at a smith's station, or the next
+ * reforge, which only a master does; for what that repair or reforge costs */
 ACMD(do_refit)
    {
    struct obj_data *obj;
    struct hero_form *f;
+   struct char_data *keeper, *master;
+   struct repair_service at;
    obj_rnum r;
    char *arg = get_buffer(MAX_INPUT_LENGTH), *buf = get_buffer(MAX_STRING_LENGTH);
-   long full;
-   int left;
+   int left, price;
 
    one_argument(argument, arg);
    if (!(obj = cw_carried(ch)))
@@ -1626,34 +1730,47 @@ ACMD(do_refit)
       send_to_char(ch, "Huh?!?\r\n");
    else if (!obj)
       send_to_char(ch, "You have no class weapon to refit.\r\n");
-   else if (!cw_at_smith(ch))
+   else if (!(keeper = cw_repairman(ch, NULL, FALSE)))
       send_to_char(ch, "There is no smith's station here: a forge, a smithy, or a smith at his "
                    "work.\r\n");
    else if (!*arg)
       {
-      cw_form_list(obj, buf);
+      cw_form_list(obj, buf, ch, keeper);
       send_to_char(ch, "Refit which form? %s\r\n", buf);
       }
    else if (!(f = cw_find_form(obj->hero, arg)) || (r = real_object(f->vnum)) < 0)
       {
-      cw_form_list(obj, buf);
+      cw_form_list(obj, buf, ch, keeper);
       send_to_char(ch, "%s knows no form called '%s'. %s\r\n", obj->short_description, arg, buf);
       }
-   else if (f->charge >= (full = cw_form_charge(f->vnum, NULL)))
+   else if (f->charge >= cw_full_charge(f))
       send_to_char(ch, "The form of %s is at full charge.\r\n", obj_proto[r].short_description);
-   else if ((left = cw_refits_left(f)) <= 0)
-      send_to_char(ch, "The form of %s has been refit as often as that weapon could be repaired; "
-                   "infuse another of it to make it new.\r\n", obj_proto[r].short_description);
+   else if (!cw_next_refit(f, &at))
+      send_to_char(ch, "The form of %s has been repaired and reforged as often as that weapon "
+                   "could be; infuse another of it to make it new.\r\n", obj_proto[r].short_description);
+   else if (at.master && !(master = cw_repairman(ch, &obj_proto[r], TRUE)))
+      {
+      cw_masters_line(buf);
+      send_to_char(ch, "Only a master smith can reforge the form of %s now, for %d gold: %s.\r\n",
+                   obj_proto[r].short_description, cw_refit_price(ch, keeper, f, &at), buf);
+      }
+   else if (GET_GOLD(ch) < (price = cw_refit_price(ch, at.master ? master : keeper, f, &at)))
+      send_to_char(ch, "You need %d gold on hand to %s the form of %s.\r\n", price,
+                   at.master ? "reforge" : "refit", obj_proto[r].short_description);
    else
       {
+      GET_GOLD(ch) -= price;
       f->refits = MAX(0, f->refits) + 1;
-      f->charge = full;
-      if (left - 1 == 0)
-         send_to_char(ch, "&YThe form of %s is refit to a full charge; it cannot be refit again.&n\r\n",
-                      obj_proto[r].short_description);
+      f->charge = cw_full_charge(f);
+      left = cw_refits_left(f);
+      if (left == 0)
+         send_to_char(ch, "&YYou pay %d gold. The form of %s is %s to a full charge; it cannot be "
+                      "refit again.&n\r\n", price, obj_proto[r].short_description,
+                      at.master ? "reforged" : "refit");
       else
-         send_to_char(ch, "&YThe form of %s is refit to a full charge; it can be refit %d more "
-                      "time%s.&n\r\n", obj_proto[r].short_description, left - 1, left - 1 == 1 ? "" : "s");
+         send_to_char(ch, "&YYou pay %d gold. The form of %s is %s to a full charge; it can be refit "
+                      "%d more time%s.&n\r\n", price, obj_proto[r].short_description,
+                      at.master ? "reforged" : "refit", left, left == 1 ? "" : "s");
       }
    release_buffer(arg);
    release_buffer(buf);
@@ -2007,7 +2124,7 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
       {
       char *list = get_buffer(MAX_STRING_LENGTH);
 
-      cw_form_list(obj, list);
+      cw_form_list(obj, list, NULL, NULL);
       sprintf(buf + strlen(buf), "%s\r\n", list);
       release_buffer(list);
       }
