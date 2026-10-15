@@ -949,15 +949,24 @@ int Crash_load(struct char_data * ch)
                   /* content list existing */
                   if (GET_OBJ_TYPE(obj) == ITEM_CONTAINER)
                      {
-                     /* rem item ; fill ; equip again */
-                     obj = unequip_char(ch, locate-1);
+                     /* rem item ; fill ; equip again. auto_equip can refuse
+                      * the slot and carry the container instead; then the
+                      * slot is empty and it is filled where it is carried. */
+                     int worn = (obj->worn_by == ch);
+                     if (worn)
+                        obj = unequip_char(ch, locate-1);
+                     else
+                        obj_from_char(obj);
                      obj->contains = NULL; /* should be empty - but who knows */
                      for (;cont_row[0];cont_row[0] = obj1)
                         {
                         obj1 = cont_row[0]->next_content;
                         obj_to_obj(cont_row[0], obj);
                         }
-                     equip_char(ch, obj, locate-1);
+                     if (worn)
+                        equip_char(ch, obj, locate-1);
+                     else
+                        obj_to_char(obj, ch);
                      }
                   else
                      {
@@ -2403,15 +2412,24 @@ int Crash_load_xapobjs(struct char_data *ch)
                { /* content list existing */
                if (GET_OBJ_TYPE(temp) == ITEM_CONTAINER)
                   {
-                  /* rem item ; fill ; equip again */
-                  temp = unequip_char(ch, locate-1);
+                  /* rem item ; fill ; equip again. auto_equip can refuse
+                   * the slot and carry the container instead; then the
+                   * slot is empty and it is filled where it is carried. */
+                  int worn = (temp->worn_by == ch);
+                  if (worn)
+                     temp = unequip_char(ch, locate-1);
+                  else
+                     obj_from_char(temp);
                   temp->contains = NULL; /* should be empty - but who knows */
                   for (;cont_row[0];cont_row[0] = obj1)
                      {
                      obj1 = cont_row[0]->next_content;
                      obj_to_obj(cont_row[0], temp);
                      }
-                  equip_char(ch, temp, locate-1);
+                  if (worn)
+                     equip_char(ch, temp, locate-1);
+                  else
+                     obj_to_char(temp, ch);
                   }
                else
                   { /* object isn't container -> empty content list */
