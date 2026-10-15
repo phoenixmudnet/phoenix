@@ -297,6 +297,7 @@ void affect_update(void)
    static struct char_data *i; 
  
    for (i = character_list; i; i = i->next) 
+      {
       for (af = i->affected; af; af = next) 
 	 { 
 	 next = af->next; 
@@ -328,6 +329,7 @@ void affect_update(void)
 		     } 
 	    affect_remove(i, af); 
 	    } 
+	 }
 
       /* 4.2: spend one buff hour's worth and CARRY the remainder - the
          half-seconds a short fight bought are not forgiven, they wait for
@@ -339,7 +341,7 @@ void affect_update(void)
          worth can accrue per window and this subtracts at most once. */
       if (COMBAT_PULSES(i) >= PULSES_PER_BUFF_HOUR)
          COMBAT_PULSES(i) -= PULSES_PER_BUFF_HOUR;
-	 } 
+      }
 } 
  
 
