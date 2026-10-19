@@ -604,6 +604,9 @@ const char *connected_types[] = {
   "Ask first time",
   "Select hometown",
   "Changing E-mail",
+  "Character select",
+  "New character",
+  "Character select",
   "ERROR",
   "\n"
 };
