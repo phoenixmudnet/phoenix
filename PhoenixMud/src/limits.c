@@ -23,6 +23,7 @@
 #include "constants.h"
 #include "queue.h"
 #include "dg_scripts.h"
+#include "classweapon.h"
 
 extern struct char_data *character_list;
 extern struct obj_data *object_list;
@@ -545,6 +546,7 @@ void check_idling(struct char_data *ch)
          sprintf(buf, "%s force-rented and extracted (idle).", GET_NAME(ch));
          mudlog(buf, CMP, LVL_DGOD, TRUE);
          
+         cw_end_sitting(ch, FALSE);   /* leaving: a lent form comes apart */
          Crash_extract_norents_from_equipped(ch);
          Crash_extract_norents(ch->carrying);
 

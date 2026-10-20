@@ -11,7 +11,8 @@
 *    HT <points> <hits> <hour> <hour hits> <hour points>  attunement   *
 *    HW <class> <core> <level> <essences> <cleared> <waiting> <form>   *
 *       <focus>                   the class weapon                     *
-*    HF <vnum> <charge> <refits>  a form it knows                      *
+*    HF <vnum> <charge> <refits> [<sitting>]  a form it knows; sitting *
+*       is when it was lent from a !rent piece (0 or none: for good)  *
 *    HH <level>                   a level a lock held it at            *
 *    HP <dps> <heal> <tank> <cast>  each focus's own points            *
 *    HG <key>                     a grant applied to it                *
@@ -112,8 +113,11 @@ int obj_hero_write(FILE *fp, const struct obj_data *obj)
                h->focus) < 0)
       err = -1;
    for (i = 0; i < h->num_forms && i < HERO_MAX_FORMS; i++)
-      if (fprintf(fp, "HF %ld %ld %d\n", h->forms[i].vnum,
-                  h->forms[i].charge, h->forms[i].refits) < 0)
+      if ((h->forms[i].sitting > 0
+           ? fprintf(fp, "HF %ld %ld %d %ld\n", h->forms[i].vnum, h->forms[i].charge,
+                     h->forms[i].refits, h->forms[i].sitting)
+           : fprintf(fp, "HF %ld %ld %d\n", h->forms[i].vnum, h->forms[i].charge,
+                     h->forms[i].refits)) < 0)
          err = -1;
    for (i = 0; i < h->num_holds && i < HERO_MAX_HOLDS; i++)
       if (fprintf(fp, "HH %d\n", h->holds[i]) < 0)
@@ -197,7 +201,8 @@ int obj_hero_read_line(struct obj_data *obj, const char *line)
             }
          return TRUE;
       case 'F':
-         if (sscanf(line, "HF %ld %ld %d", &l1, &l2, &i6) == 3)
+         l3 = 0;
+         if (sscanf(line, "HF %ld %ld %d %ld", &l1, &l2, &i6, &l3) >= 3)
             {
             h = hero_of(obj);
             if (h->num_forms < HERO_MAX_FORMS)
@@ -205,6 +210,7 @@ int obj_hero_read_line(struct obj_data *obj, const char *line)
                h->forms[h->num_forms].vnum = l1;
                h->forms[h->num_forms].charge = l2 < 0 ? 0 : l2;
                h->forms[h->num_forms].refits = i6 < 0 ? HERO_REFITS_UNSET : i6;
+               h->forms[h->num_forms].sitting = l3 > 0 ? l3 : 0;
                h->num_forms++;
                }
             }

@@ -167,11 +167,39 @@ static void test_copy(void)
    obj_hero_free(&b);
    }
 
+/* a form lent from a !rent piece carries when it was lent; an older
+ * three-field HF line reads as a form held for good */
+static void test_sitting_form(void)
+   {
+   struct obj_data a, b, c;
+   char line[64];
+
+   memset(&a, 0, sizeof(a));
+   memset(&b, 0, sizeof(b));
+   memset(&c, 0, sizeof(c));
+   a.hero = hero_create();
+   a.hero->num_forms = 2;
+   a.hero->forms[0].vnum = 850; a.hero->forms[0].charge = 3588;
+   a.hero->forms[0].refits = 2; a.hero->forms[0].sitting = 1792000000;
+   a.hero->forms[1].vnum = 3025; a.hero->forms[1].refits = 0;
+   round_trip(&a, &b);
+   CHECK(b.hero && b.hero->num_forms == 2);
+   CHECK(b.hero->forms[0].sitting == 1792000000);
+   CHECK(b.hero->forms[1].sitting == 0);
+   strcpy(line, "HF 850 3588 2");
+   CHECK(obj_hero_read_line(&c, line) == TRUE);
+   CHECK(c.hero && c.hero->forms[0].sitting == 0 && c.hero->forms[0].refits == 2);
+   obj_hero_free(&a);
+   obj_hero_free(&b);
+   obj_hero_free(&c);
+   }
+
 int main(void)
    {
    test_round_trip();
    test_plain_and_essence();
    test_copy();
+   test_sitting_form();
    printf("hero_state: %d checks, %d failures\n", checks, failures);
    return failures ? 1 : 0;
    }
