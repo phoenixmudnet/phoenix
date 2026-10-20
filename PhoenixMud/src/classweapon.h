@@ -16,6 +16,9 @@ void classweapon_boot(void);
 void cw_give_first(struct char_data *ch);
 void cw_reclass(struct char_data *ch);
 void cw_login(struct char_data *ch);
+/* forms lent for a sitting come apart: leaving (at_login 0), or at login
+ * once a day old */
+void cw_end_sitting(struct char_data *ch, int at_login);
 void cw_note_hit(struct char_data *ch, struct obj_data *wielded);
 void cw_note_cast(struct char_data *ch);
 int  cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount);

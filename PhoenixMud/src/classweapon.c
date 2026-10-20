@@ -1265,6 +1265,59 @@ void cw_reclass(struct char_data *ch)
       }
    }
 
+/* ------------------------------------------------- forms lent for a sitting */
+
+/* A form taken from a !rent piece lasts the sitting it was taken in, as the
+ * piece would have: it comes apart when its owner leaves the game, or at
+ * login once a day old (a reboot in between kept it). hero_form.sitting is
+ * when it was lent; 0 is a form held for good. */
+#define CW_SITTING_MAX (24 * 60 * 60)
+
+static int cw_end_sitting_on(struct char_data *ch, struct obj_data *o, int at_login)
+   {
+   struct hero_data *h = o->hero;
+   long now = (long)time(0);
+   obj_rnum r;
+   int i, j, lost = 0;
+
+   for (i = j = 0; i < h->num_forms; i++)
+      {
+      if (h->forms[i].sitting > 0 &&
+          (!at_login || now - h->forms[i].sitting >= CW_SITTING_MAX))
+         {
+         lost++;
+         if (h->form == h->forms[i].vnum)
+            h->form = HERO_CORE_FORM;
+         if (at_login && (r = real_object(h->forms[i].vnum)) >= 0)
+            send_to_char(ch, "The form of %s comes apart: it was lent for a sitting.\r\n",
+                         obj_proto[r].short_description);
+         continue;
+         }
+      h->forms[j++] = h->forms[i];
+      }
+   h->num_forms = j;
+   return lost;
+   }
+
+void cw_end_sitting(struct char_data *ch, int at_login)
+   {
+   struct obj_data *o;
+   int pos;
+
+   if (!class_weapons || IS_NPC(ch))
+      return;
+   for (o = ch->carrying; o; o = o->next_content)
+      if (cw_mine(o, ch) && cw_end_sitting_on(ch, o, at_login))
+         cw_refresh(o);
+   for (pos = 0; pos < NUM_WEARS; pos++)
+      if ((o = GET_EQ(ch, pos)) && cw_mine(o, ch) && cw_end_sitting_on(ch, o, at_login))
+         {
+         o = unequip_char(ch, pos);
+         cw_refresh(o);
+         equip_char(ch, o, pos);
+         }
+   }
+
 /* at login: the class's own weapon, carried and bound to its owner but
  * without its state (a hand-made copy), is started at level 0 */
 void cw_login(struct char_data *ch)
@@ -1312,6 +1365,7 @@ void cw_login(struct char_data *ch)
       }
    }
    cw_reclass(ch);
+   cw_end_sitting(ch, TRUE);
    }
 
 /* ---------------------------------------------------------------- essences */
@@ -1621,8 +1675,18 @@ ACMD(do_infuse)
             f = &h->forms[i];
       if (!f && h->num_forms >= HERO_MAX_FORMS)
          send_to_char(ch, "%s can hold no more forms.\r\n", hero->short_description);
+      /* a !rent piece lends its form for this sitting only, as the piece
+       * itself would have lasted; it never refreshes a form held for good */
+      else if (f && !f->sitting && IS_OBJ_STAT(other, ITEM_NORENT))
+         send_to_char(ch, "%s holds the form of %s for good; %s would lend it only for a "
+                      "sitting.\r\n", hero->short_description, other->short_description,
+                      other->short_description);
       else
          {
+         int rentless = IS_OBJ_STAT(other, ITEM_NORENT);
+         const char *lasts = rentless ? " The form lasts this sitting: it comes apart when "
+                                        "you leave the game." : "";
+
          strcpy(what, other->short_description);
          one_argument(other->name, word);
          obj_from_char(other);
@@ -1633,12 +1697,13 @@ ACMD(do_infuse)
          f->vnum = vnum;
          f->charge = cw_form_charge(vnum);
          f->refits = 0;   /* another of the same weapon: a new life */
+         f->sitting = rentless ? (long)time(0) : 0;
          if (known)
-            send_to_char(ch, "&Y%s absorbs %s: the form is new again.&n\r\n",
-                         hero->short_description, what);
+            send_to_char(ch, "&Y%s absorbs %s: the form is new again.%s&n\r\n",
+                         hero->short_description, what, lasts);
          else
-            send_to_char(ch, "&Y%s absorbs %s: it can take that form now. shift %s.&n\r\n",
-                         hero->short_description, what, word);
+            send_to_char(ch, "&Y%s absorbs %s: it can take that form now. shift %s.%s&n\r\n",
+                         hero->short_description, what, word, lasts);
          }
       }
    release_buffer(arg);

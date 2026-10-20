@@ -35,6 +35,8 @@ struct hero_form
    long vnum;
    long charge;
    int refits;
+   long sitting;            /* when it was lent from a !rent piece, for one
+                             * sitting (time(0)); 0: held for good */
    };
 
 struct hero_data

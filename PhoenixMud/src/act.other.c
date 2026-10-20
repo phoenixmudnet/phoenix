@@ -274,6 +274,7 @@ ACMD(do_quit)
             }
 
 	 REMOVE_BIT(PLR_FLAGS(ch), PLR_LINKLOADED);
+         cw_end_sitting(ch, FALSE);   /* leaving: a lent form comes apart */
          write_aliases(ch); /* Alias mod */
          save_char(ch, IN_ROOM(ch));
          Crash_crashsave(ch);
