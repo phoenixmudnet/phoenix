@@ -699,6 +699,15 @@ static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
    int held = cr >= 0 && cw_held_kind(&obj_proto[cr]);
    int t = GET_OBJ_VAL(o, 3);
 
+   /* A form lends the stats and leaves the scripts behind, and the scripts
+    * are often the guard (a wear trigger that refuses players, a timer that
+    * ends the piece). Nothing with object triggers becomes a form. */
+   if (o->proto_script)
+      {
+      sprintf(why, "%s carries magic of its own; your class weapon cannot take its form.",
+              o->short_description);
+      return why;
+      }
    if (held)
       {
       if (!CAN_WEAR(o, ITEM_WEAR_HOLD) || !(GET_OBJ_TYPE(o) == ITEM_ARMOR ||
