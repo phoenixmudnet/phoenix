@@ -718,6 +718,8 @@ static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
       }
    if (GET_OBJ_TYPE(o) != ITEM_WEAPON && GET_OBJ_TYPE(o) != ITEM_FIREWEAPON)
       sprintf(why, "%s is no weapon.", o->short_description);
+   else if (!CAN_WEAR(o, ITEM_WEAR_WIELD))   /* do_wield's first test */
+      sprintf(why, "You can't wield %s.", o->short_description);
    else if (GET_OBJ_WEIGHT(o) > str_app[STRENGTH_APPLY_INDEX(ch)].wield_w)
       sprintf(why, "%s is too heavy for you to use.", o->short_description);
    else if ((IS_CLERIC(ch) || IS_DRUID(ch)) && (t == 2 || t == 3 || t == 6 || t == 7 ||
