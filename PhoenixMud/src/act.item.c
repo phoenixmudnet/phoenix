@@ -49,6 +49,7 @@ void mprog_bribe_trigger(struct char_data * mob, struct char_data * ch,
 int can_give_gold(struct char_data *ch, int amount);
 int min_level(struct char_data *ch,int spellnum);
 int get_prof(struct char_data *ch, struct obj_data *wielded);   /*. fight.c .*/
+int godly_use_ok(struct char_data *ch, struct obj_data *obj);
 char *skill_name(int num);                                      /*. spell_parser.c .*/
 extern struct spell_info_type *spells;                          /*. spell_parser.c .*/
 
@@ -1640,6 +1641,8 @@ ACMD(do_eat)
       send_to_char(ch, "You can't eat THAT!\r\n");
       return;
       }
+   if (!godly_use_ok(ch, food))
+      return;
    if (GET_COND(ch, FULL) > 20) /* Stomach full */
       {
 
@@ -2027,6 +2030,18 @@ int hands_full(struct char_data *ch)
 ** after level and remort restrictions(if present)
 ** note: messages can be suppressed by setting message as FALSE
 */
+/* an immortal's potion, pill, scroll or food is not a mortal's to use up:
+ * the godly rule can_wear_lr applies to anything worn or held (LR 105+),
+ * which quaff, swallow, recite and eat skipped, taking it from the pack */
+int godly_use_ok(struct char_data *ch, struct obj_data *obj)
+   {
+   if (GET_LEVEL(ch) >= LVL_IMMORT || GET_OBJ_LR(obj) < LVL_IMMORT)
+      return 1;
+   act("$n tries to use $p but is not godly enough.", FALSE, ch, obj, 0, TO_ROOM);
+   act("You are not godly enough to use $p.", FALSE, ch, obj, 0, TO_CHAR);
+   return 0;
+   }
+
 int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message)
    {
    /* a bound piece serves its one character */
