@@ -501,7 +501,11 @@ void get_from_room(struct char_data * ch, char *arg,int howmany)
                      log_corpse(ch,obj,"picked up");
                      perform_get_from_room(ch, obj, 0);
                      }
-                  else
+                  /* every item of a run asks its get trigger, as the run's
+                   * last does through perform_get_from_room: a run of the
+                   * same object took all but one past a script that
+                   * refuses (sac the corpses, then get all) */
+                  else if (get_otrigger(obj, ch))
                      {
                      num++;
                      log_corpse(ch,obj,"picked up");
