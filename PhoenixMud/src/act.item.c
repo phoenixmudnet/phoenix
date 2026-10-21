@@ -291,10 +291,23 @@ void get_check_money(struct char_data * ch, struct obj_data * obj, int subcmd)
    }
 
 
+/* out of a container the character carries: its weight is carried already,
+ * so can_take_obj's count and weight tests are skipped, but a thing that
+ * cannot be taken still cannot (a carried corpse held its mob's no-TAKE
+ * gear: get corpse, then get apron corpse) */
+static int can_take_from_carried(struct char_data *ch, struct obj_data *obj)
+   {
+   if ((GET_LEVEL(ch) >= LVL_IMMORT && PRF_FLAGGED(ch, PRF_NOHASSLE)) ||
+       CAN_WEAR(obj, ITEM_WEAR_TAKE))
+      return 1;
+   act("$p: you can't take that!", FALSE, ch, obj, 0, TO_CHAR);
+   return 0;
+   }
+
 void perform_get_from_container(struct char_data * ch, struct obj_data * obj,
                                 struct obj_data * cont, int mode, int subcmd)
    {
-   if (mode == FIND_OBJ_INV || can_take_obj(ch, obj))
+   if (mode == FIND_OBJ_INV ? can_take_from_carried(ch, obj) : can_take_obj(ch, obj))
       {
       if (IS_CARRYING_N(ch) >= CAN_CARRY_N(ch))
          act("$p: you can't hold any more items.", FALSE, ch, obj, 0, TO_CHAR);
