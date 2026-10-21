@@ -706,41 +706,53 @@ void perform_drop_gold(struct char_data * ch, int amount,
 #define VANISH(mode) ((mode == SCMD_DONATE || mode == SCMD_JUNK || mode == SCMD_CDONATE) ? \
         "  It vanishes in a puff of smoke!" : "")
 
-int perform_drop(struct char_data * ch, struct obj_data * obj,
-                 byte mode, char *sname, room_rnum RDR, int num)
+/* may obj be dropped, donated or junked: the triggers and the flags
+ * perform_drop asks before it moves anything, with its refusals. do_drop's
+ * run of the same object (drop, junk or donate all, all.x) moved all but
+ * the last without asking, so a run of cursed or !donate pieces went, and
+ * their drop triggers never ran */
+static int drop_allowed(struct char_data * ch, struct obj_data * obj,
+                        byte mode, char *sname)
    {
-   int value;
-   long nitems=0;
    char *buf;
+
    if (!drop_otrigger(obj, ch))
       return 0;
    if ((mode == SCMD_DROP) && !drop_wtrigger(obj, ch))
       return 0;
-
-   buf = get_buffer(SMALL_BUFSIZE);
    if (IS_OBJ_STAT(obj, ITEM_NODROP)&&
            (IS_NPC(ch)||!PRF_FLAGGED(ch,PRF_NOHASSLE)))
       {
+      buf = get_buffer(SMALL_BUFSIZE);
       sprintf(buf, "You can't %s $p, it must be CURSED!", sname);
       act(buf, FALSE, ch, obj, 0, TO_CHAR);
       release_buffer(buf);
-
       return (0);
       }
    if (((mode == SCMD_DONATE)||(mode == SCMD_CDONATE)) && IS_OBJ_STAT(obj, ITEM_NODONATE))
       {
       act("You cannot donate $p.",FALSE,ch,obj,0,TO_CHAR);
-      release_buffer(buf);
       return (0);
       }
    /* I like doing this so I better disallow it - Nomikos 7/17/2025 */
    if ((mode == SCMD_JUNK) && IS_OBJ_STAT(obj, ITEM_DONATED))
       {
       act("Some kind person donated $p, maybe you can re-donate it instead?",FALSE,ch,obj,0,TO_CHAR);
-      release_buffer(buf);
       return (0);
       }
-	   
+   return 1;
+   }
+
+int perform_drop(struct char_data * ch, struct obj_data * obj,
+                 byte mode, char *sname, room_rnum RDR, int num)
+   {
+   int value;
+   long nitems=0;
+   char *buf;
+   if (!drop_allowed(ch, obj, mode, sname))
+      return 0;
+
+   buf = get_buffer(SMALL_BUFSIZE);
    if(num>0)
       {
       sprintf(buf, "You %s $p.%s (x %d)", sname, VANISH(mode), num+1);
@@ -957,6 +969,8 @@ ACMD(do_drop)
                if ((obj->next_content!=NULL)
                        &&(obj->item_number==obj->next_content->item_number))
                   {
+                  if (!drop_allowed(ch, obj, mode, sname))
+                     continue;
                   num++;
                   amount++;
                   obj_from_char(obj);
@@ -1029,6 +1043,8 @@ ACMD(do_drop)
 
             if ((next_obj!=NULL)&&(obj->item_number==next_obj->item_number))
                {
+               if (!drop_allowed(ch, obj, mode, sname))
+                  continue;
                num++;
                amount++;
                obj_from_char(obj);
