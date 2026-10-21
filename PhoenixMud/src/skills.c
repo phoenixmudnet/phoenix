@@ -2284,6 +2284,21 @@ ACMD(do_skin)
 /*
  * Steal skill code
  */
+/* a thief takes what get would take: steal skipped can_take_obj's TAKE test
+ * and the object's get trigger, so mob-only gear (no TAKE) and pieces whose
+ * script destroys them when a player takes them were stolen whole */
+static int steal_take_ok(struct char_data *ch, struct obj_data *obj)
+   {
+   if (GET_LEVEL(ch) >= LVL_IMMORT && PRF_FLAGGED(ch, PRF_NOHASSLE))
+      return 1;
+   if (!CAN_WEAR(obj, ITEM_WEAR_TAKE))
+      {
+      act("$p: you can't take that!", FALSE, ch, obj, 0, TO_CHAR);
+      return 0;
+      }
+   return 1;
+   }
+
 ACMD(do_steal)
    {
    struct char_data *vict;
@@ -2379,6 +2394,8 @@ ACMD(do_steal)
                }
             else
                {
+               if (!steal_take_ok(ch, obj) || !get_otrigger(obj, ch))
+                  return;
                act("You unequip $p and steal it.", FALSE, ch, obj, 0, TO_CHAR);
                act("$n steals $p from $N.", FALSE, ch, obj, vict, TO_NOTVICT);
                obj_to_char(unequip_char(vict, eq_pos), ch);
@@ -2396,6 +2413,8 @@ ACMD(do_steal)
          {
          /* obj found in inventory */
 
+         if (!steal_take_ok(ch, obj))
+            return;
          penality += GET_OBJ_WEIGHT(obj); /* Make heavy harder */
 
          if (AWAKE(vict) && !skill_roll(ch,SKILL_STEAL,penality))
@@ -2414,6 +2433,8 @@ ACMD(do_steal)
                {
                if ((IS_CARRYING_W(ch) + GET_OBJ_WEIGHT(obj)) < CAN_CARRY_W(ch))
                   {
+                  if (!get_otrigger(obj, ch))
+                     return;
                   improve_skill(ch,SKILL_STEAL,USE_PASS);
                   obj_from_char(obj);
                   obj_to_char(obj, ch);
