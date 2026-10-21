@@ -438,6 +438,8 @@
 #define PRF3_MOBCOLOR     (1 << 1) /* colour mobs by relative difficulty   */
 #define PRF3_DIMFARMED    (1 << 2) /* dim mobs whose xp you have worn down */
 #define PRF3_DAMAGEPROMPT (1 << 3) /* prompt lists your hits and heals     */
+#define PRF3_HIDEHERO     (1 << 4) /* practice lists only below average    */
+#define PRF3_HIDEANGEL    (1 << 5) /* practice lists only below good       */
 /*** 2 Extra sets of 32 flags with pref2 and pref3  ****/
 
 /* Updated to match Phoenix */

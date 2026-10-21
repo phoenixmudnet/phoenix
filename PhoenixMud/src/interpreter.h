@@ -144,6 +144,8 @@ struct alias_data {
 #define SCMD_MOBCOLOR   37
 #define SCMD_HIDEMASTERED 38
 #define SCMD_DAMAGEPROMPT 39
+#define SCMD_HIDEHERO     40
+#define SCMD_HIDEANGEL    41
 
 /* do_gen_vfile */
 #define SCMD_V_BUGS      0
