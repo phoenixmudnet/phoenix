@@ -737,6 +737,21 @@ int timer_otrigger(struct obj_data *obj)
 }
 
 
+/* A gating object trigger still running has not let its action by. A guard
+ * script reads "return 0", then "wait 2", then "opurge %self%": while it
+ * waits it is busy, TRIGGER_CHECK skips it, and with no other trigger of the
+ * type the action was allowed, so a second get in those two seconds took the
+ * object the first had refused. Busy refuses instead. */
+static int otrig_busy(obj_data *obj, int type)
+{
+   trig_data *t;
+
+   for (t = TRIGGERS(SCRIPT(obj)); t; t = t->next)
+      if (IS_SET(GET_TRIG_TYPE(t), type) && GET_TRIG_DEPTH(t))
+         return TRUE;
+   return FALSE;
+}
+
 int get_otrigger(obj_data *obj, char_data *actor)
 {
    trig_data *t;
@@ -746,6 +761,11 @@ int get_otrigger(obj_data *obj, char_data *actor)
       {
       release_buffer(buf);
       return 1;
+      }
+   if (otrig_busy(obj, OTRIG_GET))
+      {
+      release_buffer(buf);
+      return 0;
       }
 
    for (t = TRIGGERS(SCRIPT(obj)); t; t = t->next)
@@ -840,6 +860,11 @@ int wear_otrigger(obj_data *obj, char_data *actor, int where)
       release_buffer(buf);
       return 1;
       }
+   if (otrig_busy(obj, OTRIG_WEAR))
+      {
+      release_buffer(buf);
+      return 0;
+      }
 
    for (t = TRIGGERS(SCRIPT(obj)); t; t = t->next)
       {
@@ -865,6 +890,11 @@ int remove_otrigger(obj_data *obj, char_data *actor)
       {
       release_buffer(buf);
       return 1;
+      }
+   if (otrig_busy(obj, OTRIG_REMOVE))
+      {
+      release_buffer(buf);
+      return 0;
       }
    
    for (t = TRIGGERS(SCRIPT(obj)); t; t = t->next) 
@@ -892,6 +922,11 @@ int drop_otrigger(obj_data *obj, char_data *actor)
       release_buffer(buf);
       return 1;
       }
+   if (otrig_busy(obj, OTRIG_DROP))
+      {
+      release_buffer(buf);
+      return 0;
+      }
 
    for (t = TRIGGERS(SCRIPT(obj)); t; t = t->next)
       {
@@ -917,6 +952,11 @@ int give_otrigger(obj_data *obj, char_data *actor, char_data *victim)
       {
       release_buffer(buf);
       return 1;
+      }
+   if (otrig_busy(obj, OTRIG_GIVE))
+      {
+      release_buffer(buf);
+      return 0;
       }
 
    for (t = TRIGGERS(SCRIPT(obj)); t; t = t->next)
