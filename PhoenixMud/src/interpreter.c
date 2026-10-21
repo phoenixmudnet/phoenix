@@ -662,6 +662,8 @@ struct command_info cmd_info[] = {
    {"herolist", POS_DEAD, do_gen_ps, 0, SCMD_HEROLIST},
 	{"hide", POS_CHANT, do_hide, 1, 0},
 	{"hidemastered", POS_DEAD, do_gen_tog, 0, SCMD_HIDEMASTERED},
+	{"hidehero", POS_DEAD, do_gen_tog, 0, SCMD_HIDEHERO},
+	{"hideangel", POS_DEAD, do_gen_tog, 0, SCMD_HIDEANGEL},
 	{"hit", POS_FIGHTING, do_hit, 0, SCMD_HIT},
 	{"hold", POS_CHANT, do_grab, 1, 0},
 	{"holler", POS_CHANT, do_gen_comm, 1, SCMD_HOLLER},

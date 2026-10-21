@@ -1745,6 +1745,12 @@ ACMD(do_gen_tog)
          {"Your prompt will no longer show damage and healing numbers.\r\n",
           "Your prompt will show the damage and healing since the last prompt.\r\n"
          },
+         {"Practice will no longer hide skills at average or better.\r\n",
+          "Practice will show only skills below average and spells below level 5.\r\n"
+         },
+         {"Practice will no longer hide skills at good or better.\r\n",
+          "Practice will show only skills below good and spells below level 7.\r\n"
+         },
       };
 
 
@@ -1901,6 +1907,12 @@ ACMD(do_gen_tog)
       break;
    case SCMD_HIDEMASTERED:
       result = PRF_TOG_CHK3(ch, PRF3_HIDEMASTERED);
+      break;
+   case SCMD_HIDEHERO:
+      result = PRF_TOG_CHK3(ch, PRF3_HIDEHERO);
+      break;
+   case SCMD_HIDEANGEL:
+      result = PRF_TOG_CHK3(ch, PRF3_HIDEANGEL);
       break;
    case SCMD_DAMAGEPROMPT:
       result = PRF_TOG_CHK3(ch, PRF3_DAMAGEPROMPT);
