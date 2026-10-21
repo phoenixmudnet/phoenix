@@ -68,6 +68,7 @@ ACMD(do_flush);
 SPECIAL(shop_keeper);
 void die(struct char_data * ch, struct char_data *killer);
 void Crash_rentsave(struct char_data * ch, int cost);
+int godly_use_ok(struct char_data *ch, struct obj_data *obj);
 void Crash_count_items(struct obj_data * obj, long *nitems);
 int Crash_check_norents_equipped(struct char_data * ch);
 int Crash_check_norents(struct obj_data * obj,struct char_data *ch);
@@ -1317,6 +1318,11 @@ ACMD(do_use)
          release_buffer(buf);
          return;
          }
+      if (!godly_use_ok(ch, mag_item))
+         {
+         release_buffer(buf);
+         return;
+         }
       break;
       /* New case for Pill modification--Aleks */
    case SCMD_SWALLOW:
@@ -1326,11 +1332,21 @@ ACMD(do_use)
          release_buffer(buf);
          return;
          }
+      if (!godly_use_ok(ch, mag_item))
+         {
+         release_buffer(buf);
+         return;
+         }
       break;
    case SCMD_RECITE:
       if (GET_OBJ_TYPE(mag_item) != ITEM_SCROLL)
          {
          send_to_char(ch, "You can only recite scrolls.\r\n");
+         release_buffer(buf);
+         return;
+         }
+      if (!godly_use_ok(ch, mag_item))
+         {
          release_buffer(buf);
          return;
          }
