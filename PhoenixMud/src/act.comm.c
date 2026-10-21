@@ -1078,6 +1078,12 @@ ACMD(do_auction)
       return;
       }
 
+   /* putting it up is letting it go: its drop trigger has its say, as
+    * do_drop's does, so a piece whose script keeps it from changing hands
+    * is not auctioned on */
+   if (!drop_otrigger(obj, ch))
+      return;
+
    /* odinian, 10/26/99
       get the gold from the player
       */

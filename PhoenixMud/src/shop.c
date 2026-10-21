@@ -950,10 +950,26 @@ void shopping_sell(char *arg, struct char_data * ch,
       release_buffer(name);
       return;
       }
+   /* selling hands it to the keeper: its give trigger has its say, as
+    * perform_give's does, so a piece whose script keeps it from changing
+    * hands is not sold on (and bought back by anyone) */
+   if (!give_otrigger(obj, ch, keeper))
+      {
+      release_buffer(a_name);
+      release_buffer(name);
+      return;
+      }
    struct obj_data *sold_obj = obj;
+   int refused = FALSE;
    while ((obj) && (GET_GOLD(keeper) + SHOP_BANK(shop_nr) >=
                     sell_price(ch, obj, shop_nr,keeper)) && (sold < sellnum))
       {
+      if (sold > 0 && !give_otrigger(obj, ch, keeper))
+         {
+         obj = NULL;
+         refused = TRUE;
+         break;
+         }
       sold++;
 
       goldamt += sell_price(ch, obj, shop_nr,keeper);
@@ -974,7 +990,7 @@ void shopping_sell(char *arg, struct char_data * ch,
       }
 
    buf=get_buffer(SMALL_BUFSIZE);
-   if (sold < sellnum)
+   if (sold < sellnum && !refused)
       {
       if (!obj)
          sprintf(buf, "%s You only have %d of those.", GET_NAME(ch), sold);
