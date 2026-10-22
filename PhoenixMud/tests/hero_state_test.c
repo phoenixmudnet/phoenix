@@ -194,9 +194,40 @@ static void test_sitting_form(void)
    obj_hero_free(&c);
    }
 
+/* growth banked for the next kill rides as a sixth HT value; a five-value
+ * line reads as nothing banked (the TS writer, heroLines.ts, writes the same) */
+static void test_banked(void)
+   {
+   struct obj_data a, b;
+   char line[128];
+   FILE *fp = tmpfile();
+
+   memset(&a, 0, sizeof(a));
+   memset(&b, 0, sizeof(b));
+   a.attune = attune_create();
+   a.attune->points = 2274.5;
+   a.attune->hour = 11987949;
+   a.attune->hour_points = 52;
+   a.attune->banked = 140;
+   CHECK(obj_hero_write(fp, &a) == 0);
+   rewind(fp);
+   CHECK(fgets(line, sizeof(line), fp) != NULL);
+   CHECK(!strcmp(line, "HT 2274.5000 0 11987949 0 52 140.0000\n"));
+   fclose(fp);
+   round_trip(&a, &b);
+   CHECK(b.attune && b.attune->banked == 140);
+   obj_hero_free(&b);
+   memset(&b, 0, sizeof(b));
+   CHECK(obj_hero_read_line(&b, "HT 2274.5000 0 11987949 0 52") == TRUE);
+   CHECK(b.attune && b.attune->banked == 0);
+   obj_hero_free(&a);
+   obj_hero_free(&b);
+   }
+
 int main(void)
    {
    test_round_trip();
+   test_banked();
    test_plain_and_essence();
    test_copy();
    test_sitting_form();

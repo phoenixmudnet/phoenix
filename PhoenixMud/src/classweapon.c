@@ -61,6 +61,7 @@ const char *mob_spec_name(SPECIAL(*f));
 SPECIAL(shop_keeper);
 
 int class_weapons = FALSE;
+int kills_limit_damage_xpgain(struct char_data *ch, struct char_data *victim, int exp);
 
 #define CLASS_WEAPON_BASE    26600
 #define DEFAULT_ESSENCE      26620
@@ -68,6 +69,10 @@ int class_weapons = FALSE;
 #define POINTS_PER_CAST      25
 #define POINTS_PER_HEAL      25
 #define POINTS_PER_MUD_HOUR  100
+/* growth is banked and paid at a kill credited to the owner; a bank holds at
+ * most two MUD hours' cap, so a fled fight carries over and hours of farming
+ * beside something that never dies do not */
+#define BANK_MAX             (2 * POINTS_PER_MUD_HOUR)
 #define LEVEL_COST_A         200.0
 #define SHARE_R              0.08
 #define HERO_WEAPON_BONUS    0.33
@@ -940,13 +945,13 @@ static int cw_settle(struct char_data *ch, struct obj_data *obj)
    return result;
    }
 
+/* growth points for one action, under the MUD hour's cap, into the bank the
+ * next kill pays (cw_pay_kill) */
 static void cw_grow(struct char_data *ch, struct obj_data *obj, int base)
    {
    struct obj_attune_data *a;
-   struct hero_data *h = obj->hero;
    long hour = cw_mud_hour();
-   int take, r;
-   char line[256];
+   int take;
 
    if (!obj->attune)
       {
@@ -964,9 +969,38 @@ static void cw_grow(struct char_data *ch, struct obj_data *obj, int base)
    if (take <= 0)
       return;
    a->hour_points += take;
-   a->points += take * cw_tier(ch);
+   a->banked = MIN((double)BANK_MAX, a->banked + take);
+   (void)ch;
+   }
+
+/*
+ * What a kill pays of a bank: 1 for a mob no more than 10 levels below the
+ * owner, falling to 0 at 30 below; times the kill tracker's repeat factor
+ * for that mob (kills_limit_damage_xpgain, which only reads the tracker).
+ */
+static double cw_kill_factor(struct char_data *ch, struct char_data *victim)
+   {
+   int gap = GET_LEVEL(ch) - GET_LEVEL(victim);
+   double level = gap <= 10 ? 1.0 : MAX(0.0, 1.0 - (gap - 10) / 20.0);
+   double repeat;
+
+   if (level <= 0)
+      return 0;
+   repeat = kills_limit_damage_xpgain(ch, victim, 10000) / 10000.0;
+   return level * MAX(0.0, MIN(1.0, repeat));
+   }
+
+/* banked growth paid in: points and the focus in use, scaled by tier */
+static void cw_pay(struct char_data *ch, struct obj_data *obj, double base)
+   {
+   struct obj_attune_data *a = obj->attune;
+   struct hero_data *h = obj->hero;
+   int r;
+   char line[256];
+
+   a->points += base * cw_tier(ch);
    if (h->focus != HERO_FOCUS_NONE)
-      h->focus_points[h->focus] += take * cw_tier(ch);
+      h->focus_points[h->focus] += base * cw_tier(ch);
    if (h->waiting != HERO_NOT_LOCKED)
       cw_ensure_boss(ch, h);
    r = cw_settle(ch, obj);
@@ -982,6 +1016,52 @@ static void cw_grow(struct char_data *ch, struct obj_data *obj, int base)
       send_to_char(ch, "&Y%s is locked at level %d: it needs %s. Go there and slay it "
                    "to win its essence.&n\r\n", obj->short_description, h->level, line);
       }
+   }
+
+/* every class weapon of ch's that banked growth: worn, carried, in a bag */
+static void cw_pay_list(struct char_data *ch, struct obj_data *list, double factor)
+   {
+   struct obj_data *o;
+
+   for (o = list; o; o = o->next_content)
+      {
+      if (cw_mine(o, ch) && o->attune && o->attune->banked > 0)
+         {
+         double paid = o->attune->banked * factor;
+         o->attune->banked = 0;
+         if (paid > 0)
+            cw_pay(ch, o, paid);
+         }
+      if (o->contains)
+         cw_pay_list(ch, o->contains, factor);
+      }
+   }
+
+/* a mob's death credited to ch (its share of the kill, perform_group_gain)
+ * pays ch's banked growth, scaled by the kill */
+void cw_pay_kill(struct char_data *ch, struct char_data *victim)
+   {
+   double factor;
+   int i;
+
+   if (!class_weapons || IS_NPC(ch) || !IS_NPC(victim))
+      return;
+   factor = cw_kill_factor(ch, victim);
+   for (i = 0; i < NUM_WEARS; i++)
+      if (GET_EQ(ch, i))
+         {
+         struct obj_data *e = GET_EQ(ch, i);
+         if (cw_mine(e, ch) && e->attune && e->attune->banked > 0)
+            {
+            double paid = e->attune->banked * factor;
+            e->attune->banked = 0;
+            if (paid > 0)
+               cw_pay(ch, e, paid);
+            }
+         if (e->contains)
+            cw_pay_list(ch, e->contains, factor);
+         }
+   cw_pay_list(ch, ch->carrying, factor);
    }
 
 void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
@@ -2186,6 +2266,13 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
       cw_boss_line(h, line);
       sprintf(buf + strlen(buf), "Locked: it needs %s. Go there and slay it to win its "
               "essence.\r\n", line);
+      }
+   if (obj->attune && obj->attune->banked > 0)
+      {
+      struct char_data *owner = obj->carried_by ? obj->carried_by : obj->worn_by;
+      double tier = (owner && !IS_NPC(owner) && GET_IDNUM(owner) == obj->bound_idnum) ? cw_tier(owner) : 1.0;
+      cw_commas(a, (long)(obj->attune->banked * tier + 0.5));
+      sprintf(buf + strlen(buf), "Waiting for your next kill: %s points.\r\n", a);
       }
    cw_focus_line(h, line);
    sprintf(buf + strlen(buf), "%s\r\n", line);

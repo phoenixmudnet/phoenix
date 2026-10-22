@@ -2153,6 +2153,8 @@ void perform_group_gain(struct char_data * ch, int base,
    /* gain_exp() should not be used here, as it shorts PC exp - Nomikos 8/17/2025 */
    gain_exp_regardless(ch, share, FALSE);
    change_alignment(ch, victim);
+   /* the kill pays this member's class weapon growth (cw_pay_kill) */
+   cw_pay_kill(ch, victim);
    }
 
 void group_gain(struct char_data * ch, struct char_data * victim)
