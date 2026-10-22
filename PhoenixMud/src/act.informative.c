@@ -27,6 +27,7 @@
 #include "house.h"
 #include "constants.h"
 #include "dg_scripts.h"
+#include "help_match.h"
 
 #define ZCMD zone_table[zone].cmd[cmd_no]
 
@@ -2620,11 +2621,11 @@ static int is_help_first(const char *str, const char *namelist)
 struct help_index_element *find_help(char *keyword, int times)
 {
 	int i;
+	const char *kw;
 
-	/* pass 1: entries whose FIRST keyword matches — `help strength`
-	 * finds STRENGTH even though "ENHANCED STRENGTH" sorts earlier */
+	/* pass 1: entries whose FIRST keyword is the word */
 	for (i = 0; i < top_of_helpt; i++) {
-		if (is_help_first(keyword, help_table[i].keywords)) {
+		if (is_help_exact(keyword, help_table[i].keywords, TRUE)) {
 			times--;
 			if (!times) {
 				return (help_table + i);
@@ -2632,11 +2633,40 @@ struct help_index_element *find_help(char *keyword, int times)
 		}
 	}
 
-	/* pass 2: the historical any-word scan, minus pass-1 hits;
-	 * `times` (help N word) keeps counting across both passes */
+	/* pass 2: entries with a later keyword that is the word: `help get`
+	 * finds TAKE GET, not GET_OUT_OF_DEATH_FREE_TOKEN, which only begins
+	 * with it; `help up` finds the movement entry, not UPTIME */
 	for (i = 0; i < top_of_helpt; i++) {
-		if (!is_help_first(keyword, help_table[i].keywords) &&
-		    is_help(keyword, help_table[i].keywords)) {
+		kw = help_table[i].keywords;
+		if (!is_help_exact(keyword, kw, TRUE) &&
+		    is_help_exact(keyword, kw, FALSE)) {
+			times--;
+			if (!times) {
+				return (help_table + i);
+			}
+		}
+	}
+
+	/* pass 3: entries whose FIRST keyword begins with the word: `help
+	 * strength` finds STRENGTH even though "ENHANCED STRENGTH" sorts
+	 * earlier.  Entries an earlier pass took are skipped here and below;
+	 * `times` (help N word) keeps counting across every pass */
+	for (i = 0; i < top_of_helpt; i++) {
+		kw = help_table[i].keywords;
+		if (!is_help_exact(keyword, kw, FALSE) &&
+		    is_help_first(keyword, kw)) {
+			times--;
+			if (!times) {
+				return (help_table + i);
+			}
+		}
+	}
+
+	/* pass 4: the historical any-word scan */
+	for (i = 0; i < top_of_helpt; i++) {
+		kw = help_table[i].keywords;
+		if (!is_help_exact(keyword, kw, FALSE) &&
+		    !is_help_first(keyword, kw) && is_help(keyword, kw)) {
 			times--;
 			if (!times) {
 				return (help_table + i);

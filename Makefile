@@ -52,10 +52,15 @@ build/repair_life_test: PhoenixMud/tests/repair_life_test.c build/repair_life.o 
 build/size_fit_test: PhoenixMud/tests/size_fit_test.c build/size_fit.o | build
 	$(CC) $(CFLAGS) $^ -o $@
 
-test: build/obj_instance_test build/hero_state_test build/repair_life_test build/size_fit_test
+# A word naming a help entry exactly (help_match.c)
+build/help_match_test: PhoenixMud/tests/help_match_test.c build/help_match.o | build
+	$(CC) $(CFLAGS) $^ -o $@
+
+test: build/obj_instance_test build/hero_state_test build/repair_life_test build/size_fit_test build/help_match_test
 	./build/obj_instance_test
 	./build/hero_state_test
 	./build/repair_life_test
 	./build/size_fit_test
+	./build/help_match_test
 
 .PHONY: test clean
