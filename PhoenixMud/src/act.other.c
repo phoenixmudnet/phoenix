@@ -2187,6 +2187,9 @@ ACMD(do_remort)
          send_to_char(ch, "%s", "That is not a valid RACE!\r\n");
          return;
          }
+      /* A new race brings its size; the old race's stayed on until now. */
+      if(!same)
+         roll_height_weight(ch);
       affect_remove_all(ch);
       REMORT_LEVEL(ch)=DOUBLE_REMORT;
       GET_LEVEL(ch)=1;

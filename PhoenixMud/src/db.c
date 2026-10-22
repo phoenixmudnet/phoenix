@@ -20,6 +20,7 @@
 #include "buffer.h"
 #include "utils.h"
 #include "db.h"
+#include "size_fit.h"
 #include "events.h"
 #include "comm.h"
 #include "handler.h"
@@ -4089,7 +4090,13 @@ void load_char_ascii(struct char_file_u *ch, char *name)
   if (version >= 2) {
     read_line_ascii(fp, ch->email, 256);
   }
-  fscanf(fp, "%u %d %d %ld %d %u %u\n", &ch->level, &arr[0], &arr[1], &ch->hometown, &arr[2], &ch->weight, &ch->height);
+  /* Every narrow field goes through an int: %u into the ubyte weight and
+   * height (and the ush_int level) wrote four bytes over what follows them. */
+  fscanf(fp, "%d %d %d %ld %d %d %d\n", &arr[5], &arr[0], &arr[1], &ch->hometown, &arr[2], &arr[3], &arr[4]);
+  ch->level = (ush_int)arr[5];
+  ch->weight = (ubyte)(arr[3] & 0xff);
+  ch->player_specials_saved.weight_hi = (ubyte)((arr[3] >> 8) & 0xff);
+  ch->height = (ubyte)MAX(0, MIN(arr[4], 255));
   ch->race = arr[0];
   ch->class = arr[1];
   ch->sex = arr[2];
@@ -4280,7 +4287,8 @@ void save_char_ascii(struct char_file_u *ch)
   strcat(buf, "\n");
   strcat(buf, ch->email[0] ? ch->email : "(null)");
   strcat(buf, "\n");
-  sprintf(buf2, "%d %d %d %d %d %d %d\n", ch->level, ch->race, ch->class, ch->hometown, ch->sex, ch->weight, ch->height);
+  sprintf(buf2, "%d %d %d %d %d %d %d\n", ch->level, ch->race, ch->class, ch->hometown, ch->sex,
+          ch->weight | (ch->player_specials_saved.weight_hi << 8), ch->height);
   strcat(buf, buf2);
   sprintf(buf2, "%ld %ld %ld\n", ch->played, ch->birth, ch->last_logon);
   strcat(buf, buf2);
@@ -4446,7 +4454,7 @@ void store_to_char(struct char_file_u * st, struct char_data * ch)
    ch->player.time.played = st->played;
    ch->player.time.logon = time(0);
 
-   ch->player.weight = st->weight;
+   ch->player.weight = st->weight | (st->player_specials_saved.weight_hi << 8);
    ch->player.height = st->height;
 
    ch->real_abils = st->abilities;
@@ -4609,6 +4617,9 @@ void char_to_store(struct char_data * ch, struct char_file_u * st,
    GET_BANK_GOLD_FILE(st) = GET_BANK_GOLD(ch);
    st->char_specials_saved = ch->char_specials.saved;
    st->player_specials_saved = ch->player_specials->saved;
+   /* After the copy above, which would put back a stale high byte. */
+   st->weight = GET_WEIGHT(ch) & 0xff;
+   st->player_specials_saved.weight_hi = (GET_WEIGHT(ch) >> 8) & 0xff;
 
    st->points.armor = 200;
    st->points.hitroll = 0;
@@ -5123,9 +5134,54 @@ void clear_object(struct obj_data * obj)
 
 
 /* initialize a new character only if class is set */
+/*
+ * A size for the character's race and sex, from race_size_info: weight, then
+ * height, the order init_char has always rolled them in. Creation, `set race`
+ * and the race-changing remort all come here, so a character's size always
+ * belongs to the race it is now.
+ */
+void roll_height_weight(struct char_data *ch)
+{
+   const struct race_size_data *rs = &race_size_info[(int)GET_RACE(ch)];
+
+   if (GET_SEX(ch) == SEX_MALE) {
+      GET_WEIGHT(ch) = number(rs->MWmin, rs->MWmax);
+      GET_HEIGHT(ch) = number(rs->MHmin, rs->MHmax);
+   } else {
+      GET_WEIGHT(ch) = number(rs->FWmin, rs->FWmax);
+      GET_HEIGHT(ch) = number(rs->FHmin, rs->FHmax);
+   }
+}
+
+/*
+ * On entering the game, a height or weight outside the race's range is
+ * replaced by one inside it: a size kept from the race before a remort, a
+ * weight wrapped by the one-byte pfile field, or one never rolled. Draws no
+ * RNG; the value comes from the idnum, so every boot and every replay gives
+ * the same character the same size.
+ */
+void fit_size_to_race(struct char_data *ch)
+{
+   const struct race_size_data *rs;
+   long hlo, hhi, wlo, whi;
+   unsigned int id;
+
+   if (IS_NPC(ch) || GET_RACE(ch) < 0 || GET_RACE(ch) >= NUM_RACES)
+      return;
+   rs = &race_size_info[(int)GET_RACE(ch)];
+   if (GET_SEX(ch) == SEX_MALE) {
+      hlo = rs->MHmin; hhi = rs->MHmax; wlo = rs->MWmin; whi = rs->MWmax;
+   } else {
+      hlo = rs->FHmin; hhi = rs->FHmax; wlo = rs->FWmin; whi = rs->FWmax;
+   }
+   id = (unsigned int) GET_IDNUM(ch);
+   GET_HEIGHT(ch) = size_fit(GET_HEIGHT(ch), hlo, hhi, id, SIZE_SALT_HEIGHT);
+   GET_WEIGHT(ch) = size_fit(GET_WEIGHT(ch), wlo, whi, id, SIZE_SALT_WEIGHT);
+}
+
 void init_char(struct char_data * ch)
    {
-   int i, race;
+   int i;
 
    /* create a player_special structure */
    if (ch->player_specials == NULL)
@@ -5157,22 +5213,7 @@ void init_char(struct char_data * ch)
    for (i = 0; i < MAX_TONGUE; i++)
       GET_TALK(ch, i) = 0;
 
-   /* make favors for sex */
-   race = ch->player.race;
-   if (ch->player.sex == SEX_MALE)
-      {
-      ch->player.weight = number(race_size_info[race].MWmin,
- 				 race_size_info[race].MWmax);
-      ch->player.height = number(race_size_info[race].MHmin,      
-                                 race_size_info[race].MHmax);
-      }
-   else
-      {
-      ch->player.weight = number(race_size_info[race].FWmin,      
-                                 race_size_info[race].FWmax);
-      ch->player.height = number(race_size_info[race].FHmin,            
-                                 race_size_info[race].FHmax);
-      }
+   roll_height_weight(ch);
 
    ch->points.max_mana = 100;
    ch->points.mana = GET_MAX_MANA(ch);
