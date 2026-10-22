@@ -3518,6 +3518,7 @@ void nanny(struct descriptor_data *d, char *argu)
 					GET_NAME(d->character),
 					REMORT_LEVEL(d->character));
 			}
+			fit_size_to_race(d->character);
 
 			if (AFF2_FLAGGED(d->character, AFF2_FLYING) &&
 			    !CAN_FLY(d->character))

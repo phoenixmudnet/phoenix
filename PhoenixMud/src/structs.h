@@ -1634,7 +1634,7 @@ struct player_special_data_saved {
       'sparen' to something meaningful, but don't change the order.  */
 
    ubyte learn_tic;
-   ubyte spare0;
+   ubyte weight_hi;		/* weight's high byte: char_file_u weight is a ubyte */
    ubyte spare1;
    ubyte spare2;
    ubyte spare3;

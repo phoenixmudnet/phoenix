@@ -7523,20 +7523,7 @@ ACMD(do_set)
       if (!IS_NPC(vict) && IS_DBLREMORT_OLD(vict))
          REMORT_LEVEL(vict) = DOUBLE_REMORT;
 
-      if (GET_SEX(vict) == SEX_MALE) /* racial stats added - 10-5-02 Nomi*/
-         {
-         GET_WEIGHT(vict) = MIN(number(race_size_info[i].MWmin,
-                                       race_size_info[i].MWmax), 255);
-         GET_HEIGHT(vict) = MIN(number(race_size_info[i].MHmin,
-                                       race_size_info[i].MHmax), 255);
-         }
-      else
-         {
-         GET_WEIGHT(vict) = MIN(number(race_size_info[i].FWmin,
-                                       race_size_info[i].FWmax), 255);
-         GET_HEIGHT(vict) = MIN(number(race_size_info[i].FHmin,
-                                       race_size_info[i].FHmax), 255);
-         }
+      roll_height_weight(vict); /* racial stats added - 10-5-02 Nomi */
       break;
    case 40:
       if ((i = parse_class(val_arg)) == CLASS_UNDEFINED)

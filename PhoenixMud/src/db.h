@@ -173,6 +173,8 @@ mob_rnum real_mobile(mob_vnum vnum);
 int	vnum_mobile(char *searchname, struct char_data *ch);
 void	clear_char(struct char_data *ch);
 void	reset_char(struct char_data *ch);
+void	roll_height_weight(struct char_data *ch);
+void	fit_size_to_race(struct char_data *ch);
 void	free_char(struct char_data *ch);
 
 void    load_dg_quests(void);

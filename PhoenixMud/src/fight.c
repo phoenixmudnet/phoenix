@@ -1492,7 +1492,11 @@ void make_corpse(struct char_data * ch, struct char_data * killer)
          }
       GET_OBJ_VAL(corpse, 7) = GET_LEVEL(ch); /* animate dead */
 
-      GET_OBJ_WEIGHT(corpse) = GET_WEIGHT(ch) + IS_CARRYING_W(ch);
+      /* A player's body counts at most 255, the most a pfile could hold
+       * before weight had a high byte: a heavy race's real weight would put
+       * its corpse beyond what anyone could carry. */
+      GET_OBJ_WEIGHT(corpse) = (IS_NPC(ch) ? GET_WEIGHT(ch) : MIN(GET_WEIGHT(ch), 255))
+                               + IS_CARRYING_W(ch);
       GET_OBJ_RENT(corpse) = 100000;
       GET_OBJ_TSLOTS(corpse)=10;
       GET_OBJ_OSLOTS(corpse)=20;

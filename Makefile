@@ -48,9 +48,14 @@ build/hero_state_test: PhoenixMud/tests/hero_state_test.c build/hero_state.o | b
 build/repair_life_test: PhoenixMud/tests/repair_life_test.c build/repair_life.o | build
 	$(CC) $(CFLAGS) $^ -o $@
 
-test: build/obj_instance_test build/hero_state_test build/repair_life_test
+# A height or weight brought inside a race's range (size_fit.c)
+build/size_fit_test: PhoenixMud/tests/size_fit_test.c build/size_fit.o | build
+	$(CC) $(CFLAGS) $^ -o $@
+
+test: build/obj_instance_test build/hero_state_test build/repair_life_test build/size_fit_test
 	./build/obj_instance_test
 	./build/hero_state_test
 	./build/repair_life_test
+	./build/size_fit_test
 
 .PHONY: test clean
