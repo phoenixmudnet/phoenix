@@ -1387,10 +1387,11 @@ char* generate_fight_prompt(struct char_data *ch, char* tag, int hit, int maxhit
  *    [Hit 12 15 | Took 5 | Heal +20 | Healed +30]
  *
  * Hit is damage you dealt, Took damage you took, Heal healing you cast on
- * anyone, Healed healing someone else cast on you.  Damage you do to
- * yourself (poison, plague and the other ticks damage() is handed with ch
- * equal to victim) is not listed.  Only characters with the flag set keep a
- * tally, so it costs nothing otherwise.                                    */
+ * anyone, Healed healing someone else cast on you.  With colour on, the
+ * numbers of Hit and Took are red and those of Heal and Healed green.  Damage
+ * you do to yourself (poison, plague and the other ticks damage() is handed
+ * with ch equal to victim) is not listed.  Only characters with the flag set
+ * keep a tally, so it costs nothing otherwise.                             */
 #define PROMPT_TALLY_LENGTH 512
 
 static void prompt_tally_note(struct char_data *who, int list, int amt)
@@ -1432,6 +1433,8 @@ static size_t prompt_tally_token(struct char_data *ch, char *out, size_t size, i
 {
    static const char *label[PROMPT_TALLY_LISTS] = { "Hit", "Took", "Heal", "Healed" };
    static const char *sign[PROMPT_TALLY_LISTS] = { "", "", "+", "+" };
+   /* the numbers only: damage red, healing green */
+   static const int healing[PROMPT_TALLY_LISTS] = { 0, 0, 1, 1 };
    struct prompt_tally *t = &ch->player_specials->tally;
    char body[PROMPT_TALLY_LENGTH];
    size_t len = 0;
@@ -1442,11 +1445,14 @@ static size_t prompt_tally_token(struct char_data *ch, char *out, size_t size, i
    {
       if (t->count[list] <= 0)
          continue;
-      len += snprintf(body + len, sizeof(body) - len, "%s%s",
-                      sections++ ? " | " : "", label[list]);
+      len += snprintf(body + len, sizeof(body) - len, "%s%s %s",
+                      sections++ ? " | " : "", label[list],
+                      healing[list] ? CCGRN(ch, C_NRM) : CCRED(ch, C_NRM));
       shown = MIN(t->count[list], PROMPT_TALLY_SHOWN);
       for (i = 0; i < shown && len < sizeof(body); i++)
-         len += snprintf(body + len, sizeof(body) - len, " %s%d", sign[list], t->amount[list][i]);
+         len += snprintf(body + len, sizeof(body) - len, "%s%s%d", i ? " " : "", sign[list], t->amount[list][i]);
+      if (len < sizeof(body))
+         len += snprintf(body + len, sizeof(body) - len, "%s", CCNRM(ch, C_NRM));
       if (t->count[list] > PROMPT_TALLY_SHOWN && len < sizeof(body))
          len += snprintf(body + len, sizeof(body) - len, " +%d more", t->count[list] - PROMPT_TALLY_SHOWN);
       if (len >= sizeof(body))
