@@ -66,6 +66,7 @@ struct obj_attune_data
    long hour;               /* the MUD hour the counts below belong to */
    long hour_hits;
    long hour_points;
+   double banked;           /* growth earned since the kill that last paid it */
    };
 
 struct obj_data;

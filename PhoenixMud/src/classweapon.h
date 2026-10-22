@@ -20,6 +20,7 @@ void cw_login(struct char_data *ch);
  * once a day old */
 void cw_end_sitting(struct char_data *ch, int at_login);
 void cw_note_hit(struct char_data *ch, struct obj_data *wielded);
+void cw_pay_kill(struct char_data *ch, struct char_data *victim);
 void cw_note_cast(struct char_data *ch);
 int  cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount);
 int  cw_damage_mod(struct char_data *ch, struct char_data *victim, int dam,

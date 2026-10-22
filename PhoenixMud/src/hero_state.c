@@ -103,9 +103,17 @@ int obj_hero_write(FILE *fp, const struct obj_data *obj)
       if (fprintf(fp, "HC %ld\n", (long)obj->checkpoint_of) < 0)
          err = -1;
    if (a)
-      if (fprintf(fp, "HT %.4f %ld %ld %ld %ld\n", a->points, a->hits,
-                  a->hour, a->hour_hits, a->hour_points) < 0)
+      {
+      if (a->banked > 0)
+         {
+         if (fprintf(fp, "HT %.4f %ld %ld %ld %ld %.4f\n", a->points, a->hits,
+                     a->hour, a->hour_hits, a->hour_points, a->banked) < 0)
+            err = -1;
+         }
+      else if (fprintf(fp, "HT %.4f %ld %ld %ld %ld\n", a->points, a->hits,
+                       a->hour, a->hour_hits, a->hour_points) < 0)
          err = -1;
+      }
    if (!h)
       return err;
    if (fprintf(fp, "HW %d %ld %d %d %d %ld %ld %d\n", h->cls, h->core,
@@ -173,7 +181,8 @@ int obj_hero_read_line(struct obj_data *obj, const char *line)
             obj->checkpoint_of = l1;
          return TRUE;
       case 'T':
-         if (sscanf(line, "HT %lf %ld %ld %ld %ld", &d1, &l1, &l2, &l3, &l4) == 5)
+         d2 = 0;
+         if (sscanf(line, "HT %lf %ld %ld %ld %ld %lf", &d1, &l1, &l2, &l3, &l4, &d2) >= 5)
             {
             if (!obj->attune)
                obj->attune = attune_create();
@@ -182,6 +191,7 @@ int obj_hero_read_line(struct obj_data *obj, const char *line)
             obj->attune->hour = l2;
             obj->attune->hour_hits = l3;
             obj->attune->hour_points = l4;
+            obj->attune->banked = d2 > 0 ? d2 : 0;
             }
          return TRUE;
       case 'W':
