@@ -697,25 +697,19 @@ ASPELL(spell_summon)
 
 
 
-ASPELL(spell_locate_object)
+/* One pass of locate object over the object list. Every object whose
+   keywords satisfy match(name, keywords) is reported, up to cap rows, under
+   the usual visibility and level rules. Returns the number of rows printed. */
+static int locate_object_pass(struct char_data *ch, const char *name, int cap,
+                              int (*match)(const char *, const char *))
    {
    struct obj_data *i;
-   char *name=get_buffer(MAX_INPUT_LENGTH);
    char *buf = get_buffer(512);
+   int j = cap;
 
-   int j;
-
-   level = MAX(MIN(level,10), 1);
-
-   strcpy(name, CAST_ARG(ch));
-   j = level*2;
-   log("Locate-Obj: %s cast locate obj on |%s|.",GET_NAME(ch),name);
    for (i = object_list; i && (j > 0); i = i->next)
       {
-      /* Every word of the argument must match, so a multi-word name picks
-         out the item the caster meant rather than everything sharing its
-         first word. One-word arguments behave exactly as before. */
-      if (!isname_all(name, i->name))
+      if (!match(name, i->name))
          continue;
       /* cannot locate for body parts on NPCs */
       if (IS_SET(GET_OBJ_EXTRA2(i), ITEM2_BODYPART) &&
@@ -791,8 +785,49 @@ ASPELL(spell_locate_object)
       j--;
       }
    release_buffer(buf);
+   return cap - j;
+   }
+
+ASPELL(spell_locate_object)
+   {
+   char *name=get_buffer(MAX_INPUT_LENGTH);
+   char *first=get_buffer(MAX_INPUT_LENGTH);
+   const char *p;
+   int n = 0, found;
+
+   level = MAX(MIN(level,10), 1);
+
+   strcpy(name, CAST_ARG(ch));
+   log("Locate-Obj: %s cast locate obj on |%s|.",GET_NAME(ch),name);
+
+   /* Every word of the argument must match, so a multi-word name picks
+      out the item the caster meant rather than everything sharing its
+      first word. One-word arguments behave exactly as before. */
+   found = locate_object_pass(ch, name, level*2, isname_all);
+
+   /* Keywords are the builder's list, not the name the caster read, so a
+      phrase can name an item whose keywords lack one of its words ("green
+      dragonscale shirt" against keywords "green dragon scale shirt"). When
+      the whole phrase matches nothing, search its first word alone, as the
+      spell did before it understood phrases: a phrase is never worse than
+      a word. */
+   if (!found)
+      {
+      p = name;
+      while (*p && isspace((unsigned char)*p))
+         p++;
+      while (*p && !isspace((unsigned char)*p))
+         first[n++] = *p++;
+      first[n] = '\0';
+      while (*p && isspace((unsigned char)*p))
+         p++;
+      if (n && *p)
+         found = locate_object_pass(ch, first, level*2, isname);
+      }
+
+   release_buffer(first);
    release_buffer(name);
-   if (j == level*2)
+   if (!found)
       {
       send_to_char(ch,"You sense nothing.\r\n");
       return FALSE;
