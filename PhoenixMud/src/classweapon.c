@@ -30,6 +30,7 @@
 #include "hero_state.h"
 #include "repair_life.h"
 #include "classweapon.h"
+#include "dg_scripts.h"
 
 extern struct char_data *mob_proto;
 extern struct obj_data *obj_proto;
@@ -42,6 +43,7 @@ int invalid_race(struct char_data *ch, struct obj_data *obj);
 int invalid_align(struct char_data *ch, struct obj_data *obj);
 int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message);
 extern struct index_data *obj_index;
+extern struct index_data **trig_index;
 extern const int exp_table[];
 extern const float class_exp_multipliers[];
 extern const float race_exp_multipliers[];
@@ -695,6 +697,44 @@ void cw_loaded(struct obj_data *obj)
       cw_refresh(obj);
    }
 
+/* The scripts a form's source may carry: wear and remove guards, which
+ * decide for the character as they would at a real wield. A timer, a random,
+ * a command, a get, drop, give or load script does work the form would leave
+ * behind (a piece that melts or rots, a sword that acts when swung), so a
+ * source with any of those is no form. An unknown trigger is no guard. */
+static int cw_guard_only(struct obj_data *o)
+   {
+   struct trig_proto_list *p;
+   int rt;
+
+   for (p = o->proto_script; p; p = p->next)
+      if ((rt = real_trigger(p->vnum)) < 0 ||
+          (GET_TRIG_TYPE(trig_index[rt]->proto) & ~(OTRIG_WEAR | OTRIG_REMOVE)))
+         return 0;
+   return 1;
+   }
+
+/* Does the source's wear guard admit the character? The guard runs as it
+ * would at a wield and says its own piece (18110 on the Golden Sickle of
+ * Mastery admits druids and third remorts, and tells the rest they are no
+ * druid). A real object runs its own script; a prototype (shift, the reclass
+ * recheck) runs a probe's, read and extracted here. */
+static int cw_guard_admits(struct char_data *ch, struct obj_data *o)
+   {
+   struct obj_data *probe;
+   int ok;
+
+   if (!o->proto_script)
+      return 1;
+   if (SCRIPT(o))
+      return wear_otrigger(o, ch, 0);
+   if (!(probe = read_object(GET_OBJ_VNUM(o), VIRTUAL)))
+      return 0;
+   ok = wear_otrigger(probe, ch, 0);
+   extract_obj(probe);
+   return ok;
+   }
+
 /* could the character use this as the class weapon's form: wield it (or,
  * for a held class weapon, hold it), as they stand; NULL when so */
 static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
@@ -704,10 +744,10 @@ static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
    int held = cr >= 0 && cw_held_kind(&obj_proto[cr]);
    int t = GET_OBJ_VAL(o, 3);
 
-   /* A form lends the stats and leaves the scripts behind, and the scripts
-    * are often the guard (a wear trigger that refuses players, a timer that
-    * ends the piece). Nothing with object triggers becomes a form. */
-   if (o->proto_script)
+   /* A form lends the stats and leaves the scripts behind. A wear guard is
+    * asked below, once the rest admits the character; any other script keeps
+    * the source out (a timer that ends the piece, a sword that acts). */
+   if (!cw_guard_only(o))
       {
       sprintf(why, "%s carries magic of its own; your class weapon cannot take its form.",
               o->short_description);
@@ -726,6 +766,8 @@ static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
          sprintf(why, "%s is not for your kind to hold.", o->short_description);
       else if (!can_wear_lr(ch, o, FALSE))
          sprintf(why, "You are not experienced enough to use %s.", o->short_description);
+      else if (!cw_guard_admits(ch, o))
+         sprintf(why, "%s refuses you: your class weapon cannot take its form.", o->short_description);
       else
          return NULL;
       return why;
@@ -748,6 +790,8 @@ static const char *cw_form_refusal(struct char_data *ch, struct hero_data *h,
       sprintf(why, "%s is not for your kind to wield.", o->short_description);
    else if (!can_wear_lr(ch, o, FALSE))
       sprintf(why, "You are not experienced enough to use %s.", o->short_description);
+   else if (!cw_guard_admits(ch, o))
+      sprintf(why, "%s refuses you: your class weapon cannot take its form.", o->short_description);
    else
       return NULL;
    return why;
