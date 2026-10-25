@@ -435,6 +435,22 @@ void list_skills(struct char_data * ch, int type)
         {
         if (GET_LEVEL(ch) >= (lvl=min_level(ch,i)))
           {
+          /* The hidemastered, hidehero and hideangel toggles leave out the
+             same rows here as at a guildmaster (the practice list above):
+             a toggle is the character's, not the room's, so the list reads
+             the same anywhere it is asked for. Same thresholds as above. */
+          if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEMASTERED) &&
+             (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=10)) ||
+              ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>=95))))
+            continue;
+          if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEHERO) &&
+             (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=5)) ||
+              ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>40))))
+            continue;
+          if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEANGEL) &&
+             (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=7)) ||
+              ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>60))))
+            continue;
           if (t == IS_SPELL)
             sprintf(buf, "%-30s Spell Level: %d", spells[i].spell_name,
                     GET_SKILL(ch, i));
