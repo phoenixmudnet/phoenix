@@ -260,6 +260,8 @@ int is_removable_buff(int type)
       case SKILL_SNEAK:
       case SKILL_SHADOW:
       case SKILL_ROVE:
+      case SKILL_TIGER_STANCE:
+      case SKILL_MANTIS_STANCE:
          return TRUE;
       default:
          return is_combat_buff(type);

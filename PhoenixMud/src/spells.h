@@ -255,6 +255,8 @@
 #define SKILL_ROVE                   203
 #define SKILL_PECK                   204
 #define SKILL_GUARD                  205
+#define SKILL_TIGER_STANCE 207 /* 4.2 monk stance: bare hands claw (slash) */
+#define SKILL_MANTIS_STANCE 208 /* 4.2 monk stance: bare hands stab (pierce) */
 /*
  * ZEAL (4.2) -- the activity-reward affect. Not castable by anything: no
  * class table lists it and no guild teaches it. It arrives by quaffing a
@@ -277,7 +279,7 @@
 #define ZEAL_COMBAT_TICKS            60
 #define ZEAL_EXP_BONUS               1.10f
 
-#define MAX_SPELLS                   206
+#define MAX_SPELLS 209
 
 #define TOP_SPELL_DEFINE	     600
 /* NEW NPC/OBJECT SPELLS (non saved) can be inserted here up to 599 */

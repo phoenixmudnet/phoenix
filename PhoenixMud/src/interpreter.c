@@ -349,6 +349,7 @@ ACMD(do_sleep);
 ACMD(do_slay);
 ACMD(do_smite);
 ACMD(do_sneak);
+ACMD(do_stance);
 ACMD(do_snoop);
 ACMD(do_spec_comm);
 ACMD(do_spellhelp);
@@ -548,6 +549,7 @@ struct command_info cmd_info[] = {
 	{"castout", POS_SITTING, do_castout, 1, 0},
 	{"camouflage", POS_STANDING, do_camouflage, 1, 0},
 	{"camp", POS_DEAD, do_quit, 0, SCMD_CAMP},
+	{"cancel", POS_FIGHTING, do_stance, 1, SCMD_STANCE_CANCEL},
 	{"camp!", POS_DEAD, do_quit, 0, SCMD_CAMPR},
 	{"cbalance", POS_STANDING, do_not_here, 1, 0},
 	{"cdeposit", POS_STANDING, do_not_here, 1, 0},
@@ -717,6 +719,7 @@ struct command_info cmd_info[] = {
 	{"ls", POS_CHANT, do_look, 0, SCMD_LOOK},
 
 	{"mail", POS_STANDING, do_not_here, 1, 0},
+	{"mantis", POS_FIGHTING, do_stance, 1, SCMD_STANCE_MANTIS},
 	{"make", POS_STANDING, do_assemble, 0, SCMD_MAKE},
 	{"makeclan", POS_DEAD, do_makeclan, LVL_ADMIN, 0},
 	{"marriages", POS_DEAD, do_gen_ps, 0, SCMD_MARRIAGES},
@@ -940,6 +943,7 @@ struct command_info cmd_info[] = {
 	{"throw", POS_STANDING, do_throw, 0, 0},
 	{"title", POS_DEAD, do_title, 0, 0},
 	{"time", POS_DEAD, do_time, 0, 0},
+	{"tiger", POS_FIGHTING, do_stance, 1, SCMD_STANCE_TIGER},
 	{"tlist", POS_DEAD, do_tlist, LVL_SERP, 0},
 	{"toggle", POS_DEAD, do_toggle, 0, 0},
 	{"track", POS_STANDING, do_track, 0, 0},

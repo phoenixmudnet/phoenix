@@ -2527,6 +2527,8 @@ int skill_message(int dam, struct char_data * ch, struct char_data * vict,
    return 0;
    }
 
+int stance_attack_type(struct char_data *ch);   /* skills.c */
+
 int GetImmBit(long iWepType,long iImmType)
    {
    long iOurBit;
@@ -2604,7 +2606,9 @@ int Wep_Imm(struct char_data *ch,struct char_data *victim,int iWepType,
    if((iWepType<TYPE_HIT)||(iWepType>TYPE_MAXWEP))
       return(iDam);
 
-   if((iWepType==TYPE_HIT)&&!IS_NPC(ch))
+   /* a bare hand attacks at plus level/20; a stance's claw or stab is the
+      same bare hand and keeps the tier */
+   if(!IS_NPC(ch) && (iWepType==TYPE_HIT || iWepType==stance_attack_type(ch)))
       iTotal=GET_LEVEL(ch)/20;
    if(GET_EQ(ch,WEAR_WIELD_1))
       for(j=0;j<MAX_OBJ_AFFECT;j++)
@@ -3621,8 +3625,13 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
       w_type = GET_OBJ_VAL(wielded, 3) + TYPE_HIT;
    else
       {
+      /* a bare hand hits; a monk in a stance strikes as the form does
+         (skills.c stance_attack_type: the tiger claws, the mantis stabs) */
+      int stance = stance_attack_type(ch);
       if (IS_NPC(ch) && (ch->mob_specials.attack_type != 0))
          w_type = ch->mob_specials.attack_type + TYPE_HIT;
+      else if (stance)
+         w_type = stance;
       else
          w_type = TYPE_HIT;
       }
