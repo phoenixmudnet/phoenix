@@ -216,6 +216,11 @@ struct alias_data {
 #define SCMD_QUI	0
 #define SCMD_QUIT	1
 #define SCMD_CAMP       2
+
+/* do_stance (4.2 monk stances) */
+#define SCMD_STANCE_TIGER   0
+#define SCMD_STANCE_MANTIS  1
+#define SCMD_STANCE_CANCEL  2
 #define SCMD_CAMPR      3
 
 /* do_date */

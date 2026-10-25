@@ -3232,3 +3232,127 @@ ACMD(do_guard)
   GET_GUARDING_ME(target) = (struct char_data **)realloc(GET_GUARDING_ME(target), GET_NUM_GUARDING_ME(target) * sizeof(struct char_data *));
   GET_GUARDING_ME(target)[GET_NUM_GUARDING_ME(target)-1] = ch;
 }
+
+
+/* 4.2 monk stances. A stance is a skill that holds until it is let go, as
+ * sneak does: an affect of the skill's type with no end, so it survives a
+ * save and a login. One stance holds at a time; taking the other replaces
+ * it. In hit() a bare-handed character in a stance strikes as the form does:
+ * the tiger claws (slash), the mantis stabs (pierce), where a bare hand hits
+ * (blunt). `cancel <form>` or `unaffect <form>` lets it go. */
+struct stance_form {
+   int skill;
+   const char *name;        /* what the player types; the form's name */
+   const char *enter;       /* to the character */
+   const char *enter_room;
+   const char *leave;
+   const char *leave_room;
+};
+
+static const struct stance_form stances[] = {
+   { SKILL_TIGER_STANCE, "tiger",
+     "You curl your hands into claws and settle into the tiger's form.",
+     "$n curls $s hands into claws and settles into the tiger's form.",
+     "You open your hands and let the tiger's form go.",
+     "$n opens $s hands and lets the tiger's form go." },
+   { SKILL_MANTIS_STANCE, "mantis",
+     "You draw your hands to needle points and settle into the mantis's form.",
+     "$n draws $s hands to needle points and settles into the mantis's form.",
+     "You let your hands fall and the mantis's form go.",
+     "$n lets $s hands fall and the mantis's form go." },
+};
+#define NUM_STANCES 2
+
+/* the stance the character holds, or NULL */
+static const struct stance_form *stance_held(struct char_data *ch)
+{
+   int i;
+
+   for (i = 0; i < NUM_STANCES; i++)
+      if (affected_by_spell(ch, stances[i].skill))
+         return &stances[i];
+   return NULL;
+}
+
+/* the attack type a bare-handed character strikes with: TYPE_CLAW in the
+ * tiger's form, TYPE_STAB in the mantis's, 0 in none. Read by fight.c. */
+int stance_attack_type(struct char_data *ch)
+{
+   if (IS_NPC(ch))
+      return 0;
+   if (affected_by_spell(ch, SKILL_TIGER_STANCE))
+      return TYPE_CLAW;
+   if (affected_by_spell(ch, SKILL_MANTIS_STANCE))
+      return TYPE_STAB;
+   return 0;
+}
+
+static void stance_leave(struct char_data *ch, const struct stance_form *f)
+{
+   affect_from_char(ch, f->skill);
+   send_to_char(ch, "%s\r\n", f->leave);
+   act(f->leave_room, TRUE, ch, 0, 0, TO_ROOM);
+}
+
+ACMD(do_stance)
+{
+   const struct stance_form *f, *held;
+   struct affected_type af;
+   char *arg;
+   int i;
+
+   if (IS_NPC(ch)) {
+      send_to_char(ch, "You know no such form.\r\n");
+      return;
+   }
+   if (subcmd == SCMD_STANCE_CANCEL) {
+      arg = get_buffer(MAX_INPUT_LENGTH);
+      one_argument(argument, arg);
+      if (!*arg) {
+         if ((held = stance_held(ch)) != NULL)
+            send_to_char(ch, "Cancel which form? You hold the %s's.\r\n", held->name);
+         else
+            send_to_char(ch, "Cancel which form? You hold none.\r\n");
+         release_buffer(arg);
+         return;
+      }
+      for (f = NULL, i = 0; i < NUM_STANCES; i++)
+         if (is_abbrev(arg, stances[i].name))
+            f = &stances[i];
+      release_buffer(arg);
+      if (!f)
+         send_to_char(ch, "You know no form by that name.\r\n");
+      else if (!affected_by_spell(ch, f->skill))
+         send_to_char(ch, "You are not in the %s's form.\r\n", f->name);
+      else
+         stance_leave(ch, f);
+      return;
+   }
+   f = &stances[subcmd == SCMD_STANCE_MANTIS ? 1 : 0];
+   if (GET_SKILL(ch, f->skill) <= 0 || !SCR_SKILLCHECK(ch, f->skill)) {
+      send_to_char(ch, "You know nothing of the %s's form.\r\n", f->name);
+      return;
+   }
+   if (affected_by_spell(ch, f->skill)) {
+      send_to_char(ch, "You already hold the %s's form.\r\n", f->name);
+      return;
+   }
+   if (number(1, 101) > GET_SKILL(ch, f->skill)) {
+      improve_skill(ch, f->skill, USE_FAIL);
+      send_to_char(ch, "You cannot find the %s's form.\r\n", f->name);
+      return;
+   }
+   improve_skill(ch, f->skill, USE_PASS);
+   if ((held = stance_held(ch)) != NULL)
+      stance_leave(ch, held);
+   af.type = f->skill;
+   af.duration = -1;            /* held until let go: through saves and logins */
+   af.modifier = 0;
+   af.location = APPLY_NONE;
+   af.bitvector = 0;
+   af.spell_level = 0;
+   af.next = NULL;
+   affect_to_char(ch, &af);
+   send_to_char(ch, "%s\r\n", f->enter);
+   act(f->enter_room, TRUE, ch, 0, 0, TO_ROOM);
+}
