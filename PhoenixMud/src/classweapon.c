@@ -44,6 +44,7 @@ int invalid_align(struct char_data *ch, struct obj_data *obj);
 int can_wear_lr(struct char_data *ch, struct obj_data *obj, int message);
 extern struct index_data *obj_index;
 extern struct index_data **trig_index;
+int Crash_is_unrentable(struct obj_data *obj);   /* objsave.c */
 extern const int exp_table[];
 extern const float class_exp_multipliers[];
 extern const float race_exp_multipliers[];
@@ -1406,6 +1407,18 @@ static int cw_end_sitting_on(struct char_data *ch, struct obj_data *o, int at_lo
 
    for (i = j = 0; i < h->num_forms; i++)
       {
+      /* A form held for good whose source the rent would refuse: taken before
+         the sitting rule, or from a piece that became unrentable since. It is
+         lent from this sitting on, so it comes apart when the owner leaves,
+         as a fresh infuse of the same piece would (Ragnar's assault cannon,
+         2026-10-26). */
+      if (at_login && h->forms[i].sitting == 0 &&
+          (r = real_object(h->forms[i].vnum)) >= 0 && Crash_is_unrentable(&obj_proto[r]))
+         {
+         h->forms[i].sitting = now;
+         send_to_char(ch, "The form of %s is lent for this sitting only: the piece could not be rented.\r\n",
+                      obj_proto[r].short_description);
+         }
       if (h->forms[i].sitting > 0 &&
           (!at_login || now - h->forms[i].sitting >= CW_SITTING_MAX))
          {
@@ -1801,13 +1814,15 @@ ACMD(do_infuse)
          send_to_char(ch, "%s can hold no more forms.\r\n", hero->short_description);
       /* a !rent piece lends its form for this sitting only, as the piece
        * itself would have lasted; it never refreshes a form held for good */
-      else if (f && !f->sitting && IS_OBJ_STAT(other, ITEM_NORENT))
+      else if (f && !f->sitting && Crash_is_unrentable(other))
          send_to_char(ch, "%s holds the form of %s for good; %s would lend it only for a "
                       "sitting.\r\n", hero->short_description, other->short_description,
                       other->short_description);
       else
          {
-         int rentless = IS_OBJ_STAT(other, ITEM_NORENT);
+         /* anything the rent would refuse (Crash_is_unrentable: !rent, a battle
+            item, a negative rent, a key) lends its form for a sitting only */
+         int rentless = Crash_is_unrentable(other);
          const char *lasts = rentless ? " The form lasts this sitting: it comes apart when "
                                         "you leave the game." : "";
 
