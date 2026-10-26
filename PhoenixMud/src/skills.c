@@ -3329,6 +3329,12 @@ ACMD(do_stance)
       return;
    }
    f = &stances[subcmd == SCMD_STANCE_MANTIS ? 1 : 0];
+   /* the forms come with the remort (scr_skills, class.c): a Sensei holds
+      them, a monk who has not remorted does not */
+   if (!IS_SCR(ch)) {
+      send_to_char(ch, "Only a Sensei knows the %s's form.\r\n", f->name);
+      return;
+   }
    if (GET_SKILL(ch, f->skill) <= 0 || !SCR_SKILLCHECK(ch, f->skill)) {
       send_to_char(ch, "You know nothing of the %s's form.\r\n", f->name);
       return;
