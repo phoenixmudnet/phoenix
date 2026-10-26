@@ -1615,6 +1615,11 @@ struct scr_skills_struct scr_skills[] =
   //{CLASS_BARD, SKILL_TRIP, 51}, 
   //{CLASS_BARD, SPELL_CURE_LIGHT, 30}, 
   // CLASS_MONK          6
+  /* The stances come with the remort: a Sensei holds them, a monk who has
+     not remorted does not (owner, 2026-10-25). No base-class level in
+     etc/spells.txt; these are the only levels. */
+  {CLASS_MONK, SKILL_TIGER_STANCE, 25},
+  {CLASS_MONK, SKILL_MANTIS_STANCE, 35},
   // CLASS_BARBARIAN     8
   //{CLASS_BARBARIAN, SKILL_RAGE, 62},
   // CLASS_PALADIN       9
