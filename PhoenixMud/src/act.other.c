@@ -1745,11 +1745,11 @@ ACMD(do_gen_tog)
          {"Your prompt will no longer show damage and healing numbers.\r\n",
           "Your prompt will show the damage and healing since the last prompt.\r\n"
          },
-         {"Practice will no longer hide skills at average or better.\r\n",
-          "Practice will show only skills below average and spells below level 5.\r\n"
+         {"Practice will no longer hide what the Hero test accepts.\r\n",
+          "Practice will show only what the Hero test still wants of you.\r\n"
          },
-         {"Practice will no longer hide skills at good or better.\r\n",
-          "Practice will show only skills below good and spells below level 7.\r\n"
+         {"Practice will no longer hide what the Angel test accepts.\r\n",
+          "Practice will show only what the Angel test still wants of you.\r\n"
          },
       };
 

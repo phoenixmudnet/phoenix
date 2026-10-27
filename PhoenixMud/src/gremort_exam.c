@@ -272,6 +272,27 @@ int gremort_examine_skills(struct char_data *ch, char *result)
   }
 }
 
+/* What the hidehero and hideangel toggles leave out of a skill list
+ * (guild.c): a row the exam_type test does not ask of this character's
+ * class, or one already at the proficiency it asks. A class the test has
+ * no rows for keeps its whole list, as gremort_examine_skills would not
+ * know what to ask of it either. */
+int gremort_exam_hides(struct char_data *ch, int exam_type, int skill)
+{
+  int i, rows = 0, bar = 0;
+
+  for (i = 0; i < nSkillReqs; i++) {
+    if (skillReqs[i].class != GET_CLASS(ch) || skillReqs[i].exam_type != exam_type)
+      continue;
+    rows++;
+    if (skillReqs[i].skill == skill)
+      bar = skillReqs[i].proficiency;
+  }
+  if (rows == 0)
+    return 0;
+  return (bar <= 0 || GET_SKILL(ch, skill) >= bar);
+}
+
 int pass_explore_requirement(struct char_data *ch)
 {
   switch (which_gremort_exam(ch)) {

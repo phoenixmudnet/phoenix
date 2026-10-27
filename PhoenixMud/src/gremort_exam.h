@@ -70,4 +70,6 @@ typedef struct gremort_skill_requirement {
   int proficiency;
 } gremort_skill_requirement;
 
+int gremort_exam_hides(struct char_data *ch, int exam_type, int skill);
+
 #endif
