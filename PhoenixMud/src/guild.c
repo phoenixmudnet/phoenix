@@ -22,6 +22,7 @@
 #include "spells.h"
 #include "guild.h"
 #include "constants.h"
+#include "gremort_exam.h"
 
 /*extern declerations */
 extern struct index_data *mob_index;
@@ -314,17 +315,16 @@ void what_does_gm_know(int guild_nr, struct char_data * ch,int learn)
            (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=10)) ||
             ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>=95))))
           continue;
-        /* HIDEHERO and HIDEANGEL: only what is still below average (a skill
-           at 40 or less, the last "poor+"; a spell below level 5) or below
-           good (60 or less, the last "fair+"; below level 7).  The skill
-           edges are how_good's own. */
+        /* HIDEHERO and HIDEANGEL: only what the Hero or Angel test still
+           wants of this class (gremort_exam_hides): a row the test does not
+           ask for, or one already at the proficiency it asks, is left out.
+           A fixed edge hid rows the test still refused: the Angel test asks
+           70 of a Druid where "good" starts at 61. */
         if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEHERO) &&
-           (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=5)) ||
-            ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>40))))
+           gremort_exam_hides(ch, GREMORT_EXAM_HERO, i))
           continue;
         if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEANGEL) &&
-           (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=7)) ||
-            ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>60))))
+           gremort_exam_hides(ch, GREMORT_EXAM_ANGEL, i))
           continue;
         if(spells[i].is_spell==IS_SPELL)
           sprintf(buf,"Spell Level: %d",GET_SKILL(ch,i));
@@ -438,18 +438,16 @@ void list_skills(struct char_data * ch, int type)
           /* The hidemastered, hidehero and hideangel toggles leave out the
              same rows here as at a guildmaster (the practice list above):
              a toggle is the character's, not the room's, so the list reads
-             the same anywhere it is asked for. Same thresholds as above. */
+             the same anywhere it is asked for. The same tests as above. */
           if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEMASTERED) &&
              (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=10)) ||
               ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>=95))))
             continue;
           if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEHERO) &&
-             (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=5)) ||
-              ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>40))))
+             gremort_exam_hides(ch, GREMORT_EXAM_HERO, i))
             continue;
           if(!IS_NPC(ch) && PRF3_FLAGGED(ch, PRF3_HIDEANGEL) &&
-             (((spells[i].is_spell==IS_SPELL)&&(GET_SKILL(ch,i)>=7)) ||
-              ((spells[i].is_spell==IS_SKILL)&&(GET_SKILL(ch,i)>60))))
+             gremort_exam_hides(ch, GREMORT_EXAM_ANGEL, i))
             continue;
           if (t == IS_SPELL)
             sprintf(buf, "%-30s Spell Level: %d", spells[i].spell_name,
