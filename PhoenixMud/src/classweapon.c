@@ -2147,23 +2147,83 @@ static int cw_end_sitting_on(struct char_data *ch, struct obj_data *o, int at_lo
    return lost;
    }
 
+/* a weapon of ch's laid again from its hero state, off the body and back
+ * if worn, so its applies come off and go on as they changed */
+static void cw_refresh_on(struct char_data *ch, struct obj_data *o)
+   {
+   int pos = o->worn_by == ch ? o->worn_on : -1;
+
+   if (pos >= 0)
+      unequip_char(ch, pos);
+   cw_refresh(o);
+   if (pos >= 0)
+      equip_char(ch, o, pos);
+   }
+
 void cw_end_sitting(struct char_data *ch, int at_login)
    {
-   struct obj_data *o;
-   int pos;
+   struct obj_data *mine[16];
+   int n, i;
 
    if (!class_weapons || IS_NPC(ch))
       return;
-   for (o = ch->carrying; o; o = o->next_content)
-      if (cw_mine(o, ch) && cw_end_sitting_on(ch, o, at_login))
-         cw_refresh(o);
-   for (pos = 0; pos < NUM_WEARS; pos++)
-      if ((o = GET_EQ(ch, pos)) && cw_mine(o, ch) && cw_end_sitting_on(ch, o, at_login))
+   /* worn, carried and in containers: a weapon put in a bag kept its lent form */
+   n = cw_all_mine(ch, mine, 16);
+   for (i = 0; i < n; i++)
+      if (cw_end_sitting_on(ch, mine[i], at_login))
+         cw_refresh_on(ch, mine[i]);
+   }
+
+/* could the template ever be this weapon's form, whoever took it: a source
+ * with no magic of its own but a wear guard, of the kind its core takes */
+static int cw_formable(struct hero_data *h, struct obj_data *t)
+   {
+   obj_rnum cr = real_object(h->core);
+
+   if (!t || !cw_guard_only(t))
+      return FALSE;
+   if (cr >= 0 && cw_held_kind(&obj_proto[cr]))
+      return CAN_WEAR(t, ITEM_WEAR_HOLD) && (GET_OBJ_TYPE(t) == ITEM_ARMOR ||
+             GET_OBJ_TYPE(t) == ITEM_WORN || GET_OBJ_TYPE(t) == ITEM_TREASURE ||
+             GET_OBJ_TYPE(t) == ITEM_OTHER);
+   return (GET_OBJ_TYPE(t) == ITEM_WEAPON || GET_OBJ_TYPE(t) == ITEM_FIREWEAPON) &&
+          CAN_WEAR(t, ITEM_WEAR_WIELD);
+   }
+
+/* at login, a form taken before the gates that now refuse it (no wield
+ * flag, magic of its own) comes off: the weapon could not take it again, so
+ * it does not keep it, and one in that form goes back to its own */
+static void cw_drop_unformable(struct char_data *ch)
+   {
+   struct obj_data *mine[16];
+   struct hero_data *h;
+   obj_rnum fr;
+   int n, i, j, k, was_in;
+
+   n = cw_all_mine(ch, mine, 16);
+   for (i = 0; i < n; i++)
+      {
+      h = mine[i]->hero;
+      for (j = k = was_in = 0; j < h->num_forms && j < HERO_MAX_FORMS; j++)
          {
-         o = unequip_char(ch, pos);
-         cw_refresh(o);
-         equip_char(ch, o, pos);
+         fr = real_object(h->forms[j].vnum);
+         if (fr < 0 || !cw_formable(h, &obj_proto[fr]))
+            {
+            send_to_char(ch, "The form of %s comes apart: your class weapon cannot hold it.\r\n",
+                         fr >= 0 ? obj_proto[fr].short_description : "a weapon");
+            if (h->form == h->forms[j].vnum)
+               was_in = TRUE;
+            continue;
+            }
+         h->forms[k++] = h->forms[j];
          }
+      h->num_forms = k;
+      if (was_in)
+         {
+         h->form = HERO_CORE_FORM;
+         cw_refresh_on(ch, mine[i]);
+         }
+      }
    }
 
 /* at login: the class's own weapon, carried and bound to its owner but
@@ -2237,6 +2297,7 @@ void cw_login(struct char_data *ch)
    if (cw_all_mine(ch, two, 2) > 1)
       mudlogf(BRF, LVL_IMMORT, TRUE, "(GC) SYSERR: %s carries more than one class weapon.", GET_NAME(ch));
    }
+   cw_drop_unformable(ch);
    cw_end_sitting(ch, TRUE);
    }
 
