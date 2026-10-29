@@ -1722,6 +1722,29 @@ void cw_focus_tick(void)
  * scroll or a wand grows nothing */
 static int cw_cast_mana = 0;
 
+/* the cast now resolving mended someone who counts (cw_heal_counts) */
+static int cw_cast_healed = FALSE;
+
+/* both grouped under one leader */
+static int cw_same_group(struct char_data *a, struct char_data *b)
+   {
+   struct char_data *la = a->master ? a->master : a;
+   struct char_data *lb = b->master ? b->master : b;
+
+   return AFF_FLAGGED(a, AFF_GROUP) && AFF_FLAGGED(b, AFF_GROUP) && la == lb;
+   }
+
+/* a heal grows the weapon only in a fight (the caster's or the target's),
+ * on the caster or a player in the caster's group, and only if it mends */
+static int cw_heal_counts(struct char_data *ch, struct char_data *victim)
+   {
+   if (!victim || GET_HIT(victim) >= GET_MAX_HIT(victim))
+      return FALSE;
+   if (!FIGHTING(ch) && !FIGHTING(victim))
+      return FALSE;
+   return victim == ch || (!IS_NPC(victim) && cw_same_group(ch, victim));
+   }
+
 /* what the cast now resolving is worth: base at CAST_MANA_FULL mana or more,
  * its share below */
 static int cw_cast_share(int base)
@@ -1732,17 +1755,21 @@ static int cw_cast_share(int base)
 void cw_begin_cast(struct char_data *ch, int mana)
    {
    cw_cast_mana = IS_NPC(ch) ? 0 : MAX(0, mana);
+   cw_cast_healed = FALSE;
    }
 
-/* a spoken cast resolved; an attack spell that left the caster fighting
- * grows the class weapon in hand by what the cast cost */
+/* a spoken cast resolved; it grows the class weapon in hand once, however
+ * many it reached, by what it cost: an attack spell that left the caster
+ * fighting, or a heal that mended someone who counts */
 void cw_end_cast(struct char_data *ch, int attack)
    {
    struct obj_data *obj;
-   int pts = cw_cast_share(POINTS_PER_CAST);
+   int healed = cw_cast_healed;
+   int pts = cw_cast_share(attack ? POINTS_PER_CAST : POINTS_PER_HEAL);
 
    cw_cast_mana = 0;
-   if (!attack || pts <= 0 || !class_weapons || IS_NPC(ch))
+   cw_cast_healed = FALSE;
+   if ((!attack && !healed) || pts <= 0 || !class_weapons || IS_NPC(ch))
       return;
    cw_armor_grow(ch, pts);
    if (!(obj = cw_in_hand(ch)))
@@ -1759,12 +1786,8 @@ int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
    if (!class_weapons || IS_NPC(ch) || amount <= 0)
       return amount;
    obj = cw_in_hand(ch);
-   if (victim && GET_HIT(victim) < GET_MAX_HIT(victim) && cw_cast_share(POINTS_PER_HEAL) > 0)
-      {
-      cw_armor_grow(ch, cw_cast_share(POINTS_PER_HEAL));
-      if (obj)
-         cw_grow(ch, obj, cw_cast_share(POINTS_PER_HEAL));
-      }
+   if (cw_cast_mana > 0 && cw_heal_counts(ch, victim))
+      cw_cast_healed = TRUE;     /* grown once, when the cast resolves */
    if (obj && cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
       a *= cw_mult(KIND_HEAL, s);
    a *= cw_armor_layer(ch, obj, KIND_HEAL);
