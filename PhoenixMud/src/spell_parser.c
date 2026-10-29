@@ -2472,12 +2472,13 @@ void update_casting_time(struct char_data *ch)
             sing_spell(ch, spellnum);
             }
 
+         /* the class weapon in hand grows by what the cast cost: an
+          * attack spell that left the caster fighting, or a heal on someone
+          * hurt (cw_heal_mod) */
+         cw_begin_cast(ch, mag_manacost(ch, spellnum, CAST_LEVEL(ch)));
          call_magic(ch, tch, tobj, tdr, tdr2,spellnum,CAST_LEVEL(ch),
                     CAST_SPELL);
-         /* an attack spell that left the caster fighting: the class
-          * weapon in hand grows */
-         if (!IS_NPC(ch) && spells[spellnum].violent == VIOLENT && FIGHTING(ch))
-            cw_note_cast(ch);
+         cw_end_cast(ch, !IS_NPC(ch) && spells[spellnum].violent == VIOLENT && FIGHTING(ch));
          reset_casting_data(ch);
          }
       }

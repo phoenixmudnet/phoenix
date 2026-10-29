@@ -53,6 +53,7 @@ double cw_exp(double x);
 double cw_ln(double x);
 double cw_pow(double x, double y);
 double cw_floor(double x);
+int cw_cast_points(int base, int mana, int full);
 extern struct index_data *mob_index;
 extern struct zone_data *zone_table;
 extern zone_rnum top_of_zone_table;
@@ -69,9 +70,17 @@ int kills_limit_damage_xpgain(struct char_data *ch, struct char_data *victim, in
 #define CLASS_WEAPON_BASE    26600
 #define DEFAULT_ESSENCE      26620
 #define POINTS_PER_HIT       2
+/* an attack spell or a counted heal is worth POINTS_PER_CAST/_HEAL at
+ * CAST_MANA_FULL mana and its share below that: a level-1 entangle at 20
+ * mana counted as much as a full spell, so a cheap cast repeated every few
+ * seconds outgrew every other way of playing. 40 is the median mana of the
+ * attack spells and heals the weapon's holders cast */
 #define POINTS_PER_CAST      25
 #define POINTS_PER_HEAL      25
-#define POINTS_PER_MUD_HOUR  100
+#define CAST_MANA_FULL       40
+/* about twice what hard fighting gives (590-660 points an online hour, some
+ * 12.5 a MUD hour of 75 seconds); it was 100, eight times that */
+#define POINTS_PER_MUD_HOUR  25
 /* growth is banked and paid at a kill credited to the owner; a bank holds at
  * most two MUD hours' cap, so a fled fight carries over and hours of farming
  * beside something that never dies do not */
@@ -1196,13 +1205,33 @@ void cw_focus_tick(void)
       }
    }
 
-void cw_note_cast(struct char_data *ch)
+/* the mana of the cast now resolving: 0 outside a cast, so a potion, a
+ * scroll or a wand grows nothing */
+static int cw_cast_mana = 0;
+
+/* what the cast now resolving is worth: base at CAST_MANA_FULL mana or more,
+ * its share below */
+static int cw_cast_share(int base)
+   {
+   return cw_cast_points(base, cw_cast_mana, CAST_MANA_FULL);
+   }
+
+void cw_begin_cast(struct char_data *ch, int mana)
+   {
+   cw_cast_mana = IS_NPC(ch) ? 0 : MAX(0, mana);
+   }
+
+/* a spoken cast resolved; an attack spell that left the caster fighting
+ * grows the class weapon in hand by what the cast cost */
+void cw_end_cast(struct char_data *ch, int attack)
    {
    struct obj_data *obj;
+   int pts = cw_cast_share(POINTS_PER_CAST);
 
-   if (!class_weapons || IS_NPC(ch) || !(obj = cw_in_hand(ch)))
+   cw_cast_mana = 0;
+   if (!attack || pts <= 0 || !class_weapons || IS_NPC(ch) || !(obj = cw_in_hand(ch)))
       return;
-   cw_grow(ch, obj, POINTS_PER_CAST);
+   cw_grow(ch, obj, pts);
    }
 
 int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
@@ -1213,8 +1242,8 @@ int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
 
    if (!class_weapons || IS_NPC(ch) || amount <= 0 || !(obj = cw_in_hand(ch)))
       return amount;
-   if (victim && GET_HIT(victim) < GET_MAX_HIT(victim))
-      cw_grow(ch, obj, POINTS_PER_HEAL);
+   if (victim && GET_HIT(victim) < GET_MAX_HIT(victim) && cw_cast_share(POINTS_PER_HEAL) > 0)
+      cw_grow(ch, obj, cw_cast_share(POINTS_PER_HEAL));
    if (cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
       a *= cw_mult(KIND_HEAL, s);
    if (obj->hero->focus == HERO_FOCUS_HEAL)
@@ -2153,10 +2182,11 @@ ACMD(do_classweapon)
    if (!*a1)
       {
       send_to_char(ch, "&cThe class weapons (a Hero's, bound; grows by hits (%d), attack spells "
-                   "(%d) and heals (%d) in hand, at most %d a MUD hour, scaled by remort tier; a "
-                   "lock %d%% a level, %d in a hundred; the essence comes from a locked weapon's "
-                   "boss, slain):&n\r\n", POINTS_PER_HIT, POINTS_PER_CAST, POINTS_PER_HEAL,
-                   POINTS_PER_MUD_HOUR, (int)cw_floor(cw_chance * 100 + 0.5), cw_max_per_100);
+                   "(%d) and heals (%d) at %d mana or more, in hand, at most %d a MUD hour, scaled "
+                   "by remort tier; a lock %d%% a level, %d in a hundred; the essence comes from a "
+                   "locked weapon's boss, slain):&n\r\n", POINTS_PER_HIT, POINTS_PER_CAST,
+                   POINTS_PER_HEAL, CAST_MANA_FULL, POINTS_PER_MUD_HOUR,
+                   (int)cw_floor(cw_chance * 100 + 0.5), cw_max_per_100);
       r = real_object(cw_essence);
       send_to_char(ch, " essence [%ld] %s\r\n", cw_essence,
                    cw_essence > 0 && r >= 0 ? obj_proto[r].short_description : "(none set)");
