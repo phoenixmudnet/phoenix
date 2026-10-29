@@ -252,15 +252,30 @@ static int cw_is_service(struct index_data *ix)
    return FALSE;
    }
 
+/* zones that never give a boss: the Bowels of the UnderDark I to III (230,
+ * 249, 264) and the Stone Circle (253) by number, and any zone with a death
+ * trap in it */
+static const int cw_barred_zone_nums[] = { 230, 249, 264, 253 };
+
 static void cw_build_pool(void)
    {
    int zone, cmd_no, i, seen;
+   room_rnum r;
    mob_rnum m;
+   char *barred;
 
    if (cw_pool)
       free(cw_pool);
    cw_pool = NULL;
    cw_pool_size = 0;
+   CREATE(barred, char, top_of_zone_table + 1);
+   for (zone = 0; zone <= top_of_zone_table; zone++)
+      for (i = 0; i < (int)(sizeof(cw_barred_zone_nums) / sizeof(cw_barred_zone_nums[0])); i++)
+         if (zone_table[zone].number == cw_barred_zone_nums[i])
+            barred[zone] = TRUE;
+   for (r = 0; r <= top_of_world; r++)
+      if (ROOM_FLAGGED(r, ROOM_DEATH) && world[r].zone >= 0 && world[r].zone <= top_of_zone_table)
+         barred[world[r].zone] = TRUE;
    for (zone = 0; zone <= top_of_zone_table; zone++)
       for (cmd_no = 0; zone_table[zone].cmd && zone_table[zone].cmd[cmd_no].command != 'S'; cmd_no++)
          {
@@ -272,6 +287,8 @@ static void cw_build_pool(void)
          if (GET_LEVEL(&mob_proto[m]) <= 0 || GET_LEVEL(&mob_proto[m]) > 127)
             continue;
          if (cw_is_service(&mob_index[m]))
+            continue;
+         if (z->arg3 > top_of_world || barred[world[z->arg3].zone])
             continue;
          for (i = seen = 0; i < cw_pool_size; i++)
             if (cw_pool[i].vnum == mob_index[m].vnum)
@@ -287,6 +304,7 @@ static void cw_build_pool(void)
          cw_pool[cw_pool_size].room = z->arg3;
          cw_pool_size++;
          }
+   free(barred);
    }
 
 static void cw_read_ledger(void)
@@ -377,7 +395,7 @@ void classweapon_boot(void)
    for (i = 0; cw_staff_commands[i]; i++)
       for (j = 0; *cmd_info[j].command != '\n'; j++)
          if (!strcmp(cmd_info[j].command, cw_staff_commands[i]))
-            cmd_info[j].minimum_level = LVL_IMMORT;
+            cmd_info[j].minimum_level = LVL_IMPL;
    log("Class weapons: on (%d bosses in the pool).", cw_pool_size);
    }
 
@@ -515,42 +533,85 @@ static int cw_mine(struct obj_data *obj, struct char_data *ch)
    return obj && obj->hero && !IS_NPC(ch) && obj->bound_idnum == GET_IDNUM(ch);
    }
 
+static int cw_reclassing = FALSE;
+
+/* the copy in slot pos, as its owner's class: one still another class's
+ * (kept in a house or a bag through a remort) takes the wielder's class
+ * first, and may go to the pack doing it */
+static struct obj_data *cw_slot_as_own_class(struct char_data *ch, int pos)
+   {
+   struct obj_data *o = GET_EQ(ch, pos);
+
+   if (!cw_mine(o, ch))
+      return NULL;
+   if (o->hero->cls != GET_CLASS(ch) && class_weapons && !cw_reclassing)
+      {
+      cw_reclass(ch);
+      return GET_EQ(ch, pos) == o ? o : NULL;
+      }
+   return o;
+   }
+
 /* the class weapon in its owner's hands: wielded, or held */
 static struct obj_data *cw_in_hand(struct char_data *ch)
    {
    static const int slots[] = { WEAR_WIELD_1, WEAR_WIELD_2, WEAR_HOLD_1, WEAR_HOLD_2 };
+   struct obj_data *o;
    int i;
 
    if (IS_NPC(ch))
       return NULL;
    for (i = 0; i < 4; i++)
-      if (cw_mine(GET_EQ(ch, slots[i]), ch))
-         return GET_EQ(ch, slots[i]);
+      if ((o = cw_slot_as_own_class(ch, slots[i])))
+         return o;
    return NULL;
    }
 
 static struct obj_data *cw_held(struct char_data *ch)
    {
-   if (cw_mine(GET_EQ(ch, WEAR_HOLD_1), ch))
-      return GET_EQ(ch, WEAR_HOLD_1);
-   if (cw_mine(GET_EQ(ch, WEAR_HOLD_2), ch))
-      return GET_EQ(ch, WEAR_HOLD_2);
-   return NULL;
+   struct obj_data *o;
+
+   if ((o = cw_slot_as_own_class(ch, WEAR_HOLD_1)))
+      return o;
+   return cw_slot_as_own_class(ch, WEAR_HOLD_2);
    }
 
-/* every class weapon the character carries or wears */
+/* ch's class weapons in list and in the containers in it, into out[k..n) */
+static int cw_mine_in(struct char_data *ch, struct obj_data *list, struct obj_data **out,
+                      int k, int n)
+   {
+   for (; list && k < n; list = list->next_content)
+      {
+      if (cw_mine(list, ch))
+         out[k++] = list;
+      if (list->contains)
+         k = cw_mine_in(ch, list->contains, out, k, n);
+      }
+   return k;
+   }
+
+/* ch's class weapons, worn, carried, and in containers at any depth: at most n */
+static int cw_all_mine(struct char_data *ch, struct obj_data **out, int n)
+   {
+   int i, k = 0;
+
+   for (i = 0; i < NUM_WEARS && k < n; i++)
+      if (GET_EQ(ch, i))
+         {
+         if (cw_mine(GET_EQ(ch, i), ch))
+            out[k++] = GET_EQ(ch, i);
+         if (GET_EQ(ch, i)->contains)
+            k = cw_mine_in(ch, GET_EQ(ch, i)->contains, out, k, n);
+         }
+   return cw_mine_in(ch, ch->carrying, out, k, n);
+   }
+
+/* the class weapon the character has on them, in a container or not */
 static struct obj_data *cw_owned(struct char_data *ch)
    {
-   struct obj_data *o;
-   int i;
+   struct obj_data *w[1];
 
-   for (i = 0; i < NUM_WEARS; i++)
-      if (cw_mine(GET_EQ(ch, i), ch))
-         return GET_EQ(ch, i);
-   for (o = ch->carrying; o; o = o->next_content)
-      if (cw_mine(o, ch))
-         return o;
-   return NULL;
+   return cw_all_mine(ch, w, 1) ? w[0] : NULL;
    }
 
 /* ---------------------------------------------------------------- the class armor */
@@ -1491,7 +1552,10 @@ static int cw_settle(struct char_data *ch, struct obj_data *obj)
       for (i = recent = 0; i < h->num_holds; i++)
          if (h->holds[i] > next - 100)
             recent++;
-      if (cw_chance > 0 && recent < cw_max_per_100 && cw_lock_roll())
+      /* a lock only while it can be lifted: an essence named and in the
+       * world, and a boss to win it from; else it would hold for good */
+      if (cw_chance > 0 && recent < cw_max_per_100 && cw_essence > 0 &&
+          real_object(cw_essence) >= 0 && cw_pool_size > 0 && cw_lock_roll())
          {
          h->waiting = HERO_NO_BOSS;
          if (h->num_holds < HERO_MAX_HOLDS)
@@ -1941,17 +2005,27 @@ static void cw_switch_template(struct obj_data *o, long vnum)
 
 void cw_reclass(struct char_data *ch)
    {
-   struct obj_data *o;
+   struct obj_data *mine[16], *o;
    obj_rnum fr;
    long next;
    char why[256];
+   int n, i, pos;
 
-   if (!class_weapons || IS_NPC(ch))
+   if (!class_weapons || IS_NPC(ch) || cw_reclassing)
       return;
-   for (o = ch->carrying; o; o = o->next_content)
+   cw_reclassing = TRUE;
+   /* worn and in containers too: a weapon bagged through a remort kept the
+    * old class's bonus */
+   n = cw_all_mine(ch, mine, 16);
+   for (i = 0; i < n; i++)
       {
-      if (!cw_mine(o, ch) || o->hero->cls == GET_CLASS(ch))
+      o = mine[i];
+      if (o->hero->cls == GET_CLASS(ch))
          continue;
+      /* off the body while it changes, so its applies come off as they went on */
+      pos = o->worn_by == ch ? o->worn_on : -1;
+      if (pos >= 0)
+         unequip_char(ch, pos);
       o->hero->cls = GET_CLASS(ch);
       next = cw_first[(int)GET_CLASS(ch)];
       if (next > 0 && real_object(next) >= 0)
@@ -1964,7 +2038,21 @@ void cw_reclass(struct char_data *ch)
           ((fr = real_object(o->hero->form)) < 0 || cw_form_refusal(ch, o->hero, &obj_proto[fr], why)))
          o->hero->form = HERO_CORE_FORM;
       cw_refresh(o);
+      if (pos < 0)
+         continue;
+      /* back where it was if the new class's weapon goes there; wielded and
+       * now held, or the other way, it goes to the pack */
+      if (cw_held_kind(o) ? (pos == WEAR_HOLD_1 || pos == WEAR_HOLD_2)
+                          : (pos == WEAR_WIELD_1 || pos == WEAR_WIELD_2))
+         equip_char(ch, o, pos);
+      else
+         {
+         obj_to_char(o, ch);
+         send_to_char(ch, "%s is your new class's weapon now, and goes into your pack: %s it.\r\n",
+                      cw_cap(o->short_description), cw_held_kind(o) ? "hold" : "wield");
+         }
       }
+   cw_reclassing = FALSE;
    }
 
 /* ------------------------------------------------- forms lent for a sitting */
@@ -2097,6 +2185,12 @@ void cw_login(struct char_data *ch)
       }
    }
    cw_reclass(ch);
+   {
+   struct obj_data *two[2];
+
+   if (cw_all_mine(ch, two, 2) > 1)
+      mudlogf(BRF, LVL_IMMORT, TRUE, "(GC) SYSERR: %s carries more than one class weapon.", GET_NAME(ch));
+   }
    cw_end_sitting(ch, TRUE);
    }
 
@@ -2110,7 +2204,8 @@ static struct obj_data *cw_carried_essence(struct char_data *ch, long boss, int 
       return NULL;
    for (o = ch->carrying; o; o = o->next_content)
       {
-      if (GET_OBJ_VNUM(o) != cw_essence)
+      /* another's essence opens nothing: it is theirs alone */
+      if (GET_OBJ_VNUM(o) != cw_essence || o->bound_idnum != GET_IDNUM(ch))
          continue;
       if (!marked && !o->checkpoint_of)
          return o;
@@ -2132,7 +2227,9 @@ void cw_boss_killed(struct char_data *killer, struct char_data *victim)
    vnum = GET_MOB_VNUM(victim);
    if (!(w = cw_owned(killer)) || w->hero->waiting != vnum || vnum <= 0)
       return;
-   if (cw_carried_essence(killer, vnum, TRUE))
+   /* one to a lock, wherever the first went: in a bag, on the floor, with
+    * an alt (classweapon reissue lets a lost one be won again) */
+   if (w->hero->issued == vnum || cw_carried_essence(killer, vnum, TRUE))
       return;
    if (real_object(cw_essence) < 0 || !(ess = read_object(cw_essence, VIRTUAL)))
       return;
@@ -2140,6 +2237,7 @@ void cw_boss_killed(struct char_data *killer, struct char_data *victim)
    strncpy(ess->bound_name, GET_NAME(killer), MAX_NAME_LENGTH);
    ess->bound_name[MAX_NAME_LENGTH] = '\0';
    ess->checkpoint_of = vnum;
+   w->hero->issued = vnum;
    obj_to_char(ess, killer);
    send_to_char(killer, "&YWhere %s stood lies %s: the essence your weapon needs. It is yours "
                 "alone; a master crafter sets it in your weapon (temper).&n\r\n",
@@ -2206,6 +2304,7 @@ ACMD(do_temper)
          obj_from_char(ess);
          extract_obj(ess);
          h->waiting = HERO_NOT_LOCKED;
+         h->issued = 0;
          h->cleared++;
          h->essences++;
          r = cw_settle(ch, obj);
@@ -2807,6 +2906,25 @@ ACMD(do_classweapon)
                          r >= 0 ? obj_proto[r].short_description : "(not in the world)");
             }
       }
+   else if (!str_cmp(a1, "reissue"))
+      {
+      struct char_data *vict;
+      struct obj_data *w;
+
+      one_argument(rest, a2);
+      if (!*a2 || !(vict = get_player_vis(ch, a2, FALSE)) || IS_NPC(vict))
+         send_to_char(ch, "classweapon reissue <player>: an online player's locked weapon may win "
+                      "its essence again (one truly lost).\r\n");
+      else if (!(w = cw_owned(vict)) || w->hero->issued <= 0)
+         send_to_char(ch, "%s has no essence out for a lock.\r\n", GET_NAME(vict));
+      else
+         {
+         mudlogf(NRM, LVL_IMMORT, TRUE, "(GC) %s lets %s's lock win its essence (boss %ld) again.",
+                 GET_NAME(ch), GET_NAME(vict), w->hero->issued);
+         w->hero->issued = 0;
+         send_to_char(ch, "%s's weapon may win its essence again.\r\n", GET_NAME(vict));
+         }
+      }
    else if (!str_cmp(a1, "essence"))
       {
       one_argument(rest, a2);
@@ -2845,7 +2963,8 @@ ACMD(do_classweapon)
       }
    else
       send_to_char(ch, "classweapon | classweapon <class> first <vnum>|none | classweapon essence "
-                   "<vnum>|none | classweapon checkpoint <chance> <most in a hundred>\r\n");
+                   "<vnum>|none | classweapon checkpoint <chance> <most in a hundred> | "
+                   "classweapon reissue <player>\r\n");
    release_buffer(a1);
    release_buffer(a2);
    release_buffer(rest);

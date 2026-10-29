@@ -19,6 +19,7 @@
 *    HS <focus>                   the second focus (the class set)     *
 *    HA <stat> <essences> <over>  a unit attuned on class armor        *
 *    HE <count>                   an armor essence copy's count        *
+*    HI <boss vnum>               the essence out for its lock         *
 *                                                                      *
 *  Self-contained (no game globals) so the tests link it alone.        *
 ***********************************************************************/
@@ -191,6 +192,9 @@ int obj_hero_write(FILE *fp, const struct obj_data *obj)
    if (h->focus2 > HERO_FOCUS_NONE && h->focus2 < HERO_NUM_FOCUS)
       if (fprintf(fp, "HS %d\n", h->focus2) < 0)
          err = -1;
+   if (h->issued > 0)
+      if (fprintf(fp, "HI %ld\n", h->issued) < 0)
+         err = -1;
    return err;
    }
 
@@ -298,6 +302,10 @@ int obj_hero_read_line(struct obj_data *obj, const char *line)
             h->focus_points[HERO_FOCUS_CAST] = d4;
             }
          return TRUE;
+      case 'I':
+         if (sscanf(line, "HI %ld", &l1) == 1 && l1 > 0)
+            hero_of(obj)->issued = l1;
+         break;
       case 'S':
          if (sscanf(line, "HS %d", &i1) == 1 && i1 > HERO_FOCUS_NONE && i1 < HERO_NUM_FOCUS)
             hero_of(obj)->focus2 = i1;

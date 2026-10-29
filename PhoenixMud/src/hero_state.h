@@ -57,6 +57,8 @@ struct hero_data
    int num_grants;
    char grants[HERO_MAX_GRANTS][HERO_GRANT_LEN];
    int focus2;              /* a second focus, while the class set counts five */
+   long issued;             /* the boss whose essence is out for the lock, or 0:
+                             * one essence to a lock */
    };
 
 /* growth points and the MUD hour's count, on any attuned copy */
