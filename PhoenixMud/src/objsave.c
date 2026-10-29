@@ -1838,6 +1838,7 @@ int gen_receptionist(struct char_data * ch, struct char_data * recep,
       if (cost && (mode == RENT_FACTOR))
          Crash_rent_deadline(ch, recep, cost);
 
+      cw_set_down_corpses(ch);   /* a corpse carried for another stays here */
       if (mode == RENT_FACTOR)
          {
          act("$n stores your belongings and helps you into your private chamber.",
