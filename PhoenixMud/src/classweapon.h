@@ -20,7 +20,11 @@ void cw_login(struct char_data *ch);
 /* forms lent for a sitting come apart: leaving (at_login 0), or at login
  * once a day old */
 void cw_end_sitting(struct char_data *ch, int at_login);
-void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam);
+void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam, struct char_data *victim);
+void cw_mark_player_made(struct char_data *mob);
+void cw_mob_gone(struct char_data *mob);
+void cw_set_killer(struct char_data *killer);
+int  cw_holds_bound(struct obj_data *obj);
 int  cw_in_form(struct obj_data *obj);
 void cw_pay_kill(struct char_data *ch, struct char_data *victim);
 void cw_begin_cast(struct char_data *ch, int mana);

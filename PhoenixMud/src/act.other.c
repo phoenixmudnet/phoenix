@@ -1950,16 +1950,27 @@ ACMD(do_sac)
 	        IS_OBJ_STAT(obj, ITEM_DONATED)) &&
               CAN_WEAR(obj, ITEM_WEAR_TAKE))
          {
-         log_corpse(ch,obj,"sacrificed");
-         while (obj->contains)
+         char *what = get_buffer(MAX_STRING_LENGTH);
+         int refused;
+
+         /* a bound piece, or what holds one, is not sacrificed: its owner
+          * junks it, with a confirm, or it waits for them */
+         sprintf(what, "sacrifice %s", obj->short_description);
+         refused = cw_bound_refuse(ch, obj, what, NULL, FALSE);
+         release_buffer(what);
+         if (!refused)
             {
-            tmp_obj=obj->contains;
-            obj_from_obj(tmp_obj);
-            obj_to_room(tmp_obj,IN_ROOM(ch));
+            log_corpse(ch,obj,"sacrificed");
+            while (obj->contains)
+               {
+               tmp_obj=obj->contains;
+               obj_from_obj(tmp_obj);
+               obj_to_room(tmp_obj,IN_ROOM(ch));
+               }
+            act("$n sacrifices $p.", FALSE, ch, obj, 0, TO_ROOM);
+            act("You sacrifice $p to your god.", FALSE, ch, obj, 0, TO_CHAR);
+            extract_obj(obj);
             }
-         act("$n sacrifices $p.", FALSE, ch, obj, 0, TO_ROOM);
-         act("You sacrifice $p to your god.", FALSE, ch, obj, 0, TO_CHAR);
-         extract_obj(obj);
          }
       else if (!obj)
          {

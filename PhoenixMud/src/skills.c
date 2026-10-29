@@ -27,6 +27,7 @@
 #include "queue.h"
 #include "dg_scripts.h"
 #include "vnum.h"
+#include "classweapon.h"
 
 /* extern variables */
 extern struct room_data *world;
@@ -2296,7 +2297,8 @@ static int steal_take_ok(struct char_data *ch, struct obj_data *obj)
       act("$p: you can't take that!", FALSE, ch, obj, 0, TO_CHAR);
       return 0;
       }
-   return 1;
+   /* nor another's bound piece, whatever carries it (a janitor, a zombie) */
+   return !cw_take_refused(ch, obj, TRUE);
    }
 
 ACMD(do_steal)
