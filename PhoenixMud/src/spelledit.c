@@ -27,8 +27,35 @@ bitvector_t asciiflag_conv(char *flag);
 #define SPELLS_LOAD_FILE "etc/spells.txt"
 struct spell_info_type *spells=NULL;
 
+extern const char *unused_spellname;
 
-void load_spells(void) {
+/* a number below MAX_SPELLS the file does not list is an unused one, as
+ * the file writes those: every reader of spell_name (sort_spells first)
+ * expects a string, and nobody may learn it */
+static void name_unlisted_spells(void)
+   {
+   int nr, c;
+
+   if (!spells)
+      return;
+   for (nr = 0; nr < MAX_SPELLS; nr++)
+      if (!spells[nr].spell_name)
+         {
+         spells[nr].spell_name = str_dup(unused_spellname);
+         for (c = 0; c < NUM_CLASSES; c++)
+            spells[nr].min_level[c] = LVL_IMMORT;
+         }
+   }
+
+static void read_spells_file(void);
+
+void load_spells(void)
+   {
+   read_spells_file();
+   name_unlisted_spells();
+   }
+
+static void read_spells_file(void) {
    FILE *fp;
    char *line=get_buffer(256);
    char *buf1=get_buffer(2048);
