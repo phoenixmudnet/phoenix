@@ -243,6 +243,7 @@ static void test_class_armor(void)
    a.hero = hero_create();
    a.hero->focus = HERO_FOCUS_DPS;
    a.hero->focus2 = HERO_FOCUS_TANK;
+   a.hero->issued = 13718;
    fp = tmpfile();
    CHECK(obj_hero_write(fp, &a) == 0);
    rewind(fp);
@@ -254,6 +255,7 @@ static void test_class_armor(void)
    CHECK(b.armor && b.armor->num == 2 && b.armor->pts[1].stat == 4 && b.armor->pts[1].over == 1 &&
          b.armor->pts[1].essences == 200 && b.armor->essences == 37);
    CHECK(b.hero && b.hero->focus2 == HERO_FOCUS_TANK);
+   CHECK(b.hero && b.hero->issued == 13718);
    obj_hero_copy(&c, &b);
    CHECK(c.armor && c.armor != b.armor && c.armor->num == 2);
    CHECK(obj_hero_read_line(&c, "HA wisdom 100 0") == TRUE && c.armor->num == 2);

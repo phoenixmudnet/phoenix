@@ -286,7 +286,9 @@ void obj_derive_instance_facts(struct obj_data *obj, struct obj_data *proto,
 
    obj_facts_init(f);
    f->has_type = TRUE;
-   f->saved_type = GET_OBJ_TYPE(obj);
+   /* a class weapon in a form of another type is still its core: the form
+    * is laid again from the hero state on load, so its facts are the core's */
+   f->saved_type = obj->hero ? type : GET_OBJ_TYPE(obj);
 
    forged = (type == ITEM_WEAPON) && weapon_forged(obj, proto);
    cursed = (type == ITEM_WEAPON) && weapon_cursed(obj, proto);
