@@ -3443,6 +3443,188 @@ ACMD(do_unattune)
    release_buffer(sum);
    }
 
+/* ------------------------------------------------- a bound piece stays put */
+
+/*
+ * A bound piece stays with the one it serves: it is not dropped, given,
+ * donated or put in a container on the floor, nor is a container holding
+ * one. Junk alone destroys it, after a confirm. Another's bound piece is not
+ * taken, except that a corpse holding one may be carried to its owner; the
+ * piece comes out only for them, and a carrier leaving the game sets such a
+ * corpse down. Handing a piece to the one it serves is the way back for one
+ * that strayed. Immortals aside; nothing of it while the switch is off.
+ */
+
+/* the first bound piece in obj, itself first and then what it holds, deep:
+ * bound to anyone but `a` (only FALSE), or bound to `a` (only TRUE) */
+static struct obj_data *cw_bound_find(struct obj_data *obj, int only, long a)
+   {
+   struct obj_data *o, *r;
+
+   if (obj->bound_idnum > 0 && (only ? obj->bound_idnum == a : obj->bound_idnum != a))
+      return obj;
+   for (o = obj->contains; o; o = o->next_content)
+      if ((r = cw_bound_find(o, only, a)))
+         return r;
+   return NULL;
+   }
+
+static int cw_bound_rules(struct char_data *ch)
+   {
+   return class_weapons && ch && !IS_NPC(ch) && GET_LEVEL(ch) < LVL_IMMORT;
+   }
+
+/* "it is" or "<piece> in it is" */
+static const char *cw_in_it(struct obj_data *obj, struct obj_data *b, char *buf)
+   {
+   if (b == obj)
+      return "it is";
+   sprintf(buf, "%s in it is", b->short_description);
+   return buf;
+   }
+
+/* refuses ch moving obj, saying why: `what` is the act ("drop the sack"),
+ * `to` one it is handed to (the one a piece serves may have it back), drop
+ * whether it is set down (a corpse carried for another may be) */
+int cw_bound_refuse(struct char_data *ch, struct obj_data *obj, const char *what,
+                    struct char_data *to, int drop)
+   {
+   struct obj_data *b;
+   char in[MAX_STRING_LENGTH];
+
+   if (!cw_bound_rules(ch) || !obj)
+      return FALSE;
+   if (drop && IS_CORPSE(obj))
+      b = cw_bound_find(obj, TRUE, GET_IDNUM(ch));
+   else
+      b = cw_bound_find(obj, FALSE, (to && !IS_NPC(to)) ? GET_IDNUM(to) : 0);
+   if (!b)
+      return FALSE;
+   send_to_char(ch, "You cannot %s: %s bound to %s.\r\n", what, cw_in_it(obj, b, in),
+                b->bound_idnum == GET_IDNUM(ch) ? "you" : b->bound_name);
+   return TRUE;
+   }
+
+/* refuses ch taking obj when another's bound piece is in it: from the floor
+ * or a room's container a corpse holding one may still be carried; out of a
+ * carried container (carried TRUE) never */
+int cw_take_refused(struct char_data *ch, struct obj_data *obj, int carried)
+   {
+   struct obj_data *b;
+   char in[MAX_STRING_LENGTH];
+
+   if (!cw_bound_rules(ch) || !obj || !(b = cw_bound_find(obj, FALSE, GET_IDNUM(ch))))
+      return FALSE;
+   if (!carried && b != obj && IS_CORPSE(obj))
+      return FALSE;
+   send_to_char(ch, "%s: %s bound to %s, and not yours to take.\r\n", cw_cap(obj->short_description),
+                cw_in_it(obj, b, in), b->bound_name);
+   return TRUE;
+   }
+
+/* junk is the one way to be rid of a bound piece, so it asks first: `junk
+ * <it>` asks and only `junk <it> confirm` after it destroys it. The two
+ * differ on purpose: a client repeats the last line on a bare return, so
+ * `junk <it>` twice never destroys anything, and a confirm with no question
+ * standing asks again. A question stands a minute. */
+#define CW_JUNK_SLOTS 32
+#define CW_JUNK_SECONDS 60
+static struct { long idnum; struct obj_data *obj; time_t at; } cw_junk_asked[CW_JUNK_SLOTS];
+
+int cw_junk_gate(struct char_data *ch, struct obj_data *obj, const char *kw, int confirm)
+   {
+   struct obj_data *b;
+   char in[MAX_STRING_LENGTH];
+   time_t now = time(0);
+   int i, slot = -1, asked = FALSE;
+
+   if (!cw_bound_rules(ch) || !obj || !(b = cw_bound_find(obj, FALSE, 0)))
+      return TRUE;
+   if ((b = cw_bound_find(obj, FALSE, GET_IDNUM(ch))))
+      {
+      send_to_char(ch, "You cannot junk %s: %s bound to %s.\r\n", obj->short_description,
+                   cw_in_it(obj, b, in), b->bound_name);
+      return FALSE;
+      }
+   b = cw_bound_find(obj, FALSE, 0);
+   for (i = 0; i < CW_JUNK_SLOTS; i++)
+      if (cw_junk_asked[i].idnum == GET_IDNUM(ch))
+         {
+         asked = cw_junk_asked[i].obj == obj && now - cw_junk_asked[i].at <= CW_JUNK_SECONDS;
+         cw_junk_asked[i].idnum = 0;
+         }
+   if (confirm && asked)
+      {
+      mudlogf(BRF, LVL_IMMORT, TRUE, "%s junked %s, bound to %s.", GET_NAME(ch),
+              b->short_description, b->bound_name);
+      return TRUE;
+      }
+   if (!confirm)
+      {
+      for (i = 0; i < CW_JUNK_SLOTS && slot < 0; i++)
+         if (!cw_junk_asked[i].idnum || now - cw_junk_asked[i].at > CW_JUNK_SECONDS)
+            slot = i;
+      if (slot < 0)
+         slot = (int)(now % CW_JUNK_SLOTS);
+      cw_junk_asked[slot].idnum = GET_IDNUM(ch);
+      cw_junk_asked[slot].obj = obj;
+      cw_junk_asked[slot].at = now;
+      send_to_char(ch, "%s: %s bound to you. Junked, it is gone for good. To destroy it, type: "
+                   "junk %s confirm\r\n", cw_cap(obj->short_description), cw_in_it(obj, b, in), kw);
+      }
+   else
+      send_to_char(ch, "%s: %s bound to you. Type 'junk %s' first, then 'junk %s confirm'.\r\n",
+                   cw_cap(obj->short_description), cw_in_it(obj, b, in), kw, kw);
+   return FALSE;
+   }
+
+/* a bound piece is junked by itself, never along with others */
+int cw_junk_in_bulk(struct char_data *ch, struct obj_data *obj)
+   {
+   struct obj_data *b;
+   char in[MAX_STRING_LENGTH];
+
+   if (!cw_bound_rules(ch) || !obj || !(b = cw_bound_find(obj, FALSE, 0)))
+      return FALSE;
+   send_to_char(ch, "You cannot junk %s along with others: %s bound to %s.\r\n", obj->short_description,
+                cw_in_it(obj, b, in), b->bound_idnum == GET_IDNUM(ch) ? "you" : b->bound_name);
+   return TRUE;
+   }
+
+/* leaving the game, a carrier sets down any corpse holding a piece bound to
+ * someone else, where they stand, so the piece never leaves its owner's reach */
+static int cw_corpses_for_others(struct char_data *ch, struct obj_data *list,
+                                 struct obj_data **out, int k, int n)
+   {
+   for (; list && k < n; list = list->next_content)
+      {
+      if (IS_CORPSE(list) && cw_bound_find(list, FALSE, GET_IDNUM(ch)))
+         out[k++] = list;
+      else if (list->contains)
+         k = cw_corpses_for_others(ch, list->contains, out, k, n);
+      }
+   return k;
+   }
+
+void cw_set_down_corpses(struct char_data *ch)
+   {
+   struct obj_data *found[32];
+   int n, i;
+
+   if (!class_weapons || !ch || IS_NPC(ch) || IN_ROOM(ch) == NOWHERE)
+      return;
+   n = cw_corpses_for_others(ch, ch->carrying, found, 0, 32);
+   for (i = 0; i < n; i++)
+      {
+      if (found[i]->in_obj)
+         obj_from_obj(found[i]);
+      else
+         obj_from_char(found[i]);
+      obj_to_room(found[i], IN_ROOM(ch));
+      send_to_char(ch, "You set down %s.\r\n", found[i]->short_description);
+      }
+   }
+
 int cw_bound_ok(struct char_data *ch, struct obj_data *obj, int message)
    {
    int cls, slot;

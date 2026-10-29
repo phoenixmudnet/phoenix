@@ -547,6 +547,7 @@ void check_idling(struct char_data *ch)
          mudlog(buf, CMP, LVL_DGOD, TRUE);
          
          cw_end_sitting(ch, FALSE);   /* leaving: a lent form comes apart */
+         cw_set_down_corpses(ch);     /* and a corpse carried for another is set down */
          Crash_extract_norents_from_equipped(ch);
          Crash_extract_norents(ch->carrying);
 

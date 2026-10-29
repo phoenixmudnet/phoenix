@@ -38,6 +38,12 @@ void cw_identify_lines(struct obj_data *obj, char *buf);
 /* a bound piece serves its one character (immortals aside): FALSE and
  * the message when ch may not use it */
 int  cw_bound_ok(struct char_data *ch, struct obj_data *obj, int message);
+int  cw_bound_refuse(struct char_data *ch, struct obj_data *obj, const char *what,
+                     struct char_data *to, int drop);
+int  cw_take_refused(struct char_data *ch, struct obj_data *obj, int carried);
+int  cw_junk_gate(struct char_data *ch, struct obj_data *obj, const char *kw, int confirm);
+int  cw_junk_in_bulk(struct char_data *ch, struct obj_data *obj);
+void cw_set_down_corpses(struct char_data *ch);
 /* class armor: an attuned piece's stats on its wearer (equip, unequip and
  * affect_total), and the record beside the pfile at every save */
 void cw_armor_affect(struct char_data *ch, struct obj_data *obj, int add);

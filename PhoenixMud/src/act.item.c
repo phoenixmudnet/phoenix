@@ -82,6 +82,20 @@ void log_corpse(struct char_data *ch,struct obj_data *cont,char *ztString)
 void perform_put(struct char_data * ch, struct obj_data * obj,
                  struct obj_data * cont)
    {
+   char *what;
+
+   /* a bound piece goes only into a container its carrier carries */
+   if (cont->in_room != NOWHERE)
+      {
+      what = get_buffer(MAX_STRING_LENGTH);
+      sprintf(what, "put %s in %s", obj->short_description, cont->short_description);
+      if (cw_bound_refuse(ch, obj, what, NULL, FALSE))
+         {
+         release_buffer(what);
+         return;
+         }
+      release_buffer(what);
+      }
    if (!drop_otrigger(obj, ch))
       return;
    if (IS_OBJ_STAT(obj, ITEM_NODROP)&&
@@ -250,6 +264,8 @@ int can_take_obj(struct char_data * ch, struct obj_data * obj)
       act("$p: you can't take that!", FALSE, ch, obj, 0, TO_CHAR);
       return (0);
       }
+   else if (cw_take_refused(ch, obj, FALSE))
+      return (0);
    else if ((GET_OBJ_TYPE(obj) == ITEM_FURNITURE) && (obj->people) &&
             (GET_LEVEL(ch) < LVL_GRGOD))
       {
@@ -298,11 +314,15 @@ void get_check_money(struct char_data * ch, struct obj_data * obj, int subcmd)
  * gear: get corpse, then get apron corpse) */
 static int can_take_from_carried(struct char_data *ch, struct obj_data *obj)
    {
-   if ((GET_LEVEL(ch) >= LVL_IMMORT && PRF_FLAGGED(ch, PRF_NOHASSLE)) ||
-       CAN_WEAR(obj, ITEM_WEAR_TAKE))
+   if (GET_LEVEL(ch) >= LVL_IMMORT && PRF_FLAGGED(ch, PRF_NOHASSLE))
       return 1;
-   act("$p: you can't take that!", FALSE, ch, obj, 0, TO_CHAR);
-   return 0;
+   if (!CAN_WEAR(obj, ITEM_WEAR_TAKE))
+      {
+      act("$p: you can't take that!", FALSE, ch, obj, 0, TO_CHAR);
+      return 0;
+      }
+   /* another's bound piece comes out of a carried corpse only for its owner */
+   return !cw_take_refused(ch, obj, TRUE);
    }
 
 void perform_get_from_container(struct char_data * ch, struct obj_data * obj,
@@ -752,6 +772,18 @@ static int drop_allowed(struct char_data * ch, struct obj_data * obj,
       act("You cannot donate $p.",FALSE,ch,obj,0,TO_CHAR);
       return (0);
       }
+   /* a bound piece stays with the one it serves (junk asks in do_drop) */
+   if (mode != SCMD_JUNK)
+      {
+      buf = get_buffer(MAX_STRING_LENGTH);
+      sprintf(buf, "%s %s", sname, obj->short_description);
+      if (cw_bound_refuse(ch, obj, buf, NULL, mode == SCMD_DROP))
+         {
+         release_buffer(buf);
+         return (0);
+         }
+      release_buffer(buf);
+      }
    /* I like doing this so I better disallow it - Nomikos 7/17/2025 */
    if ((mode == SCMD_JUNK) && IS_OBJ_STAT(obj, ITEM_DONATED))
       {
@@ -955,7 +987,8 @@ ACMD(do_drop)
          do
             {
             next_obj = get_obj_in_list_vis(ch, arg, obj->next_content);
-            amount += perform_drop(ch, obj, mode, sname, RDR,0);
+            if (!(mode == SCMD_JUNK && cw_junk_in_bulk(ch, obj)))
+               amount += perform_drop(ch, obj, mode, sname, RDR,0);
             obj = next_obj;
             }
          while (obj && --multi);
@@ -1058,6 +1091,8 @@ ACMD(do_drop)
          for(obj= get_obj_in_list_vis(ch,arg,ch->carrying);obj;obj = next_obj)
             {
             next_obj = get_obj_in_list_vis(ch, arg, obj->next_content);
+            if (mode == SCMD_JUNK && cw_junk_in_bulk(ch, obj))
+               continue;
 
             if ((next_obj!=NULL)&&(obj->item_number==next_obj->item_number))
                {
@@ -1178,8 +1213,15 @@ ACMD(do_drop)
             }
          else
             {
-            log_corpse(ch,obj,sname);
-            amount += perform_drop(ch, obj, mode, sname, RDR, 0);
+            char *word = get_buffer(MAX_INPUT_LENGTH);
+
+            one_argument(argument, word);
+            if (mode != SCMD_JUNK || cw_junk_gate(ch, obj, arg, !str_cmp(word, "confirm")))
+               {
+               log_corpse(ch,obj,sname);
+               amount += perform_drop(ch, obj, mode, sname, RDR, 0);
+               }
+            release_buffer(word);
             }
          }
 
@@ -1200,6 +1242,16 @@ ACMD(do_drop)
 void perform_give(struct char_data * ch, struct char_data * vict,
                   struct obj_data * obj)
    {
+   char *what = get_buffer(MAX_STRING_LENGTH);
+
+   /* a bound piece goes only back to the one it serves */
+   sprintf(what, "give %s away", obj->short_description);
+   if (cw_bound_refuse(ch, obj, what, vict, FALSE))
+      {
+      release_buffer(what);
+      return;
+      }
+   release_buffer(what);
    if (IS_OBJ_STAT(obj, ITEM_NODROP)&&
            (IS_NPC(ch)||!PRF_FLAGGED(ch,PRF_NOHASSLE)))
       {
