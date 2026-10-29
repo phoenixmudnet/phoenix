@@ -15,6 +15,7 @@ void classweapon_boot(void);
 /* the hooks; each does nothing with the switch off */
 void cw_give_first(struct char_data *ch);
 void cw_reclass(struct char_data *ch);
+void cw_help_boot(void);
 void cw_login(struct char_data *ch);
 /* forms lent for a sitting come apart: leaving (at_login 0), or at login
  * once a day old */

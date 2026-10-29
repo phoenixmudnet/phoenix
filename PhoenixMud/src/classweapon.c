@@ -396,7 +396,221 @@ void classweapon_boot(void)
       for (j = 0; *cmd_info[j].command != '\n'; j++)
          if (!strcmp(cmd_info[j].command, cw_staff_commands[i]))
             cmd_info[j].minimum_level = LVL_IMPL;
+   cw_help_boot();
    log("Class weapons: on (%d bosses in the pool).", cw_pool_size);
+   }
+
+/* ---------------------------------------------------------------- help */
+
+/* The class weapon's help, in the game only while its switch is on: added
+ * after the help file's entries, unsorted, so a word the file already
+ * answers (help class: CLASSES) still opens the file's entry first. hedit
+ * never writes these to the help file (HELP_CODE_ORDER). */
+static const struct { const char *keywords; const char *entry; } cw_help[] =
+   {
+   { "TEMPER",
+     "Usage: temper <weapon>   (class weapon carried, before a master crafter)\r\n"
+     "\r\n"
+     "Sets an essence in a LOCKED class weapon, to unlock its level. An essence\r\n"
+     "never raises the weapon; only fighting with it does.\r\n"
+     "\r\n"
+     "THE CLASS WEAPON\r\n"
+     "  - Given at the Hero test, bound to you, kept through every remort.\r\n"
+     "  - Bound: you cannot drop, give or donate it, or leave it in a container\r\n"
+     "    you do not carry. junk asks first; junk <weapon> confirm then destroys\r\n"
+     "    it for good.\r\n"
+     "  - Passed the Hero test before it was handed out? Claim it (help CLAIM).\r\n"
+     "  - Gains levels as you fight with it in hand: hits, attack spells, and\r\n"
+     "    heals in a fight on you or your group. A spell counts once, however\r\n"
+     "    many it reaches. What a fight earns is paid when its mob dies, by you\r\n"
+     "    or your group, and counts less for a mob far below you or one killed\r\n"
+     "    over and over, as experience does. A fight you leave keeps its points\r\n"
+     "    for your next kill; identify shows what is waiting.\r\n"
+     "  - Each level raises your CLASS BONUS while you wield it:\r\n"
+     "      Clerics, Druids, Paladins and Monks heal more\r\n"
+     "      Thieves, Magic-Users and Necromancers take less damage\r\n"
+     "      every other class deals more damage\r\n"
+     "  - A Monk's is held, not wielded.\r\n"
+     "  - It absorbs other weapons as FORMS (help INFUSE, SHIFT, REFIT).\r\n"
+     "  - It carries one FOCUS (help FOCUS).\r\n"
+     "  - Some levels are LOCKED until you slay a boss and set its essence.\r\n"
+     "    identify names the creature and where it lives. A boss is never named\r\n"
+     "    in the Bowels of the UnderDark, the Stone Circle, or any zone with a\r\n"
+     "    death trap.\r\n"
+     "  - identify shows its level, bonus and forms.\r\n"
+     "\r\n"
+     "A WEAPON ESSENCE drops when you slay the boss a locked weapon names: one\r\n"
+     "to a lock, bound to you, and it opens that lock. Armor essences are\r\n"
+     "another thing (help ATTUNE).\r\n"
+     "\r\n"
+     "MASTER CRAFTERS, the only ones who temper:\r\n"
+     "  - the Master Weaponsmith, north off Blackwater Way, Keorc Koilos\r\n"
+     "  - the Master Armourer, south off Eden Lane, New Thalos\r\n"
+     "  - the Master Goldsmith, east off the Temple Way, Naraka\r\n"
+     "  - the Legendary Purveyor of Mystical Wares, east of a small pool, Talam\r\n"
+     "\r\n"
+     "See also: INFUSE, SHIFT, REFIT, FOCUS, CLAIM, IDENTIFY, CLASS ARMOR\r\n" },
+   { "INFUSE",
+     "Usage: infuse <weapon>   (class weapon carried, at a smith's station)\r\n"
+     "\r\n"
+     "A smith's station is a forge, a smithy, or a smith at his work.\r\n"
+     "\r\n"
+     "Your class weapon absorbs a weapon you carry; that weapon is used up. It\r\n"
+     "must be one you could wield yourself. A Monk's absorbs things held instead:\r\n"
+     "armour, clothing, trinkets and other held things, never weapons.\r\n"
+     "\r\n"
+     "Each infused weapon becomes a FORM (help SHIFT). A form's charge runs down\r\n"
+     "as you fight; refit it for the price of a repair, or a master's reforge\r\n"
+     "(help REFIT), as often as that weapon could be repaired. A sturdier weapon\r\n"
+     "makes a longer-lasting form. While in a form the class weapon itself takes\r\n"
+     "no wear: the form's charge is its wear. Infusing another of the same weapon makes a\r\n"
+     "worn-out form new. A weapon the rent refuses (no-rent and the like)\r\n"
+     "lends its form only until you leave the game; a form held for good is\r\n"
+     "not lent again. The class weapon is never no-rent.\r\n"
+     "\r\n"
+     "See also: SHIFT, REFIT, TEMPER, FOCUS\r\n" },
+   { "SHIFT",
+     "Usage: shift <form>   |   shift core   (class weapon carried)\r\n"
+     "\r\n"
+     "Your class weapon takes a form it has absorbed: that weapon's damage,\r\n"
+     "damage type, weight, bonuses and spells, with your levels and class bonus\r\n"
+     "on top. It\r\n"
+     "keeps its own name; identify shows the form it is in. `shift core` returns\r\n"
+     "it to its own form, and a spent form returns it by itself. `shift` alone\r\n"
+     "lists the forms it knows, their charge and the refits left.\r\n"
+     "\r\n"
+     "See also: INFUSE, REFIT, TEMPER, FOCUS\r\n" },
+   { "REFIT",
+     "Usage: refit <form>   (class weapon carried or in hand, at a smith's station)\r\n"
+     "\r\n"
+     "Fills a form of your class weapon to a full charge again. Stand at a\r\n"
+     "smith's station, where you infuse. A refit costs what a shop charges to\r\n"
+     "repair that weapon, paid from the gold you carry, and uses one of the\r\n"
+     "form's refits however little charge was gone: refit a spent form.\r\n"
+     "`refit` alone lists the forms and what each one's next refit costs.\r\n"
+     "\r\n"
+     "A form lives as its weapon would at the smiths. Now and then that weapon\r\n"
+     "is too worn for a shop: the next refit is then a master's reforge, at a\r\n"
+     "master's price, before a master smith who works on that kind of piece\r\n"
+     "(for a weapon, the Master Weaponsmith). Refits at a smith's station go on\r\n"
+     "after it, each charge a little shorter. A weapon no shop will repair goes\r\n"
+     "to a master every time.\r\n"
+     "\r\n"
+     "A form can be refit as often as that weapon could be repaired and reforged\r\n"
+     "over its life; `shift` alone shows the refits left. After the last, the\r\n"
+     "form is worn out until you infuse another of the same weapon.\r\n"
+     "\r\n"
+     "See also: INFUSE, SHIFT\r\n" },
+   { "FOCUS",
+     "Usage: focus                                (shows your focus)\r\n"
+     "       focus <dps|heal|tank|cast>          (class weapon carried or in hand)\r\n"
+     "       focus second <dps|heal|tank|cast>   (a class set of five)\r\n"
+     "\r\n"
+     "One focus for your class weapon at a time. The first is chosen anywhere;\r\n"
+     "to change it, stand at a smith's station, where you infuse. Only the focus\r\n"
+     "in use grows; one you leave keeps what it had, and picks up there when you\r\n"
+     "return to it.\r\n"
+     "\r\n"
+     "  dps    more damage\r\n"
+     "  heal   stronger heals\r\n"
+     "  tank   your hits heal you over time\r\n"
+     "  cast   your hits give you mana over time\r\n"
+     "\r\n"
+     "With five of your class set (help CLASS ARMOR), a second focus works beside\r\n"
+     "the first and grows with it. It is chosen and changed as the first is.\r\n"
+     "\r\n"
+     "The weapon tells you what its focus adds as it happens: the damage a blow\r\n"
+     "gained, what a heal gained, the hit points or mana it restores.\r\n"
+     "\r\n"
+     "See also: TEMPER, INFUSE, SHIFT\r\n" },
+   { "CLAIM",
+     "Usage: claim [weapon | <number>]   (before the Legendary Purveyor of\r\n"
+     "                                    Mystical Wares, east of a small pool\r\n"
+     "                                    in Talam)\r\n"
+     "\r\n"
+     "  claim           your class weapon, if you passed the Hero test before it\r\n"
+     "                  was handed out; at the last mortal level, the reward set\r\n"
+     "                  out for your class\r\n"
+     "  claim weapon    your class weapon alone\r\n"
+     "  claim <number>  take that reward, bound to you\r\n"
+     "\r\n"
+     "See also: TEMPER, INFUSE, IDENTIFY\r\n" },
+   { "\"CLASS ARMOR\" CLASSARMOR CLASSARMOUR",
+     "Six pieces for each class: head, body, legs, feet, hands and arms.\r\n"
+     "\r\n"
+     "  - Each piece carries part of your class bonus (help TEMPER): the body\r\n"
+     "    the most, head and legs less, feet, hands and arms the least.\r\n"
+     "  - Pieces drop from the mobs you kill, earned as the class weapon's growth\r\n"
+     "    is: hits, attack spells, and heals in a fight on you or your group.\r\n"
+     "    No class weapon or remort is needed.\r\n"
+     "  - A mob far below you, or killed over and over, counts for less. A mob\r\n"
+     "    summoned, lured out of its own zone, or charmed counts for nothing.\r\n"
+     "  - A piece drops into the mob's corpse, bound to you. The lighter pieces\r\n"
+     "    come sooner; the body is the rarest.\r\n"
+     "  - A piece arrives with armor, hitroll and damroll.\r\n"
+     "  - A piece serves only its class. A remort into another class starts that\r\n"
+     "    class's set.\r\n"
+     "  - Bound: never sold, given, dropped or taken.\r\n"
+     "\r\n"
+     "THE SET is the pieces you wear and the class weapon in hand. At three, your\r\n"
+     "focus works harder. At five, you may carry a second focus (help FOCUS).\r\n"
+     "\r\n"
+     "See also: ATTUNE, UNATTUNE, TEMPER, FOCUS\r\n" },
+   { "ATTUNE \"ARMOR ESSENCE\" \"ARMOR ESSENCES\"",
+     "Usage: attune                          (your pieces and essences)\r\n"
+     "       attune <piece>                  (what it carries and its pool)\r\n"
+     "       attune <piece> <stat>\r\n"
+     "       attune <piece> <stat> confirm   (past the limit)\r\n"
+     "\r\n"
+     "Puts a stat on a piece of your class armor for armor essences, anywhere,\r\n"
+     "worn or carried.\r\n"
+     "\r\n"
+     "  - Armor essences drop on the same kills as the pieces, more often. They\r\n"
+     "    are bound to you and held as one item. They are not weapon essences.\r\n"
+     "  - Each piece has a pool of stats, set by its slot. Any class may take\r\n"
+     "    any stat in the pool.\r\n"
+     "  - Each piece has a limit. Heavier pieces hold more. No stat takes more\r\n"
+     "    than half a piece. Strength costs double and goes on once a piece.\r\n"
+     "  - Every piece may also take hitroll and damroll, up to half a piece\r\n"
+     "    together.\r\n"
+     "  - Past the limit a piece takes a few more points. Each costs more than\r\n"
+     "    the last and has an increasing chance to break. A break loses that\r\n"
+     "    point and its essences.\r\n"
+     "\r\n"
+     "Stats: hp, mana, strength, dexterity, hitroll, damroll, save spell,\r\n"
+     "save breath, armor.\r\n"
+     "\r\n"
+     "See also: CLASS ARMOR, UNATTUNE\r\n" },
+   { "UNATTUNE",
+     "Usage: unattune <piece>\r\n"
+     "       unattune <piece> <stat>\r\n"
+     "\r\n"
+     "The Master Armourer, south off Eden Lane in New Thalos, takes attuned\r\n"
+     "points out of your class armor for gold and gives back their essences,\r\n"
+     "less a share.\r\n"
+     "\r\n"
+     "See also: ATTUNE, CLASS ARMOR\r\n" },
+   };
+
+extern struct help_index_element *help_table;
+extern int top_of_helpt;
+
+void cw_help_boot(void)
+   {
+   int n = (int)(sizeof(cw_help) / sizeof(cw_help[0])), i;
+
+   if (!class_weapons || !help_table)
+      return;
+   RECREATE(help_table, struct help_index_element, top_of_helpt + n + 1);
+   for (i = 0; i < n; i++)
+      {
+      help_table[top_of_helpt].keywords = str_dup(cw_help[i].keywords);
+      help_table[top_of_helpt].entry = str_dup(cw_help[i].entry);
+      help_table[top_of_helpt].min_level = 0;
+      help_table[top_of_helpt].file_order = HELP_CODE_ORDER + i;
+      top_of_helpt++;
+      }
+   memset(&help_table[top_of_helpt], 0, sizeof(struct help_index_element));
    }
 
 /* ---------------------------------------------------------------- curves */

@@ -196,6 +196,8 @@ void hedit_save_to_disk(void)
 #endif
       if(!help->keywords)
 	 continue;
+      if (help->file_order >= HELP_CODE_ORDER)   /* the code's own, not the file's */
+	 continue;
      /*
       * Remove the '\r\n' sequences from description.
       */
