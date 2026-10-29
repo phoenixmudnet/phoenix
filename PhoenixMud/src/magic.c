@@ -1989,6 +1989,7 @@ void mag_summons(int level, struct char_data * ch, struct obj_data * obj,
 	 }
       GET_MOB_VAL(mob,0)=GET_ROOM_VNUM(IN_ROOM(ch));
       mob->orig_room=IN_ROOM(ch);
+      cw_mark_player_made(mob);   /* its death pays no class weapon growth or armor work */
       char_to_room(mob, IN_ROOM(ch)); 
       IS_CARRYING_W(mob) = 0; 
       IS_CARRYING_N(mob) = 0; 
@@ -2072,7 +2073,11 @@ void mag_summons(int level, struct char_data * ch, struct obj_data * obj,
 	 { 
 	 next_obj = tobj->next_content; 
 	 obj_from_obj(tobj); 
-	 obj_to_char(tobj, mob); 
+	 /* a bound piece is no zombie's: it stays in the room for its owner */
+	 if (cw_holds_bound(tobj))
+	    obj_to_room(tobj, IN_ROOM(ch));
+	 else
+	    obj_to_char(tobj, mob); 
 	 } 
       extract_obj(obj); 
       } 

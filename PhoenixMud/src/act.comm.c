@@ -1018,6 +1018,17 @@ ACMD(do_auction)
       send_to_char(ch, "You can't auction THAT!!\r\n");
       return;
       }
+   /* a bound piece inside, at any depth, is nobody's to sell */
+   {
+   char *what = get_buffer(MAX_STRING_LENGTH);
+   int refused;
+
+   sprintf(what, "auction %s", obj->short_description);
+   refused = cw_bound_refuse(ch, obj, what, NULL, FALSE);
+   release_buffer(what);
+   if (refused)
+      return;
+   }
    /* odinian 8/23/00 */
    /* see if the object is a container */
    if (GET_OBJ_TYPE(obj) == ITEM_CONTAINER)

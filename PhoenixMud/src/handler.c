@@ -1777,6 +1777,9 @@ void extract_char(struct char_data * ch)
 
    /*log("extract_char(%s)", ch ? GET_NAME(ch) : "<null>");*/
 
+   if (ch && IS_NPC(ch))
+      cw_mob_gone(ch);   /* the class weapon forgets a mob before its memory is reused */
+
    if (ch) {
      for (i = 0; i < ch->num_casters; i++) {
        struct char_data *caster = find_char(ch->casting_on_me[i]);

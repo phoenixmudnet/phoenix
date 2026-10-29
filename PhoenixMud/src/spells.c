@@ -656,6 +656,8 @@ ASPELL(spell_summon)
       dismount_char(victim);
       char_from_room(victim);
       char_to_room(victim, IN_ROOM(ch));
+      if (IS_NPC(victim))
+         cw_mark_player_made(victim);   /* a mob called here pays no class weapon growth */
       }
    /* component mobs */
    if (IS_NPC(victim) && victim->followers)

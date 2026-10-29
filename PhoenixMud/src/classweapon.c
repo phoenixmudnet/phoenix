@@ -174,8 +174,8 @@ static int cw_104_n[NUM_CLASSES];
 /* the focus: one at a time, each with its own growth points */
 static const char *cw_focus_names[HERO_NUM_FOCUS] = { NULL, "dps", "heal", "tank", "cast" };
 static const char *cw_focus_words[HERO_NUM_FOCUS] =
-   { NULL, "strikes harder", "heals stronger", "mends you with each blow",
-     "feeds your mana with each blow" };
+   { NULL, "strikes harder", "heals stronger", "heals you over time as you hit",
+     "gives you mana over time as you hit" };
 
 /* the over-time pools a tank or cast focus fills: by character */
 struct cw_pool { long idnum; int hp, mana, ticks; struct cw_pool *next; };
@@ -1201,14 +1201,14 @@ static void cw_armor_pay(struct char_data *ch, struct char_data *victim, double 
    st = cw_armor_state(ch);
    if (st->bank <= 0)
       return;
-   work = st->bank * factor;
-   st->bank = 0;
-   if (work <= 0)
-      return;
+   /* a mob that dies outside the zone that loaded it pays nothing, and the
+    * bank waits */
    home = real_room(GET_MOB_VAL(victim, 0));
    if (IN_ROOM(victim) == NOWHERE || home == NOWHERE || world[home].zone != world[IN_ROOM(victim)].zone)
       return;
-   if (victim->master || AFF_FLAGGED(victim, AFF_CHARM))
+   work = st->bank * factor;
+   st->bank = 0;
+   if (work <= 0)
       return;
    n = real_object(ARMOR_ESSENCE_VNUM) >= 0 ? armor_essences_for(work, cw_rand01()) : 0;
    if (n > 0 && cw_give_essences(ch, n))
@@ -1228,7 +1228,13 @@ static void cw_armor_pay(struct char_data *ch, struct char_data *victim, double 
       obj->bound_idnum = GET_IDNUM(ch);
       strncpy(obj->bound_name, GET_NAME(ch), MAX_NAME_LENGTH);
       obj->bound_name[MAX_NAME_LENGTH] = '\0';
-      obj_to_char(obj, victim);
+      /* into the corpse; a death that leaves none (a component mob, a ghost)
+       * hands it straight over, or it would vanish and never drop again */
+      if (MOB2_FLAGGED(victim, MOB2_COMPONENT) || GET_RACE(victim) == MRACE_GHOST ||
+          GET_RACE(victim) == MRACE_IMMATERIAL)
+         obj_to_char(obj, ch);
+      else
+         obj_to_char(obj, victim);
       send_to_char(ch, "&Y*****************************************************************&n\r\n");
       send_to_char(ch, "&Y*  A powerful item falls from %s!&n\r\n", GET_NAME(victim));
       send_to_char(ch, "&Y*  %s: your class armor's %s, bound to you (%d of 6).&n\r\n",
@@ -1879,12 +1885,116 @@ static void cw_pay_list(struct char_data *ch, struct obj_data *list, double fact
 
 /* a mob's death credited to ch (its share of the kill, perform_group_gain)
  * pays ch's banked growth, scaled by the kill */
+/* ------------------------------------------------- fights that earn */
+
+/* mobs a player made or moved (summoned, raised, cloned, conjured, bought,
+ * stabled, called with summon): their deaths pay no class weapon growth or
+ * armor work, even once a blow has broken a charm */
+static struct char_data **cw_made = NULL;
+static int cw_made_n = 0, cw_made_cap = 0;
+
+static int cw_is_made(struct char_data *mob)
+   {
+   int i;
+
+   for (i = 0; i < cw_made_n; i++)
+      if (cw_made[i] == mob)
+         return TRUE;
+   return FALSE;
+   }
+
+void cw_mark_player_made(struct char_data *mob)
+   {
+   if (!mob || !IS_NPC(mob) || cw_is_made(mob))
+      return;
+   if (cw_made_n == cw_made_cap)
+      {
+      cw_made_cap = cw_made_cap ? 2 * cw_made_cap : 64;
+      if (cw_made)
+         RECREATE(cw_made, struct char_data *, cw_made_cap);
+      else
+         CREATE(cw_made, struct char_data *, cw_made_cap);
+      }
+   cw_made[cw_made_n++] = mob;
+   }
+
+/* who earned on a mob: the players whose blows, attack spells or heals in a
+ * fight against it banked growth. Only they are paid when it dies. */
+struct cw_earned { struct char_data *mob; long idnum; };
+static struct cw_earned *cw_earn = NULL;
+static int cw_earn_n = 0, cw_earn_cap = 0;
+
+static int cw_has_earned(struct char_data *ch, struct char_data *mob)
+   {
+   int i;
+
+   for (i = 0; i < cw_earn_n; i++)
+      if (cw_earn[i].mob == mob && cw_earn[i].idnum == GET_IDNUM(ch))
+         return TRUE;
+   return FALSE;
+   }
+
+static void cw_earned_on(struct char_data *ch, struct char_data *mob)
+   {
+   if (!mob || IS_NPC(ch) || cw_has_earned(ch, mob))
+      return;
+   if (cw_earn_n == cw_earn_cap)
+      {
+      cw_earn_cap = cw_earn_cap ? 2 * cw_earn_cap : 256;
+      if (cw_earn)
+         RECREATE(cw_earn, struct cw_earned, cw_earn_cap);
+      else
+         CREATE(cw_earn, struct cw_earned, cw_earn_cap);
+      }
+   cw_earn[cw_earn_n].mob = mob;
+   cw_earn[cw_earn_n].idnum = GET_IDNUM(ch);
+   cw_earn_n++;
+   }
+
+/* a mob leaves the world (extract_char): forget it, before its memory is
+ * reused by another */
+void cw_mob_gone(struct char_data *mob)
+   {
+   int i, k;
+
+   for (i = k = 0; i < cw_earn_n; i++)
+      if (cw_earn[i].mob != mob)
+         cw_earn[k++] = cw_earn[i];
+   cw_earn_n = k;
+   for (i = k = 0; i < cw_made_n; i++)
+      if (cw_made[i] != mob)
+         cw_made[k++] = cw_made[i];
+   cw_made_n = k;
+   }
+
+/* a fight that earns: against a real NPC, not a player, a charmed mob or
+ * one following a player, nor a mob a player made or moved */
+static int cw_work_counts(struct char_data *v)
+   {
+   if (!v || !IS_NPC(v) || AFF_FLAGGED(v, AFF_CHARM) || cw_is_made(v))
+      return FALSE;
+   return !(v->master && !IS_NPC(v->master));
+   }
+
+/* the killer of the death now paid (group_gain): a kill by a pet or any
+ * other NPC pays nobody's growth */
+static int cw_killer_npc = FALSE;
+
+void cw_set_killer(struct char_data *killer)
+   {
+   cw_killer_npc = !killer || IS_NPC(killer);
+   }
+
 void cw_pay_kill(struct char_data *ch, struct char_data *victim)
    {
    double factor;
    int i;
 
    if (!class_weapons || IS_NPC(ch) || !IS_NPC(victim))
+      return;
+   /* only a kill that earns pays, and only those who earned on it; a bank
+    * it does not pay waits for the next kill that does */
+   if (cw_killer_npc || !cw_work_counts(victim) || !cw_has_earned(ch, victim))
       return;
    factor = cw_kill_factor(ch, victim);
    for (i = 0; i < NUM_WEARS; i++)
@@ -1912,13 +2022,21 @@ int cw_in_form(struct obj_data *obj)
    return class_weapons && obj && obj->hero && obj->hero->form != HERO_CORE_FORM;
    }
 
-void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam)
+void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam, struct char_data *victim)
    {
    struct obj_data *obj;
+   int earns;
 
    if (!class_weapons || IS_NPC(ch))
       return;
-   cw_armor_grow(ch, POINTS_PER_HIT);   /* the class armor's work: every hit, weapon or not */
+   /* growth only in a fight that earns; a blow anywhere still works the
+    * focus and spends a form's charge */
+   earns = cw_work_counts(victim);
+   if (earns)
+      {
+      cw_earned_on(ch, victim);
+      cw_armor_grow(ch, POINTS_PER_HIT);   /* the class armor's work: every hit, weapon or not */
+      }
    obj = (wielded && cw_mine(wielded, ch)) ? wielded : cw_held(ch);
    if (!obj)
       return;
@@ -1974,7 +2092,8 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam)
                       obj->short_description, cw_spent_hint(f));
          }
       }
-   cw_grow(ch, obj, POINTS_PER_HIT);
+   if (earns)
+      cw_grow(ch, obj, POINTS_PER_HIT);
    }
 
 /* every two seconds: the pools pay out */
@@ -2045,14 +2164,20 @@ static int cw_same_group(struct char_data *a, struct char_data *b)
 
 /* a heal grows the weapon only in a fight (the caster's or the target's),
  * on the caster or a player in the caster's group, and only if it mends */
-static int cw_heal_counts(struct char_data *ch, struct char_data *victim)
+static struct char_data *cw_heal_counts(struct char_data *ch, struct char_data *victim)
    {
    if (!victim || GET_HIT(victim) >= GET_MAX_HIT(victim))
-      return FALSE;
-   if (!FIGHTING(ch) && !FIGHTING(victim))
-      return FALSE;
-   return victim == ch || (!IS_NPC(victim) && cw_same_group(ch, victim));
+      return NULL;
+   if (victim != ch && (IS_NPC(victim) || !cw_same_group(ch, victim)))
+      return NULL;
+   if (cw_work_counts(FIGHTING(ch)))
+      return FIGHTING(ch);
+   return cw_work_counts(FIGHTING(victim)) ? FIGHTING(victim) : NULL;
    }
+
+/* a spoken cast is resolving (cw_begin_cast to cw_end_cast): only its heals
+ * take the class layers */
+static int cw_casting = FALSE;
 
 /* what the cast now resolving is worth: base at CAST_MANA_FULL mana or more,
  * its share below */
@@ -2066,6 +2191,7 @@ void cw_begin_cast(struct char_data *ch, int mana)
    cw_cast_mana = IS_NPC(ch) ? 0 : MAX(0, mana);
    cw_cast_healed = FALSE;
    cw_cast_heal_added = 0;
+   cw_casting = TRUE;
    }
 
 /* a spoken cast resolved; it grows the class weapon in hand once, however
@@ -2075,14 +2201,18 @@ void cw_end_cast(struct char_data *ch, int attack)
    {
    struct obj_data *obj;
    int healed = cw_cast_healed;
-   int pts = cw_cast_share(attack ? POINTS_PER_CAST : POINTS_PER_HEAL);
+   int attack_earns = attack && !IS_NPC(ch) && cw_work_counts(FIGHTING(ch));
+   int pts = cw_cast_share(attack_earns ? POINTS_PER_CAST : POINTS_PER_HEAL);
 
+   if (attack_earns)
+      cw_earned_on(ch, FIGHTING(ch));
+   cw_casting = FALSE;
    cw_cast_mana = 0;
    cw_cast_healed = FALSE;
    if (cw_cast_heal_added > 0 && !IS_NPC(ch))
       send_to_char(ch, "&cYour focus adds %d to the heal.&n\r\n", cw_cast_heal_added);
    cw_cast_heal_added = 0;
-   if ((!attack && !healed) || pts <= 0 || !class_weapons || IS_NPC(ch))
+   if ((!attack_earns && !healed) || pts <= 0 || !class_weapons || IS_NPC(ch))
       return;
    cw_armor_grow(ch, pts);
    if (!(obj = cw_in_hand(ch)))
@@ -2093,14 +2223,22 @@ void cw_end_cast(struct char_data *ch, int attack)
 int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
    {
    struct obj_data *obj;
+   struct char_data *foe;
    int kind;
    double a = amount, s;
 
    if (!class_weapons || IS_NPC(ch) || amount <= 0)
       return amount;
    obj = cw_in_hand(ch);
-   if (cw_cast_mana > 0 && cw_heal_counts(ch, victim))
+   if (cw_cast_mana > 0 && (foe = cw_heal_counts(ch, victim)))
+      {
       cw_cast_healed = TRUE;     /* grown once, when the cast resolves */
+      cw_earned_on(ch, foe);
+      }
+   /* the class layers strengthen a spoken cast only: a potion, scroll,
+    * staff or weapon proc heals as it always has */
+   if (!cw_casting)
+      return amount;
    if (obj && cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
       a *= cw_mult(KIND_HEAL, s);
    a *= cw_armor_layer(ch, obj, KIND_HEAL);
@@ -2110,12 +2248,9 @@ int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
 
       a *= 1.0 + FOCUS_HEAL * cw_focus_output(ch, obj->hero, HERO_FOCUS_HEAL);
       added = (int)cw_floor(a) - before;
-      /* tallied while a cast resolves (cw_end_cast says it), else at once:
-       * a potion, a proc */
-      if (added > 0 && cw_cast_mana > 0)
+      /* said once, after the heal's own lines, when the cast resolves */
+      if (added > 0)
          cw_cast_heal_added += added;
-      else if (added > 0)
-         send_to_char(ch, "&cYour focus adds %d to the heal.&n\r\n", added);
       }
    return (int)cw_floor(a);
    }
@@ -2654,7 +2789,7 @@ ACMD(do_temper)
 /* ---------------------------------------------------------------- focus */
 
 /* "Its focus: it strikes harder (63% of the full focus). Kept: heal 34%." */
-static void cw_focus_line(struct hero_data *h, char *out)
+static void cw_focus_line(struct hero_data *h, char *out, double set_mult)
    {
    char tail[160] = "";
    int f, n = 0;
@@ -2669,11 +2804,11 @@ static void cw_focus_line(struct hero_data *h, char *out)
        h->focus2 < HERO_NUM_FOCUS)
       sprintf(out, "Its focus: it %s (%d%% of the full focus). Its second focus, while your class "
               "set counts %d: it %s (%d%%).%s", cw_focus_words[h->focus],
-              (int)cw_floor(cw_focus_share(h) * 100 + 0.5), SET_SECOND_FOCUS_AT, cw_focus_words[h->focus2],
-              (int)cw_floor(cw_share(cw_level_for(h->focus_points[h->focus2])) * 100 + 0.5), tail);
+              (int)cw_floor(cw_focus_share(h) * set_mult * 100 + 0.5), SET_SECOND_FOCUS_AT, cw_focus_words[h->focus2],
+              (int)cw_floor(cw_share(cw_level_for(h->focus_points[h->focus2])) * set_mult * 100 + 0.5), tail);
    else if (h->focus > HERO_FOCUS_NONE && h->focus < HERO_NUM_FOCUS)
       sprintf(out, "Its focus: it %s (%d%% of the full focus).%s", cw_focus_words[h->focus],
-              (int)cw_floor(cw_focus_share(h) * 100 + 0.5), tail);
+              (int)cw_floor(cw_focus_share(h) * set_mult * 100 + 0.5), tail);
    else
       sprintf(out, "No focus chosen yet: focus <dps|heal|tank|cast>.%s", tail);
    }
@@ -2751,11 +2886,11 @@ ACMD(do_focus)
       if (h->focus == HERO_FOCUS_NONE)
          send_to_char(ch, "Choose a focus first: focus <dps|heal|tank|cast>.\r\n");
       else if (count < SET_SECOND_FOCUS_AT)
-         send_to_char(ch, "A second focus needs the class set at %d: your class weapon in hand and "
-                      "four pieces of your class armor worn. You have %d.\r\n", SET_SECOND_FOCUS_AT, count);
+         send_to_char(ch, "A second focus needs %d of your class set, class armor worn and the "
+                      "class weapon in hand. You have %d.\r\n", SET_SECOND_FOCUS_AT, count);
       else if (!*arg2)
          {
-         cw_focus_line(h, line);
+         cw_focus_line(h, line, armor_set_focus_mult(cw_set_count(ch)));
          send_to_char(ch, "&Y%s&n\r\n", line);
          }
       else if (f >= HERO_NUM_FOCUS)
@@ -2782,16 +2917,19 @@ ACMD(do_focus)
          ;
       if (!*arg)
          {
-         cw_focus_line(h, line);
+         cw_focus_line(h, line, armor_set_focus_mult(cw_set_count(ch)));
          send_to_char(ch, "&Y%s&n\r\n", line);
          }
       else if (f >= HERO_NUM_FOCUS)
          send_to_char(ch, "focus <dps|heal|tank|cast>: dps, it strikes harder; heal, it heals "
-                      "stronger; tank, it mends you with each blow; cast, it feeds your mana with "
-                      "each blow.\r\n");
+                      "stronger; tank, it heals you over time as you hit; cast, it gives you "
+                      "mana over time as you hit.\r\n");
       else if (h->focus == f)
          send_to_char(ch, "The focus of %s is already %s.\r\n", obj->short_description,
                       cw_focus_names[f]);
+      else if (h->focus2 == f)
+         send_to_char(ch, "%s is already the second focus of %s.\r\n", cw_cap(cw_focus_names[f]),
+                      obj->short_description);
       else if (h->focus != HERO_FOCUS_NONE && !cw_at_smith(ch))
          send_to_char(ch, "A focus is changed at a smith's station: a forge, a smithy, or a "
                       "smith at his work.\r\n");
@@ -3414,7 +3552,12 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
       cw_commas(a, (long)(obj->attune->banked * tier + 0.5));
       sprintf(buf + strlen(buf), "Waiting for your next kill: %s points.\r\n", a);
       }
-   cw_focus_line(h, line);
+   {
+   struct char_data *holder = obj->carried_by ? obj->carried_by : obj->worn_by;
+
+   cw_focus_line(h, line, (holder && !IS_NPC(holder) && GET_IDNUM(holder) == obj->bound_idnum)
+                 ? armor_set_focus_mult(cw_set_count(holder)) : 1.0);
+   }
    sprintf(buf + strlen(buf), "%s\r\n", line);
    if (h->form != HERO_CORE_FORM)
       {
@@ -3742,6 +3885,12 @@ static struct obj_data *cw_bound_find(struct obj_data *obj, int only, long a)
       if ((r = cw_bound_find(o, only, a)))
          return r;
    return NULL;
+   }
+
+/* a bound piece in obj, itself or inside it, while the switch is on */
+int cw_holds_bound(struct obj_data *obj)
+   {
+   return class_weapons && obj && cw_bound_find(obj, FALSE, 0) != NULL;
    }
 
 static int cw_bound_rules(struct char_data *ch)

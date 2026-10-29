@@ -21,6 +21,7 @@
 #include "handler.h" 
 #include "db.h" 
 #include "spells.h" 
+#include "classweapon.h"
  
  
 /*   external vars  */ 
@@ -297,6 +298,8 @@ int block_way(struct char_data * ch, int cmd, char *arg, int iIn_room,
 /* Used by James the Butler and the Cleaning Lady */ 
 int is_trash(struct obj_data * i) 
 { 
+   if (cw_holds_bound(i))   /* a bound piece waits for the one it serves */
+      return FALSE;
    if (OBJWEAR_FLAGGED(i, ITEM_WEAR_TAKE) && 
        ((GET_OBJ_TYPE(i) == ITEM_DRINKCON) || (GET_OBJ_COST(i) <= 10)) &&
        !(GET_OBJ_VAL(i, 3) && (GET_OBJ_TYPE(i)==ITEM_CONTAINER))) 

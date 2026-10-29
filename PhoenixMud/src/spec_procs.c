@@ -25,6 +25,7 @@
 #include "dg_scripts.h"
 #include "shop.h"
 #include "vnum.h"
+#include "classweapon.h"
 /*   external vars  */
 extern struct room_data *world;
 extern struct char_data *character_list;
@@ -744,6 +745,8 @@ SPECIAL(janitor)
 
    for (i = world[IN_ROOM(ch)].contents; i; i = i->next_content)
       {
+      if (cw_holds_bound(i))   /* a bound piece waits for the one it serves */
+         continue;
       if (!CAN_WEAR(i, ITEM_WEAR_TAKE))
          continue;
       if (GET_OBJ_TYPE(i) != ITEM_DRINKCON && GET_OBJ_COST(i) >= 15)
@@ -2037,6 +2040,7 @@ SPECIAL(stable_master)
          release_buffer(buf);
          return TRUE;
          }
+      cw_mark_player_made(horse);   /* a stabled mount pays no class weapon growth */
       /* take & extract ticket (look at the junk code) */
       /* set horse to charmed, create the correct master/follower links. */
       act("You give $p to $N.",FALSE,ch,obj,stable_guy,TO_CHAR);
@@ -4102,6 +4106,7 @@ SPECIAL(pet_shops)
       GET_GOLD(ch) -= PET_PRICE(pet);
 
       pet = read_mobile(GET_MOB_RNUM(pet), REAL);
+      cw_mark_player_made(pet);   /* a bought pet pays no class weapon growth or armor work */
       GET_EXP(pet) = 0;
       SET_BIT(AFF_FLAGS(pet), AFF_CHARM);
 

@@ -41,7 +41,7 @@ int main(void)
    {
    struct obj_armor_data a;
    struct class_armor_state st;
-   int pool[ARMOR_NUM_STATS], n, cls, slot, cost = 0, over = 0, totals[ARMOR_NUM_STATS], e, p;
+   int pool[ARMOR_NUM_STATS], n, cls, slot, cost = 0, over = 0, totals[ARMOR_NUM_STATS], e, p, i;
    long gold;
    double brk = 0;
 
@@ -105,6 +105,15 @@ int main(void)
    add(&a, ARMOR_STAT_DEX, 200, 1);
    armor_settle_over(&a, ARMOR_FEET);
    CHECK(a.pts[1].over == 0);
+   /* a body: damroll at half (3), hp to the limit, three damroll past it;
+    * the hp taken out, the damroll past the limit could not have gone on
+    * within it, so it stays past it and no more goes on */
+   memset(&a, 0, sizeof(a));
+   for (i = 0; i < 3; i++) add(&a, ARMOR_STAT_DAMROLL, 100, 0);
+   for (i = 0; i < 3; i++) add(&a, ARMOR_STAT_DAMROLL, 200, 1);
+   armor_settle_over(&a, ARMOR_BODY);
+   CHECK(armor_points_over(&a) == 3);
+   CHECK(armor_check(ARMOR_BODY, &a, ARMOR_STAT_DAMROLL, &cost, &brk, &over) != ATTUNE_OK);
 
    /* the set's limit costs the six pieces' work: one essence per 108 */
    CHECK(fabs(armor_work_per_essence() - 108.0) < 1e-9);

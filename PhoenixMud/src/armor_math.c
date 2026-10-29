@@ -408,15 +408,26 @@ void armor_unattune_terms(const struct obj_armor_data *a, int stat, int *essence
    *points = p;
    }
 
-/* as room opens under the limit, the oldest points past it come within */
+/* as room opens under the limit, the oldest points past it come within,
+ * each only if it could have gone on within the limit (no stat past half
+ * the piece, hitroll and damroll half together): moved any other way, an
+ * unattune would launder points past the limit over the caps and start
+ * their price and break chance again */
 void armor_settle_over(struct obj_armor_data *a, int slot)
    {
-   int i, used = armor_points_used(a);
+   struct obj_armor_data rest;
+   int i, j, cost, over;
+   double brk;
 
    for (i = 0; a && i < a->num; i++)
-      if (a->pts[i].over && used + 1 <= armor_limit(slot))
-         {
+      {
+      if (!a->pts[i].over)
+         continue;
+      rest = *a;
+      for (j = i; j + 1 < rest.num; j++)
+         rest.pts[j] = rest.pts[j + 1];
+      rest.num--;
+      if (armor_check(slot, &rest, a->pts[i].stat, &cost, &brk, &over) == ATTUNE_OK && !over)
          a->pts[i].over = 0;
-         used++;
-         }
+      }
    }

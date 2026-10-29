@@ -2172,6 +2172,7 @@ void group_gain(struct char_data * ch, struct char_data * victim)
       return;
    if (PLR_FLAGGED(ch, PLR_PK) && PLR_FLAGGED(victim, PLR_PK) && abs(GET_LEVEL(ch)-GET_LEVEL(victim))<=10)
       return;
+   cw_set_killer(ch);   /* a kill by a pet or another NPC pays no class weapon growth */
 
    if ((ch->master)&&AFF_FLAGGED(ch,AFF_GROUP))
       k=ch->master;
@@ -3810,7 +3811,7 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
          dam = damage(ch, victim, dam, w_type,0);
       /* a blow landed: the class weapon in hand (or held) grows */
       if (dam > 0 || dam == -1)
-         cw_note_hit(ch, wielded, dam);
+         cw_note_hit(ch, wielded, dam, victim);
       }
 
    /* check if the victim has a hitprcnt trigger */
