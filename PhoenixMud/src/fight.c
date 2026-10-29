@@ -2911,8 +2911,10 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
 
             if (number(0, range) < damage_chance)
                {
-               /* Tslots of 0 means INDESTRUCTABLE */
-               if (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE)
+               /* Tslots of 0 means INDESTRUCTABLE; a class weapon in a
+                * borrowed form wears its form's charge, not its condition */
+               if (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE &&
+                   !cw_in_form(GET_EQ(victim, j)))
                   {
                   if(OBJ_FLAGGED(victim->equipment[j],ITEM_RESISTANT))
                      GET_OBJ_CSLOTS(victim->equipment[j])-=2;
@@ -2931,7 +2933,8 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
                }
 
             if ((victim->equipment[j]->obj_flags.curr_dam_slots < 0) &&
-                    (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE))
+                    (GET_OBJ_TSLOTS(GET_EQ(victim,j)) != INDESTRUCTABLE) &&
+                    !cw_in_form(GET_EQ(victim, j)))
                {
                /* Nomikos 5/2/2025: don't want to lose it */
                obj_to_char(obj = unequip_char(victim, j), victim);
@@ -3807,7 +3810,7 @@ void hit(struct char_data * ch, struct char_data * victim, int type)
          dam = damage(ch, victim, dam, w_type,0);
       /* a blow landed: the class weapon in hand (or held) grows */
       if (dam > 0 || dam == -1)
-         cw_note_hit(ch, wielded);
+         cw_note_hit(ch, wielded, dam);
       }
 
    /* check if the victim has a hitprcnt trigger */

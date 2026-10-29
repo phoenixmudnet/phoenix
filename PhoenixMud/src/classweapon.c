@@ -1691,7 +1691,14 @@ void cw_pay_kill(struct char_data *ch, struct char_data *victim)
    cw_armor_pay(ch, victim, factor);
    }
 
-void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
+/* a class weapon in a borrowed form: its form's charge is its wear, so its
+ * own condition is spared */
+int cw_in_form(struct obj_data *obj)
+   {
+   return class_weapons && obj && obj->hero && obj->hero->form != HERO_CORE_FORM;
+   }
+
+void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam)
    {
    struct obj_data *obj;
 
@@ -1701,6 +1708,16 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
    obj = (wielded && cw_mine(wielded, ch)) ? wielded : cw_held(ch);
    if (!obj)
       return;
+   /* a dps focus says what it added to the blow: the share it made of it, as
+    * cw_damage_mod multiplied it in, while the weapon is in hand */
+   if (dam > 0 && cw_in_hand(ch) == obj && cw_focus_in_use(ch, obj->hero, HERO_FOCUS_DPS))
+      {
+      double f = FOCUS_DPS * cw_focus_output(ch, obj->hero, HERO_FOCUS_DPS);
+      int added = (int)cw_floor(dam * f / (1.0 + f) + 0.5);
+
+      if (added >= 1)
+         send_to_char(ch, "&cYour focus adds %d damage.&n\r\n", added);
+      }
    /* a tank or cast focus: each blow refreshes the over-time pool (both,
     * with a second focus) */
    if (cw_focus_in_use(ch, obj->hero, HERO_FOCUS_TANK) || cw_focus_in_use(ch, obj->hero, HERO_FOCUS_CAST))
@@ -1763,10 +1780,20 @@ void cw_focus_tick(void)
             ch = d->character;
       if (ch && p->ticks > 0)
          {
+         int before;
+
          if (p->hp > 0 && GET_HIT(ch) < GET_MAX_HIT(ch))
+            {
+            before = GET_HIT(ch);
             GET_HIT(ch) = MIN(GET_MAX_HIT(ch), GET_HIT(ch) + p->hp);
+            send_to_char(ch, "&cYour focus mends you: +%d hit points.&n\r\n", GET_HIT(ch) - before);
+            }
          if (p->mana > 0 && GET_MANA(ch) < GET_MAX_MANA(ch))
+            {
+            before = GET_MANA(ch);
             GET_MANA(ch) = MIN(GET_MAX_MANA(ch), GET_MANA(ch) + p->mana);
+            send_to_char(ch, "&cYour focus restores %d mana.&n\r\n", GET_MANA(ch) - before);
+            }
          p->ticks--;
          }
       if (!ch || p->ticks <= 0)
@@ -1788,6 +1815,10 @@ static int cw_cast_mana = 0;
 
 /* the cast now resolving mended someone who counts (cw_heal_counts) */
 static int cw_cast_healed = FALSE;
+
+/* what a heal focus added during the cast now resolving: said once, after
+ * the heal's own lines */
+static int cw_cast_heal_added = 0;
 
 /* both grouped under one leader */
 static int cw_same_group(struct char_data *a, struct char_data *b)
@@ -1820,6 +1851,7 @@ void cw_begin_cast(struct char_data *ch, int mana)
    {
    cw_cast_mana = IS_NPC(ch) ? 0 : MAX(0, mana);
    cw_cast_healed = FALSE;
+   cw_cast_heal_added = 0;
    }
 
 /* a spoken cast resolved; it grows the class weapon in hand once, however
@@ -1833,6 +1865,9 @@ void cw_end_cast(struct char_data *ch, int attack)
 
    cw_cast_mana = 0;
    cw_cast_healed = FALSE;
+   if (cw_cast_heal_added > 0 && !IS_NPC(ch))
+      send_to_char(ch, "&cYour focus adds %d to the heal.&n\r\n", cw_cast_heal_added);
+   cw_cast_heal_added = 0;
    if ((!attack && !healed) || pts <= 0 || !class_weapons || IS_NPC(ch))
       return;
    cw_armor_grow(ch, pts);
@@ -1855,8 +1890,19 @@ int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
    if (obj && cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
       a *= cw_mult(KIND_HEAL, s);
    a *= cw_armor_layer(ch, obj, KIND_HEAL);
-   if (obj)
+   if (obj && cw_focus_in_use(ch, obj->hero, HERO_FOCUS_HEAL))
+      {
+      int before = (int)cw_floor(a), added;
+
       a *= 1.0 + FOCUS_HEAL * cw_focus_output(ch, obj->hero, HERO_FOCUS_HEAL);
+      added = (int)cw_floor(a) - before;
+      /* tallied while a cast resolves (cw_end_cast says it), else at once:
+       * a potion, a proc */
+      if (added > 0 && cw_cast_mana > 0)
+         cw_cast_heal_added += added;
+      else if (added > 0)
+         send_to_char(ch, "&cYour focus adds %d to the heal.&n\r\n", added);
+      }
    return (int)cw_floor(a);
    }
 
