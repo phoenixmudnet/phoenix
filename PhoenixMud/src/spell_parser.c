@@ -2472,9 +2472,9 @@ void update_casting_time(struct char_data *ch)
             sing_spell(ch, spellnum);
             }
 
-         /* the class weapon in hand grows by what the cast cost: an
-          * attack spell that left the caster fighting, or a heal on someone
-          * hurt (cw_heal_mod) */
+         /* the class weapon in hand grows once by what the cast cost: an
+          * attack spell that left the caster fighting, or a heal that mended
+          * the caster or a groupmate in a fight (cw_heal_mod) */
          cw_begin_cast(ch, mag_manacost(ch, spellnum, CAST_LEVEL(ch)));
          call_magic(ch, tch, tobj, tdr, tdr2,spellnum,CAST_LEVEL(ch),
                     CAST_SPELL);
