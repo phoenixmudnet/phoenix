@@ -28,6 +28,7 @@
 #include "handler.h"
 #include "db.h"
 #include "hero_state.h"
+#include "armor_math.h"
 #include "repair_life.h"
 #include "classweapon.h"
 #include "dg_scripts.h"
@@ -156,7 +157,7 @@ static const char *cw_service_stems[] =
 static const long cw_crafters[] = { 27498, 27497, 27496, 27499, 0 };
 
 /* the class weapon commands, opened at boot when the switch is on */
-static const char *cw_commands[] = { "temper", "focus", "infuse", "shift", "refit", "claim", NULL };
+static const char *cw_commands[] = { "temper", "focus", "infuse", "shift", "refit", "claim", "attune", "unattune", NULL };
 /* the staff's, opened to immortals */
 static const char *cw_staff_commands[] = { "classweapon", "remortreward", NULL };
 
@@ -550,6 +551,511 @@ static struct obj_data *cw_owned(struct char_data *ch)
       if (cw_mine(o, ch))
          return o;
    return NULL;
+   }
+
+/* ---------------------------------------------------------------- the class armor */
+
+/*
+ * Six pieces a class (armor_math.c), part of the class weapon's system. The
+ * armor carries the two thirds of the class's gap the weapon does not, a
+ * fixed part a piece by its weight; the set (the pieces worn and the weapon
+ * in hand) works the focus harder at three and opens a second focus at five.
+ * Pieces and armor essences drop on work counted as the weapon's growth is,
+ * for every character, weapon in hand or not, paid at the kill. A piece is
+ * attuned with essences; the Master Armourer takes an attunement out.
+ */
+
+/* "The Warlord's Helm": a capitalised copy of a name, never the shared string */
+static const char *cw_cap(const char *name)
+   {
+   static char buf[4][256];
+   static int at = 0;
+   char *b = buf[at++ & 3];
+
+   strncpy(b, name ? name : "", 255);
+   b[255] = '\0';
+   if (*b)
+      *b = UPPER(*b);
+   return b;
+   }
+
+struct cw_armor_rec { long idnum; struct class_armor_state st; struct cw_armor_rec *next; };
+static struct cw_armor_rec *cw_armor_recs = NULL;
+
+static double cw_rand01(void)
+   {
+   return (double)rand() / ((double)RAND_MAX + 1.0);
+   }
+
+static struct cw_armor_rec *cw_armor_rec_of(long idnum, int create)
+   {
+   struct cw_armor_rec *r;
+
+   for (r = cw_armor_recs; r; r = r->next)
+      if (r->idnum == idnum)
+         return r;
+   if (!create)
+      return NULL;
+   CREATE(r, struct cw_armor_rec, 1);
+   r->idnum = idnum;
+   armor_state_fresh(&r->st, -1);
+   r->next = cw_armor_recs;
+   cw_armor_recs = r;
+   return r;
+   }
+
+/* the character's record, for their class: another class starts afresh */
+static struct class_armor_state *cw_armor_state(struct char_data *ch)
+   {
+   struct cw_armor_rec *r = cw_armor_rec_of(GET_IDNUM(ch), TRUE);
+
+   if (r->st.cls != GET_CLASS(ch))
+      armor_state_fresh(&r->st, GET_CLASS(ch));
+   return &r->st;
+   }
+
+static void cw_armor_path(char *out, const char *name)
+   {
+   char fname[MAX_NAME_LENGTH + 1];
+   int i;
+
+   for (i = 0; name[i] && i < MAX_NAME_LENGTH; i++)
+      fname[i] = i ? LOWER(name[i]) : UPPER(name[i]);
+   fname[i] = '\0';
+   sprintf(out, "etc/players_ascii/%c/%s.classarmor", fname[0], fname);
+   }
+
+/* the record from <Name>.classarmor at login, unless this boot holds one */
+static void cw_armor_load(struct char_data *ch)
+   {
+   char path[MAX_STRING_LENGTH];
+   struct class_armor_state st;
+   FILE *fp;
+
+   if (IS_NPC(ch) || cw_armor_rec_of(GET_IDNUM(ch), FALSE))
+      return;
+   cw_armor_path(path, GET_NAME(ch));
+   if (!(fp = fopen(path, "r")))
+      return;
+   armor_state_fresh(&st, -1);
+   if (fscanf(fp, "%d %d %lf %d %ld %lf %ld %ld", &st.cls, &st.got, &st.work, &st.next,
+              &st.mark, &st.bank, &st.hour, &st.hour_points) >= 5)
+      {
+      st.got &= (1 << ARMOR_NUM_SLOTS) - 1;
+      if (st.next < -1 || st.next >= ARMOR_NUM_SLOTS)
+         st.next = -1;
+      cw_armor_rec_of(GET_IDNUM(ch), TRUE)->st = st;
+      }
+   fclose(fp);
+   }
+
+/* the record beside the pfile, at every save (save_char_ascii); a character
+ * this boot has no record for keeps the file it has */
+void cw_armor_save(const char *name, long idnum)
+   {
+   struct cw_armor_rec *r = cw_armor_rec_of(idnum, FALSE);
+   char path[MAX_STRING_LENGTH];
+   FILE *fp;
+
+   if (!r || !name || !*name)
+      return;
+   cw_armor_path(path, name);
+   if (!(fp = fopen(path, "w")))
+      return;
+   fprintf(fp, "%d %d %.4f %d %ld %.4f %ld %ld\n", r->st.cls, r->st.got, r->st.work,
+           r->st.next, r->st.mark, r->st.bank, r->st.hour, r->st.hour_points);
+   fclose(fp);
+   }
+
+/* all six of the class's pieces are in the world (zone 276) */
+static int cw_armor_set_loaded(int cls)
+   {
+   int s;
+
+   for (s = 0; s < ARMOR_NUM_SLOTS; s++)
+      if (armor_vnum(cls, s) < 0 || real_object(armor_vnum(cls, s)) < 0)
+         return FALSE;
+   return TRUE;
+   }
+
+static const int cw_armor_wear[ARMOR_NUM_SLOTS] =
+   { WEAR_HEAD, WEAR_BODY, WEAR_LEGS, WEAR_FEET, WEAR_HANDS, WEAR_ARMS };
+
+/* the piece in slot s worn by ch, bound to them and of their class */
+static struct obj_data *cw_armor_worn(struct char_data *ch, int s)
+   {
+   struct obj_data *o = GET_EQ(ch, cw_armor_wear[s]);
+   int cls, slot;
+
+   if (!o || IS_NPC(ch) || o->bound_idnum != GET_IDNUM(ch) ||
+       !armor_piece_of(GET_OBJ_VNUM(o), &cls, &slot) || slot != s || cls != GET_CLASS(ch))
+      return NULL;
+   return o;
+   }
+
+/* the class set: the pieces worn and the class weapon in hand */
+static int cw_set_count(struct char_data *ch)
+   {
+   int s, n = 0;
+
+   if (IS_NPC(ch))
+      return 0;
+   for (s = 0; s < ARMOR_NUM_SLOTS; s++)
+      if (cw_armor_worn(ch, s))
+         n++;
+   return n + (cw_in_hand(ch) ? 1 : 0);
+   }
+
+/* the armor's part of the class bonus of `kind`, on top of the weapon's */
+static double cw_armor_layer(struct char_data *ch, struct obj_data *weapon, int kind)
+   {
+   double fraction = 0;
+   int s, cls = GET_CLASS(ch);
+
+   if (IS_NPC(ch) || cls < 0 || cls >= NUM_CLASSES || !cw_raise[cls].knob ||
+       cw_raise[cls].kind != kind || !cw_raise[cls].s)
+      return 1.0;
+   for (s = 0; s < ARMOR_NUM_SLOTS; s++)
+      if (cw_armor_worn(ch, s))
+         fraction += armor_slot_fraction(s);
+   if (fraction <= 0)
+      return 1.0;
+   return armor_factor(kind == KIND_IN, cw_raise[cls].s,
+                       weapon && weapon->hero ? cw_share(weapon->hero->level) : 0, fraction);
+   }
+
+/* the foci at work: the focus, and the second while the set counts five */
+static int cw_focus_in_use(struct char_data *ch, struct hero_data *h, int f)
+   {
+   if (f <= HERO_FOCUS_NONE || f >= HERO_NUM_FOCUS)
+      return FALSE;
+   if (h->focus == f)
+      return TRUE;
+   return h->focus2 == f && cw_set_count(ch) >= SET_SECOND_FOCUS_AT;
+   }
+
+/* a focus's output as it works now: its own share, times the set's */
+static double cw_focus_output(struct char_data *ch, struct hero_data *h, int f)
+   {
+   if (!cw_focus_in_use(ch, h, f))
+      return 0;
+   return cw_share(cw_level_for(h->focus_points[f])) * armor_set_focus_mult(cw_set_count(ch));
+   }
+
+/* a hit, an attack spell or a counted heal: the armor's work, by the
+ * weapon's rules (its MUD hour cap, its bank) */
+static void cw_armor_grow(struct char_data *ch, int base)
+   {
+   struct class_armor_state *st;
+   long hour = cw_mud_hour();
+   int take;
+
+   if (!class_weapons || IS_NPC(ch) || base <= 0 || !cw_armor_set_loaded(GET_CLASS(ch)))
+      return;
+   st = cw_armor_state(ch);
+   if (st->hour != hour)
+      {
+      st->hour = hour;
+      st->hour_points = 0;
+      }
+   take = MIN(base, MAX(0, POINTS_PER_MUD_HOUR - (int)st->hour_points));
+   if (take <= 0)
+      return;
+   st->hour_points += take;
+   st->bank = MIN((double)BANK_MAX, st->bank + take);
+   }
+
+/* the essence copies ch carries, bound to them: first, and the count of all */
+static void cw_essence_walk(struct char_data *ch, struct obj_data *list, struct obj_data **first,
+                            long *count)
+   {
+   struct obj_data *o;
+
+   for (o = list; o; o = o->next_content)
+      {
+      if (GET_OBJ_VNUM(o) == ARMOR_ESSENCE_VNUM && o->bound_idnum == GET_IDNUM(ch))
+         {
+         if (!*first)
+            *first = o;
+         *count += (o->armor && o->armor->essences > 0) ? o->armor->essences : 1;
+         }
+      if (o->contains)
+         cw_essence_walk(ch, o->contains, first, count);
+      }
+   }
+
+static long cw_essences_held(struct char_data *ch, struct obj_data **first)
+   {
+   struct obj_data *f = NULL;
+   long n = 0;
+   int i;
+
+   for (i = 0; i < NUM_WEARS; i++)
+      if (GET_EQ(ch, i))
+         {
+         struct obj_data *e = GET_EQ(ch, i);
+         if (GET_OBJ_VNUM(e) == ARMOR_ESSENCE_VNUM && e->bound_idnum == GET_IDNUM(ch))
+            {
+            if (!f)
+               f = e;
+            n += (e->armor && e->armor->essences > 0) ? e->armor->essences : 1;
+            }
+         if (e->contains)
+            cw_essence_walk(ch, e->contains, &f, &n);
+         }
+   cw_essence_walk(ch, ch->carrying, &f, &n);
+   if (first)
+      *first = f;
+   return n;
+   }
+
+/* the copy says how many it holds */
+static void cw_name_essence(struct obj_data *o)
+   {
+   char buf[96];
+   long n = (o->armor && o->armor->essences > 0) ? o->armor->essences : 1;
+   obj_rnum r = GET_OBJ_RNUM(o);
+
+   if (r >= 0 && o->short_description && o->short_description != obj_proto[r].short_description)
+      free(o->short_description);
+   if (r >= 0 && o->description && o->description != obj_proto[r].description)
+      free(o->description);
+   if (n == 1)
+      {
+      o->short_description = str_dup("an armor essence");
+      o->description = str_dup("An armor essence glimmers here.");
+      }
+   else
+      {
+      sprintf(buf, "%ld armor essences", n);
+      o->short_description = str_dup(buf);
+      sprintf(buf, "%ld armor essences glimmer here.", n);
+      o->description = str_dup(buf);
+      }
+   }
+
+/* n essences to ch, joined to the copy they carry (one made if none) */
+static struct obj_data *cw_give_essences(struct char_data *ch, int n)
+   {
+   struct obj_data *o = NULL;
+
+   if (n <= 0)
+      return NULL;
+   cw_essences_held(ch, &o);
+   if (o)
+      {
+      if (!o->armor)
+         o->armor = armor_create();
+      o->armor->essences = MAX(1, o->armor->essences) + n;
+      cw_name_essence(o);
+      return o;
+      }
+   if (real_object(ARMOR_ESSENCE_VNUM) < 0 || !(o = read_object(ARMOR_ESSENCE_VNUM, VIRTUAL)))
+      return NULL;
+   o->bound_idnum = GET_IDNUM(ch);
+   strncpy(o->bound_name, GET_NAME(ch), MAX_NAME_LENGTH);
+   o->bound_name[MAX_NAME_LENGTH] = '\0';
+   o->armor = armor_create();
+   o->armor->essences = n;
+   cw_name_essence(o);
+   obj_to_char(o, ch);
+   return o;
+   }
+
+/* every essence copy ch carries, bound to them (worn, carried, in bags) */
+static int cw_essence_copies(struct char_data *ch, struct obj_data *list, struct obj_data **out,
+                             int n, int max)
+   {
+   struct obj_data *o;
+
+   for (o = list; o && n < max; o = o->next_content)
+      {
+      if (GET_OBJ_VNUM(o) == ARMOR_ESSENCE_VNUM && o->bound_idnum == GET_IDNUM(ch))
+         out[n++] = o;
+      if (o->contains)
+         n = cw_essence_copies(ch, o->contains, out, n, max);
+      }
+   return n;
+   }
+
+/* spend n essences: FALSE, and nothing spent, when there are not enough;
+ * what is left is kept in one copy */
+static int cw_take_essences(struct char_data *ch, long n)
+   {
+   struct obj_data *copies[64];
+   long total = cw_essences_held(ch, NULL), left;
+   int i, k = 0;
+
+   if (total < n)
+      return FALSE;
+   left = total - n;
+   for (i = 0; i < NUM_WEARS && k < 64; i++)
+      if (GET_EQ(ch, i))
+         {
+         if (GET_OBJ_VNUM(GET_EQ(ch, i)) == ARMOR_ESSENCE_VNUM && GET_EQ(ch, i)->bound_idnum == GET_IDNUM(ch))
+            copies[k++] = GET_EQ(ch, i);
+         if (GET_EQ(ch, i)->contains)
+            k = cw_essence_copies(ch, GET_EQ(ch, i)->contains, copies, k, 64);
+         }
+   k = cw_essence_copies(ch, ch->carrying, copies, k, 64);
+   if (!k)
+      return FALSE;
+   for (i = (left > 0 ? 1 : 0); i < k; i++)
+      extract_obj(copies[i]);
+   if (left > 0)
+      {
+      if (!copies[0]->armor)
+         copies[0]->armor = armor_create();
+      copies[0]->armor->essences = left;
+      cw_name_essence(copies[0]);
+      }
+   return TRUE;
+   }
+
+/* the drop: a kill's work, paid in the zone that loaded the mob, not on a
+ * charmed one; essences straight to the finder, a piece loaded on the mob */
+static void cw_armor_pay(struct char_data *ch, struct char_data *victim, double factor)
+   {
+   struct class_armor_state *st;
+   room_rnum home;
+   double work;
+   int n, slot;
+
+   if (!cw_armor_set_loaded(GET_CLASS(ch)))
+      return;
+   st = cw_armor_state(ch);
+   if (st->bank <= 0)
+      return;
+   work = st->bank * factor;
+   st->bank = 0;
+   if (work <= 0)
+      return;
+   home = real_room(GET_MOB_VAL(victim, 0));
+   if (IN_ROOM(victim) == NOWHERE || home == NOWHERE || world[home].zone != world[IN_ROOM(victim)].zone)
+      return;
+   if (victim->master || AFF_FLAGGED(victim, AFF_CHARM))
+      return;
+   n = real_object(ARMOR_ESSENCE_VNUM) >= 0 ? armor_essences_for(work, cw_rand01()) : 0;
+   if (n > 0 && cw_give_essences(ch, n))
+      {
+      if (n == 1)
+         send_to_char(ch, "&cYou find an armor essence on %s.&n\r\n", GET_NAME(victim));
+      else
+         send_to_char(ch, "&cYou find %d armor essences on %s.&n\r\n", n, GET_NAME(victim));
+      }
+   slot = armor_add_work(st, work, cw_rand01);
+   if (slot >= 0)
+      {
+      struct obj_data *obj = read_object(armor_vnum(GET_CLASS(ch), slot), VIRTUAL);
+
+      if (!obj)
+         return;
+      obj->bound_idnum = GET_IDNUM(ch);
+      strncpy(obj->bound_name, GET_NAME(ch), MAX_NAME_LENGTH);
+      obj->bound_name[MAX_NAME_LENGTH] = '\0';
+      obj_to_char(obj, victim);
+      send_to_char(ch, "&Y*****************************************************************&n\r\n");
+      send_to_char(ch, "&Y*  A powerful item falls from %s!&n\r\n", GET_NAME(victim));
+      send_to_char(ch, "&Y*  %s: your class armor's %s, bound to you (%d of 6).&n\r\n",
+                   cw_cap(obj->short_description), armor_slot_name(slot), armor_got_count(st->got));
+      send_to_char(ch, "&Y*****************************************************************&n\r\n");
+      }
+   }
+
+/* an attuned piece's stats on its wearer: equip, unequip and affect_total */
+void cw_armor_affect(struct char_data *ch, struct obj_data *obj, int add)
+   {
+   static const int loc[ARMOR_NUM_STATS] =
+      { APPLY_HIT, APPLY_MANA, APPLY_STR, APPLY_DEX, APPLY_HITROLL, APPLY_DAMROLL,
+        APPLY_SAVING_SPELL, APPLY_SAVING_BREATH, APPLY_AC };
+   int totals[ARMOR_NUM_STATS], i;
+
+   if (!class_weapons || !ch || !obj || !obj->armor || obj->armor->num <= 0)
+      return;
+   armor_totals(obj->armor, totals);
+   for (i = 0; i < ARMOR_NUM_STATS; i++)
+      if (totals[i])
+         affect_modify(ch, loc[i], totals[i], 0, add);
+   }
+
+/* "hit points +20, dexterity +1" */
+static void cw_armor_summary(const struct obj_armor_data *a, int stat, char *out)
+   {
+   int totals[ARMOR_NUM_STATS], i, n = 0, seen[ARMOR_NUM_STATS] = { 0 };
+
+   *out = '\0';
+   for (i = 0; i < ARMOR_NUM_STATS; i++)
+      totals[i] = 0;
+   for (i = 0; a && i < a->num; i++)
+      if (stat < 0 || a->pts[i].stat == stat)
+         totals[a->pts[i].stat] += armor_stat_per(a->pts[i].stat);
+   /* in the order the points were bought, as TS lists them */
+   for (i = 0; a && i < a->num; i++)
+      {
+      int s = a->pts[i].stat;
+
+      if ((stat >= 0 && s != stat) || seen[s] || !totals[s])
+         continue;
+      seen[s] = 1;
+      sprintf(out + strlen(out), "%s%s %+d", n++ ? ", " : "", armor_stat_label(s), totals[s]);
+      }
+   }
+
+static void cw_pool_line(int slot, char *out)
+   {
+   int pool[ARMOR_NUM_STATS], n = armor_pool(slot, pool), i;
+
+   *out = '\0';
+   for (i = 0; i < n; i++)
+      sprintf(out + strlen(out), "%s%s", i ? ", " : "", armor_stat_label(pool[i]));
+   }
+
+/* "Attuned: hit points +20 (2 of 4 points)." and the pool */
+static void cw_attune_lines(struct obj_data *obj, int slot, int own, char *buf)
+   {
+   char sum[256], pool[256];
+   int over = armor_points_over(obj->armor);
+
+   cw_armor_summary(obj->armor, -1, sum);
+   if (over)
+      sprintf(buf + strlen(buf), "Attuned: %s (%d of %d points, %d past the limit).\r\n",
+              *sum ? sum : "nothing", armor_points_used(obj->armor), armor_limit(slot), over);
+   else
+      sprintf(buf + strlen(buf), "Attuned: %s (%d of %d points).\r\n", *sum ? sum : "nothing",
+              armor_points_used(obj->armor), armor_limit(slot));
+   if (own)
+      {
+      cw_pool_line(slot, pool);
+      sprintf(buf + strlen(buf), "Pool: %s.\r\n", pool);
+      }
+   }
+
+/* identify on a class armor piece: its part of the class bonus, and its
+ * attunement */
+static void cw_armor_identify(struct obj_data *obj, char *buf)
+   {
+   int cls, slot, kind;
+   double s, pct;
+   char line[64];
+
+   if (!armor_piece_of(GET_OBJ_VNUM(obj), &cls, &slot))
+      return;
+   if (cls >= 0 && cls < NUM_CLASSES && cw_raise[cls].knob && cw_raise[cls].s)
+      {
+      kind = cw_raise[cls].kind;
+      s = cw_raise[cls].s;
+      pct = armor_slot_fraction(slot) * (kind == KIND_IN ? 1.0 - cw_exp(-s) : cw_exp(s) - 1.0) * 100.0;
+      cw_pct(line, pct);
+      sprintf(buf + strlen(buf), "Class armor (%s), %s: %d of the armor's %d parts of the class "
+              "bonus: %s, %s%% %s.\r\n", pc_class_types[cls], armor_slot_name(slot),
+              armor_slot_parts(slot), ARMOR_PARTS_TOTAL, cw_raise[cls].knob, line,
+              kind == KIND_IN ? "less damage taken" : kind == KIND_HEAL ? "more healing" : "more damage");
+      }
+   else
+      sprintf(buf + strlen(buf), "Class armor (%s), %s: %d of the armor's %d parts of the class "
+              "bonus: none (the anchor class).\r\n", (cls >= 0 && cls < NUM_CLASSES) ? pc_class_types[cls] : "hero",
+              armor_slot_name(slot), armor_slot_parts(slot), ARMOR_PARTS_TOTAL);
+   cw_attune_lines(obj, slot, TRUE, buf);
    }
 
 /* ---------------------------------------------------------------- forms */
@@ -1055,6 +1561,8 @@ static void cw_pay(struct char_data *ch, struct obj_data *obj, double base)
    a->points += base * cw_tier(ch);
    if (h->focus != HERO_FOCUS_NONE)
       h->focus_points[h->focus] += base * cw_tier(ch);
+   if (h->focus2 != HERO_FOCUS_NONE && h->focus2 != h->focus && cw_focus_in_use(ch, h, h->focus2))
+      h->focus_points[h->focus2] += base * cw_tier(ch);
    if (h->waiting != HERO_NOT_LOCKED)
       cw_ensure_boss(ch, h);
    r = cw_settle(ch, obj);
@@ -1116,6 +1624,7 @@ void cw_pay_kill(struct char_data *ch, struct char_data *victim)
             cw_pay_list(ch, e->contains, factor);
          }
    cw_pay_list(ch, ch->carrying, factor);
+   cw_armor_pay(ch, victim, factor);
    }
 
 void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
@@ -1124,15 +1633,19 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
 
    if (!class_weapons || IS_NPC(ch))
       return;
+   cw_armor_grow(ch, POINTS_PER_HIT);   /* the class armor's work: every hit, weapon or not */
    obj = (wielded && cw_mine(wielded, ch)) ? wielded : cw_held(ch);
    if (!obj)
       return;
-   /* a tank or cast focus: each blow refreshes the over-time pool */
-   if (obj->hero->focus == HERO_FOCUS_TANK || obj->hero->focus == HERO_FOCUS_CAST)
+   /* a tank or cast focus: each blow refreshes the over-time pool (both,
+    * with a second focus) */
+   if (cw_focus_in_use(ch, obj->hero, HERO_FOCUS_TANK) || cw_focus_in_use(ch, obj->hero, HERO_FOCUS_CAST))
       {
       struct cw_pool *p;
-      int per = MAX(1, (int)cw_floor((obj->hero->focus == HERO_FOCUS_TANK ? FOCUS_HOT_HP :
-                    FOCUS_HOT_MANA) * cw_focus_share(obj->hero) + 0.5));
+      int hp = cw_focus_in_use(ch, obj->hero, HERO_FOCUS_TANK)
+               ? MAX(1, (int)cw_floor(FOCUS_HOT_HP * cw_focus_output(ch, obj->hero, HERO_FOCUS_TANK) + 0.5)) : 0;
+      int mana = cw_focus_in_use(ch, obj->hero, HERO_FOCUS_CAST)
+               ? MAX(1, (int)cw_floor(FOCUS_HOT_MANA * cw_focus_output(ch, obj->hero, HERO_FOCUS_CAST) + 0.5)) : 0;
 
       for (p = cw_pools; p && p->idnum != GET_IDNUM(ch); p = p->next)
          ;
@@ -1143,8 +1656,8 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded)
          p->next = cw_pools;
          cw_pools = p;
          }
-      p->hp = obj->hero->focus == HERO_FOCUS_TANK ? per : 0;
-      p->mana = obj->hero->focus == HERO_FOCUS_CAST ? per : 0;
+      p->hp = hp;
+      p->mana = mana;
       p->ticks = FOCUS_HOT_TICKS;
       }
    /* a borrowed form spends its charge, a blow at a time */
@@ -1229,7 +1742,10 @@ void cw_end_cast(struct char_data *ch, int attack)
    int pts = cw_cast_share(POINTS_PER_CAST);
 
    cw_cast_mana = 0;
-   if (!attack || pts <= 0 || !class_weapons || IS_NPC(ch) || !(obj = cw_in_hand(ch)))
+   if (!attack || pts <= 0 || !class_weapons || IS_NPC(ch))
+      return;
+   cw_armor_grow(ch, pts);
+   if (!(obj = cw_in_hand(ch)))
       return;
    cw_grow(ch, obj, pts);
    }
@@ -1240,14 +1756,20 @@ int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
    int kind;
    double a = amount, s;
 
-   if (!class_weapons || IS_NPC(ch) || amount <= 0 || !(obj = cw_in_hand(ch)))
+   if (!class_weapons || IS_NPC(ch) || amount <= 0)
       return amount;
+   obj = cw_in_hand(ch);
    if (victim && GET_HIT(victim) < GET_MAX_HIT(victim) && cw_cast_share(POINTS_PER_HEAL) > 0)
-      cw_grow(ch, obj, cw_cast_share(POINTS_PER_HEAL));
-   if (cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
+      {
+      cw_armor_grow(ch, cw_cast_share(POINTS_PER_HEAL));
+      if (obj)
+         cw_grow(ch, obj, cw_cast_share(POINTS_PER_HEAL));
+      }
+   if (obj && cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
       a *= cw_mult(KIND_HEAL, s);
-   if (obj->hero->focus == HERO_FOCUS_HEAL)
-      a *= 1.0 + FOCUS_HEAL * cw_focus_share(obj->hero);
+   a *= cw_armor_layer(ch, obj, KIND_HEAL);
+   if (obj)
+      a *= 1.0 + FOCUS_HEAL * cw_focus_output(ch, obj->hero, HERO_FOCUS_HEAL);
    return (int)cw_floor(a);
    }
 
@@ -1264,12 +1786,15 @@ int cw_damage_mod(struct char_data *ch, struct char_data *victim, int dam,
       {
       if (cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_OUT)
          mul *= cw_mult(KIND_OUT, s);
-      if (obj->hero->focus == HERO_FOCUS_DPS)
-         mul *= 1.0 + FOCUS_DPS * cw_focus_share(obj->hero);
+      mul *= 1.0 + FOCUS_DPS * cw_focus_output(ch, obj->hero, HERO_FOCUS_DPS);
       }
+   if (ch && !IS_NPC(ch))
+      mul *= cw_armor_layer(ch, cw_in_hand(ch), KIND_OUT);
    if (victim && (obj = cw_in_hand(victim)) &&
        cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_IN)
       mul *= cw_mult(KIND_IN, s);
+   if (victim && !IS_NPC(victim))
+      mul *= cw_armor_layer(victim, cw_in_hand(victim), KIND_IN);
    if (mul == 1.0)
       return dam;
    return (int)cw_floor(dam * mul + 0.5);
@@ -1493,6 +2018,24 @@ void cw_login(struct char_data *ch)
 
    if (!class_weapons || IS_NPC(ch))
       return;
+   /* the class armor's record, and each essence copy says its count again */
+   cw_armor_load(ch);
+   {
+   struct obj_data *ess[64];
+   int k = 0, i;
+
+   for (i = 0; i < NUM_WEARS && k < 64; i++)
+      if (GET_EQ(ch, i))
+         {
+         if (GET_OBJ_VNUM(GET_EQ(ch, i)) == ARMOR_ESSENCE_VNUM && GET_EQ(ch, i)->bound_idnum == GET_IDNUM(ch))
+            ess[k++] = GET_EQ(ch, i);
+         if (GET_EQ(ch, i)->contains)
+            k = cw_essence_copies(ch, GET_EQ(ch, i)->contains, ess, k, 64);
+         }
+   k = cw_essence_copies(ch, ch->carrying, ess, k, 64);
+   for (i = 0; i < k; i++)
+      cw_name_essence(ess[i]);
+   }
    first = cw_first[(int)GET_CLASS(ch)];
    for (o = ch->carrying; o; o = o->next_content)
       if (!o->hero && first > 0 && GET_OBJ_VNUM(o) == first &&
@@ -1674,12 +2217,18 @@ static void cw_focus_line(struct hero_data *h, char *out)
    int f, n = 0;
 
    for (f = HERO_FOCUS_DPS; f < HERO_NUM_FOCUS; f++)
-      if (f != h->focus && h->focus_points[f] > 0)
+      if (f != h->focus && f != h->focus2 && h->focus_points[f] > 0)
          sprintf(tail + strlen(tail), "%s%s %d%%", n++ ? ", " : " Kept: ", cw_focus_names[f],
                  (int)cw_floor(cw_share(cw_level_for(h->focus_points[f])) * 100 + 0.5));
    if (n)
       strcat(tail, ".");
-   if (h->focus > HERO_FOCUS_NONE && h->focus < HERO_NUM_FOCUS)
+   if (h->focus > HERO_FOCUS_NONE && h->focus < HERO_NUM_FOCUS && h->focus2 > HERO_FOCUS_NONE &&
+       h->focus2 < HERO_NUM_FOCUS)
+      sprintf(out, "Its focus: it %s (%d%% of the full focus). Its second focus, while your class "
+              "set counts %d: it %s (%d%%).%s", cw_focus_words[h->focus],
+              (int)cw_floor(cw_focus_share(h) * 100 + 0.5), SET_SECOND_FOCUS_AT, cw_focus_words[h->focus2],
+              (int)cw_floor(cw_share(cw_level_for(h->focus_points[h->focus2])) * 100 + 0.5), tail);
+   else if (h->focus > HERO_FOCUS_NONE && h->focus < HERO_NUM_FOCUS)
       sprintf(out, "Its focus: it %s (%d%% of the full focus).%s", cw_focus_words[h->focus],
               (int)cw_floor(cw_focus_share(h) * 100 + 0.5), tail);
    else
@@ -1734,10 +2283,11 @@ ACMD(do_focus)
    {
    struct obj_data *obj = NULL, *o;
    struct hero_data *h;
-   char *arg = get_buffer(MAX_INPUT_LENGTH), *line = get_buffer(512);
-   int f, was;
+   char *arg = get_buffer(MAX_INPUT_LENGTH), *arg2 = get_buffer(MAX_INPUT_LENGTH),
+        *line = get_buffer(512);
+   int f, was, count;
 
-   one_argument(argument, arg);
+   two_arguments(argument, arg, arg2);
    for (o = ch->carrying; o && !obj; o = o->next_content)
       if (cw_mine(o, ch))
          obj = o;
@@ -1747,6 +2297,41 @@ ACMD(do_focus)
       send_to_char(ch, "Huh?!?\r\n");
    else if (!obj)
       send_to_char(ch, "You have no class weapon in hand.\r\n");
+   else if (!str_cmp(arg, "second"))
+      {
+      /* a second focus, while the class set counts five: the first choice
+       * anywhere, a change at a smith's station; it grows beside the first */
+      h = obj->hero;
+      count = cw_set_count(ch);
+      for (f = HERO_FOCUS_DPS; f < HERO_NUM_FOCUS && str_cmp(arg2, (char *)cw_focus_names[f]); f++)
+         ;
+      if (h->focus == HERO_FOCUS_NONE)
+         send_to_char(ch, "Choose a focus first: focus <dps|heal|tank|cast>.\r\n");
+      else if (count < SET_SECOND_FOCUS_AT)
+         send_to_char(ch, "A second focus needs the class set at %d: your class weapon in hand and "
+                      "four pieces of your class armor worn. You have %d.\r\n", SET_SECOND_FOCUS_AT, count);
+      else if (!*arg2)
+         {
+         cw_focus_line(h, line);
+         send_to_char(ch, "&Y%s&n\r\n", line);
+         }
+      else if (f >= HERO_NUM_FOCUS)
+         send_to_char(ch, "focus second <dps|heal|tank|cast>.\r\n");
+      else if (h->focus == f)
+         send_to_char(ch, "%s is already the first focus of %s.\r\n", cw_cap(arg2), obj->short_description);
+      else if (h->focus2 == f)
+         send_to_char(ch, "The second focus of %s is already %s.\r\n", obj->short_description,
+                      cw_focus_names[f]);
+      else if (h->focus2 != HERO_FOCUS_NONE && !cw_at_smith(ch))
+         send_to_char(ch, "A focus is changed at a smith's station: a forge, a smithy, or a "
+                      "smith at his work.\r\n");
+      else
+         {
+         h->focus2 = f;
+         send_to_char(ch, "&Y%s takes a second focus: it %s as well, while your class set counts %d.&n\r\n",
+                      cw_cap(obj->short_description), cw_focus_words[f], SET_SECOND_FOCUS_AT);
+         }
+      }
    else
       {
       h = obj->hero;
@@ -1784,6 +2369,7 @@ ACMD(do_focus)
          }
       }
    release_buffer(arg);
+   release_buffer(arg2);
    release_buffer(line);
    }
 
@@ -2341,6 +2927,8 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
 
    if (obj->bound_idnum > 0 && obj->bound_name[0])
       sprintf(buf + strlen(buf), "Bound to %s, and no other.\r\n", obj->bound_name);
+   if (class_weapons)
+      cw_armor_identify(obj, buf);
    if (!h)
       return;
    cw_bonus_line(h, line);
@@ -2382,8 +2970,303 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
       }
    }
 
+/* ---------------------------------------------------------------- attune */
+
+/* a piece carried or worn, by keyword */
+static struct obj_data *cw_carried_or_worn(struct char_data *ch, char *kw)
+   {
+   struct obj_data *o;
+   int pos;
+
+   if ((o = get_obj_in_list_vis(ch, kw, ch->carrying)))
+      return o;
+   return get_object_in_equip_vis(ch, kw, ch->equipment, &pos);
+   }
+
+/* why ch may not attune this copy, or NULL */
+static const char *cw_attune_refusal(struct char_data *ch, struct obj_data *obj, char *buf)
+   {
+   int cls, slot;
+
+   if (!armor_piece_of(GET_OBJ_VNUM(obj), &cls, &slot))
+      sprintf(buf, "%s: not class armor.", cw_cap(obj->short_description));
+   else if (obj->bound_idnum != GET_IDNUM(ch))
+      sprintf(buf, "%s: not yours.", cw_cap(obj->short_description));
+   else if (cls != GET_CLASS(ch))
+      sprintf(buf, "%s: for a %s only.", cw_cap(obj->short_description), pc_class_types[cls]);
+   else
+      return NULL;
+   return buf;
+   }
+
+/* one class armor piece's line in the attune list; 1 if it was one */
+static int cw_attune_one(struct char_data *ch, struct obj_data *o, char *buf)
+   {
+   int cls, slot, over;
+   char sum[256];
+
+   if (o->bound_idnum != GET_IDNUM(ch) || !armor_piece_of(GET_OBJ_VNUM(o), &cls, &slot))
+      return 0;
+   cw_armor_summary(o->armor, -1, sum);
+   over = armor_points_over(o->armor);
+   sprintf(buf + strlen(buf), "  %s", cw_cap(o->short_description));
+   if (cls != GET_CLASS(ch))
+      sprintf(buf + strlen(buf), " (%s)", pc_class_types[cls]);
+   sprintf(buf + strlen(buf), ": %s (%d of %d points", *sum ? sum : "nothing",
+           armor_points_used(o->armor), armor_limit(slot));
+   if (over)
+      sprintf(buf + strlen(buf), ", %d past the limit", over);
+   strcat(buf, ").\r\n");
+   return 1;
+   }
+
+/* every class armor piece in a list and the bags in it */
+static int cw_attune_list(struct char_data *ch, struct obj_data *list, char *buf)
+   {
+   struct obj_data *o;
+   int n = 0;
+
+   for (o = list; o; o = o->next_content)
+      {
+      n += cw_attune_one(ch, o, buf);
+      if (o->contains)
+         n += cw_attune_list(ch, o->contains, buf);
+      }
+   return n;
+   }
+
+/* a worn piece's stats come off before a change and go back on after */
+static void cw_attune_set(struct char_data *ch, struct obj_data *obj, struct obj_armor_data *now)
+   {
+   int worn = obj->worn_by == ch;
+
+   if (worn)
+      cw_armor_affect(ch, obj, FALSE);
+   if (!obj->armor)
+      obj->armor = armor_create();
+   obj->armor->num = now->num;
+   memcpy(obj->armor->pts, now->pts, sizeof(now->pts));
+   if (worn)
+      {
+      cw_armor_affect(ch, obj, TRUE);
+      affect_total(ch);
+      }
+   }
+
+/* attune [piece [stat [confirm]]]: class armor takes stats from armor
+ * essences, anywhere, worn or carried. Past the limit a point costs more
+ * each time and may break as it sets, losing that point and its essences. */
+ACMD(do_attune)
+   {
+   char *arg = get_buffer(MAX_INPUT_LENGTH), *rest = get_buffer(MAX_INPUT_LENGTH),
+        *buf = get_buffer(MAX_STRING_LENGTH), *word = get_buffer(MAX_INPUT_LENGTH), kw[64];
+   struct obj_data *obj;
+   struct obj_armor_data now;
+   int cls, slot, stat, rc, cost = 0, over = 0, confirm = 0, i, len;
+   double brk = 0;
+   long held;
+
+   half_chop(argument, arg, rest);
+   /* a trailing "confirm" */
+   len = strlen(rest);
+   if (len >= 7 && !str_cmp(rest + len - 7, "confirm") && (len == 7 || rest[len - 8] == ' '))
+      {
+      confirm = 1;
+      rest[len - 7] = '\0';
+      while (len > 7 && rest[strlen(rest) - 1] == ' ')
+         rest[strlen(rest) - 1] = '\0';
+      }
+   *buf = '\0';
+   if (!class_weapons)
+      send_to_char(ch, "Huh?!?\r\n");
+   else if (!*arg)
+      {
+      int j, n = 0;
+
+      sprintf(buf, "Armor essences: %ld.\r\n", cw_essences_held(ch, NULL));
+      n += cw_attune_list(ch, ch->carrying, buf);
+      for (j = 0; j < NUM_WEARS; j++)
+         if (GET_EQ(ch, j))
+            {
+            n += cw_attune_one(ch, GET_EQ(ch, j), buf);
+            if (GET_EQ(ch, j)->contains)
+               n += cw_attune_list(ch, GET_EQ(ch, j)->contains, buf);
+            }
+      if (!n)
+         strcat(buf, "No class armor.\r\n");
+      send_to_char(ch, "%s", buf);
+      }
+   else if (!(obj = cw_carried_or_worn(ch, arg)))
+      send_to_char(ch, "You have no %s.\r\n", arg);
+   else if (cw_attune_refusal(ch, obj, buf))
+      send_to_char(ch, "%s\r\n", buf);
+   else
+      {
+      armor_piece_of(GET_OBJ_VNUM(obj), &cls, &slot);
+      if (!*rest)
+         {
+         cw_attune_lines(obj, slot, TRUE, buf);
+         sprintf(buf + strlen(buf), "Armor essences: %ld.\r\n", cw_essences_held(ch, NULL));
+         send_to_char(ch, "%s", buf);
+         }
+      else if ((stat = armor_stat_parse(rest)) < 0)
+         {
+         cw_pool_line(slot, word);
+         send_to_char(ch, "No \"%s\" in the pool of %s: %s.\r\n", rest, obj->short_description, word);
+         }
+      else if ((rc = armor_check(slot, obj->armor, stat, &cost, &brk, &over)) != ATTUNE_OK)
+         {
+         switch (rc)
+            {
+            case ATTUNE_NOT_IN_POOL:
+               send_to_char(ch, "%s: no %s.\r\n", cw_cap(obj->short_description), armor_stat_label(stat));
+               break;
+            case ATTUNE_STAT_FULL:
+               send_to_char(ch, "%s: no more %s.\r\n", cw_cap(obj->short_description), armor_stat_label(stat));
+               break;
+            case ATTUNE_OFFENSE_FULL:
+               send_to_char(ch, "%s: no more hitroll or damroll.\r\n", cw_cap(obj->short_description));
+               break;
+            case ATTUNE_NO_ROOM:
+               send_to_char(ch, "%s: %d point left; %s needs %d.\r\n", cw_cap(obj->short_description),
+                            armor_limit(slot) - armor_points_used(obj->armor), armor_stat_label(stat),
+                            armor_stat_points(stat));
+               break;
+            case ATTUNE_OVER_FULL:
+               send_to_char(ch, "%s: no more past the limit.\r\n", cw_cap(obj->short_description));
+               break;
+            default:
+               send_to_char(ch, "%s: no %s past the limit.\r\n", cw_cap(obj->short_description),
+                            armor_stat_label(stat));
+               break;
+            }
+         }
+      else if (over && !confirm)
+         {
+         one_argument(obj->name, kw);
+         send_to_char(ch, "%s: at the limit. attune %s %s confirm to go past it.\r\n",
+                      cw_cap(obj->short_description), kw, armor_stat_word(stat));
+         }
+      else if ((held = cw_essences_held(ch, NULL)) < cost)
+         send_to_char(ch, "You need %d armor essences; you have %ld.\r\n", cost, held);
+      else
+         {
+         cw_take_essences(ch, cost);
+         if (over && cw_rand01() < brk)
+            send_to_char(ch, "&YThe attunement breaks: %d armor essences are lost.&n\r\n", cost);
+         else
+            {
+            memset(&now, 0, sizeof(now));
+            if (obj->armor)
+               {
+               now.num = obj->armor->num;
+               for (i = 0; i < now.num; i++)
+                  now.pts[i] = obj->armor->pts[i];
+               }
+            if (now.num < ARMOR_MAX_POINTS)
+               {
+               now.pts[now.num].stat = stat;
+               now.pts[now.num].essences = cost;
+               now.pts[now.num].over = over;
+               now.num++;
+               }
+            cw_attune_set(ch, obj, &now);
+            send_to_char(ch, "&YYou attune %s%s with %d armor essences: %s %+d.&n\r\n",
+                         obj->short_description, over ? " past the limit" : "", cost,
+                         armor_stat_label(stat), armor_stat_per(stat));
+            }
+         }
+      }
+   release_buffer(arg);
+   release_buffer(rest);
+   release_buffer(buf);
+   release_buffer(word);
+   }
+
+/* the Master Armourer, awake and not fighting, in the room */
+static int cw_armourer_here(struct char_data *ch)
+   {
+   struct char_data *k;
+
+   for (k = world[IN_ROOM(ch)].people; k; k = k->next_in_room)
+      if (IS_NPC(k) && GET_MOB_VNUM(k) == MASTER_ARMOURER && AWAKE(k) && !FIGHTING(k))
+         return TRUE;
+   return FALSE;
+   }
+
+/* unattune <piece> [stat]: before the Master Armourer, the points come out
+ * for gold a point, and he hands back their essences less his share */
+ACMD(do_unattune)
+   {
+   char *arg = get_buffer(MAX_INPUT_LENGTH), *rest = get_buffer(MAX_INPUT_LENGTH),
+        *sum = get_buffer(MAX_STRING_LENGTH);
+   struct obj_data *obj;
+   struct obj_armor_data now;
+   int cls, slot, stat = -1, i, essences, points;
+   long gold;
+
+   half_chop(argument, arg, rest);
+   if (!class_weapons)
+      send_to_char(ch, "Huh?!?\r\n");
+   else if (!*arg)
+      send_to_char(ch, "Unattune what?\r\n");
+   else if (!cw_armourer_here(ch))
+      send_to_char(ch, "Only the Master Armourer, south off Eden Lane in New Thalos, takes an "
+                   "attunement out.\r\n");
+   else if (!(obj = cw_carried_or_worn(ch, arg)))
+      send_to_char(ch, "You have no %s.\r\n", arg);
+   else if (*rest && (stat = armor_stat_parse(rest)) < 0)
+      send_to_char(ch, "No stat called \"%s\".\r\n", rest);
+   else if (!armor_piece_of(GET_OBJ_VNUM(obj), &cls, &slot))
+      send_to_char(ch, "%s: not class armor.\r\n", cw_cap(obj->short_description));
+   else if (obj->bound_idnum != GET_IDNUM(ch))
+      send_to_char(ch, "%s: not yours.\r\n", cw_cap(obj->short_description));
+   else
+      {
+      armor_unattune_terms(obj->armor, stat, &essences, &gold, &points);
+      if (points <= 0)
+         {
+         if (stat >= 0)
+            send_to_char(ch, "%s: no %s attuned.\r\n", cw_cap(obj->short_description), armor_stat_label(stat));
+         else
+            send_to_char(ch, "%s: nothing attuned.\r\n", cw_cap(obj->short_description));
+         }
+      else if (GET_GOLD(ch) < gold)
+         send_to_char(ch, "The Master Armourer wants %ld gold.\r\n", gold);
+      else
+         {
+         cw_armor_summary(obj->armor, stat, sum);
+         GET_GOLD(ch) -= gold;
+         memset(&now, 0, sizeof(now));
+         for (i = 0; i < obj->armor->num; i++)
+            if (stat >= 0 && obj->armor->pts[i].stat != stat)
+               now.pts[now.num++] = obj->armor->pts[i];
+         armor_settle_over(&now, slot);
+         cw_attune_set(ch, obj, &now);
+         if (essences > 0)
+            cw_give_essences(ch, essences);
+         send_to_char(ch, "&YThe Master Armourer takes %s out of %s for %ld gold and gives you %d "
+                      "armor essence%s.&n\r\n", sum, obj->short_description, gold, essences,
+                      essences == 1 ? "" : "s");
+         }
+      }
+   release_buffer(arg);
+   release_buffer(rest);
+   release_buffer(sum);
+   }
+
 int cw_bound_ok(struct char_data *ch, struct obj_data *obj, int message)
    {
+   int cls, slot;
+
+   if (obj && obj->bound_idnum > 0 && class_weapons && !IS_NPC(ch) && GET_LEVEL(ch) < LVL_IMMORT &&
+       GET_IDNUM(ch) == obj->bound_idnum && armor_piece_of(GET_OBJ_VNUM(obj), &cls, &slot) &&
+       cls != GET_CLASS(ch))
+      {
+      if (message)
+         send_to_char(ch, "%s: for a %s only.\r\n", cw_cap(obj->short_description), pc_class_types[cls]);
+      return FALSE;
+      }
    if (!obj || obj->bound_idnum <= 0 || IS_NPC(ch) || GET_IDNUM(ch) == obj->bound_idnum ||
        GET_LEVEL(ch) >= LVL_IMMORT)
       return TRUE;

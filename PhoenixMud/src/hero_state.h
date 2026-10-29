@@ -56,6 +56,7 @@ struct hero_data
    int holds[HERO_MAX_HOLDS];  /* the levels a lock held it at */
    int num_grants;
    char grants[HERO_MAX_GRANTS][HERO_GRANT_LEN];
+   int focus2;              /* a second focus, while the class set counts five */
    };
 
 /* growth points and the MUD hour's count, on any attuned copy */
@@ -69,11 +70,34 @@ struct obj_attune_data
    double banked;           /* growth earned since the kill that last paid it */
    };
 
+/* a class armor piece's attunement, one entry a unit of a stat, and an armor
+ * essence copy's count (classweapon.c, armor_math.c) */
+#define ARMOR_MAX_POINTS  32
+#define ARMOR_NUM_STATS   9   /* hp mana str dex hitroll damroll spellsave
+                               * breathsave armor (armor_math.h) */
+struct armor_point
+   {
+   int stat;                /* 0..ARMOR_NUM_STATS-1 */
+   int essences;            /* what the point cost */
+   int over;                /* bought past the piece's limit */
+   };
+
+struct obj_armor_data
+   {
+   int num;
+   struct armor_point pts[ARMOR_MAX_POINTS];
+   long essences;           /* an armor essence copy: how many it holds */
+   };
+
 struct obj_data;
 struct char_data;
 
 struct hero_data *hero_create(void);
 struct obj_attune_data *attune_create(void);
+struct obj_armor_data *armor_create(void);
+/* the attunement's stat words, as the HA line and the commands write them */
+const char *armor_stat_word(int stat);
+int armor_stat_of(const char *word);
 /* the copy's weapon state, attunement and binding freed or cleared */
 void obj_hero_free(struct obj_data *obj);
 /* dst takes its own copy of src's weapon state, attunement and binding */

@@ -4426,6 +4426,9 @@ void save_char_ascii(struct char_file_u *ch)
   } else {
     remove(filename);
   }
+
+  /* the class armor's record (<Name>.classarmor), when this boot holds one */
+  cw_armor_save(fname, ch->char_specials_saved.idnum);
 }
 
 

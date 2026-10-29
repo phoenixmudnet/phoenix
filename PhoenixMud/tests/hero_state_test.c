@@ -224,8 +224,49 @@ static void test_banked(void)
    obj_hero_free(&b);
    }
 
+/* class armor: the attunement a unit a line, an essence copy's count, and
+ * the second focus; each survives the round trip and a copy */
+static void test_class_armor(void)
+   {
+   struct obj_data a, b, c;
+   FILE *fp;
+   char line[256];
+
+   memset(&a, 0, sizeof(a));
+   memset(&b, 0, sizeof(b));
+   memset(&c, 0, sizeof(c));
+   a.armor = armor_create();
+   a.armor->pts[0].stat = 0; a.armor->pts[0].essences = 100; a.armor->pts[0].over = 0;
+   a.armor->pts[1].stat = 4; a.armor->pts[1].essences = 200; a.armor->pts[1].over = 1;
+   a.armor->num = 2;
+   a.armor->essences = 37;
+   a.hero = hero_create();
+   a.hero->focus = HERO_FOCUS_DPS;
+   a.hero->focus2 = HERO_FOCUS_TANK;
+   fp = tmpfile();
+   CHECK(obj_hero_write(fp, &a) == 0);
+   rewind(fp);
+   CHECK(fgets(line, sizeof(line), fp) && !strcmp(line, "HA hp 100 0\n"));
+   CHECK(fgets(line, sizeof(line), fp) && !strcmp(line, "HA hitroll 200 1\n"));
+   CHECK(fgets(line, sizeof(line), fp) && !strcmp(line, "HE 37\n"));
+   fclose(fp);
+   round_trip(&a, &b);
+   CHECK(b.armor && b.armor->num == 2 && b.armor->pts[1].stat == 4 && b.armor->pts[1].over == 1 &&
+         b.armor->pts[1].essences == 200 && b.armor->essences == 37);
+   CHECK(b.hero && b.hero->focus2 == HERO_FOCUS_TANK);
+   obj_hero_copy(&c, &b);
+   CHECK(c.armor && c.armor != b.armor && c.armor->num == 2);
+   CHECK(obj_hero_read_line(&c, "HA wisdom 100 0") == TRUE && c.armor->num == 2);
+   CHECK(armor_stat_of("spellsave") == 6 && armor_stat_of("x") == -1);
+   obj_hero_free(&a);
+   obj_hero_free(&b);
+   obj_hero_free(&c);
+   CHECK(!c.armor);
+   }
+
 int main(void)
    {
+   test_class_armor();
    test_round_trip();
    test_banked();
    test_plain_and_essence();

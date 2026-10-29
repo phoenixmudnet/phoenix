@@ -24,6 +24,7 @@
 #include "spells.h"
 #include "constants.h"
 #include "dg_scripts.h"
+#include "classweapon.h"
 
 #define WHITESPACE " \t"
 
@@ -382,10 +383,13 @@ void affect_total(struct char_data * ch)
    for (i = 0; i < NUM_WEARS; i++)
       {
       if (GET_EQ(ch, i))
+         {
          for (j = 0; j < MAX_OBJ_AFFECT; j++)
             affect_modify(ch, GET_EQ(ch, i)->affected[j].location,
                           GET_EQ(ch, i)->affected[j].modifier,
                           GET_EQ(ch, i)->obj_flags.bitvector, FALSE);
+         cw_armor_affect(ch, GET_EQ(ch, i), FALSE);   /* class armor's attuned stats */
+         }
       }
 
 
@@ -401,10 +405,13 @@ void affect_total(struct char_data * ch)
    for (i = 0; i < NUM_WEARS; i++)
       {
       if (GET_EQ(ch, i))
+         {
          for (j = 0; j < MAX_OBJ_AFFECT; j++)
             affect_modify(ch, GET_EQ(ch, i)->affected[j].location,
                           GET_EQ(ch, i)->affected[j].modifier,
                           GET_EQ(ch, i)->obj_flags.bitvector, TRUE);
+         cw_armor_affect(ch, GET_EQ(ch, i), TRUE);
+         }
       }
 
 
@@ -1117,6 +1124,7 @@ void equip_char(struct char_data * ch, struct obj_data * obj, int pos)
       affect_modify(ch, obj->affected[j].location,
                     obj->affected[j].modifier,
                     obj->obj_flags.bitvector, TRUE);
+   cw_armor_affect(ch, obj, TRUE);   /* class armor's attuned stats */
 
    if(GET_EQ(ch,WEAR_WIELD_1)&&GET_EQ(ch,WEAR_WIELD_2))
       {
@@ -1195,6 +1203,7 @@ struct obj_data *unequip_char_inner(struct char_data * ch, int pos)
       affect_modify(ch, obj->affected[j].location,
                     obj->affected[j].modifier,
                     obj->obj_flags.bitvector, FALSE);
+   cw_armor_affect(ch, obj, FALSE);   /* class armor's attuned stats */
 
    affect_total(ch);
    return (obj);
