@@ -1287,6 +1287,7 @@ struct obj_data {
     * (hero_state.c): NULL or 0 on every prototype and plain object. */
    struct hero_data *hero;
    struct obj_attune_data *attune;
+   struct obj_armor_data *armor;  /* class armor's attunement, an essence's count */
    long bound_idnum;
    char bound_name[MAX_NAME_LENGTH + 1];
    long checkpoint_of;            /* a boss's essence: the boss's vnum */

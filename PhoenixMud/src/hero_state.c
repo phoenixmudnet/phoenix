@@ -16,6 +16,9 @@
 *    HH <level>                   a level a lock held it at            *
 *    HP <dps> <heal> <tank> <cast>  each focus's own points            *
 *    HG <key>                     a grant applied to it                *
+*    HS <focus>                   the second focus (the class set)     *
+*    HA <stat> <essences> <over>  a unit attuned on class armor        *
+*    HE <count>                   an armor essence copy's count        *
 *                                                                      *
 *  Self-contained (no game globals) so the tests link it alone.        *
 ***********************************************************************/
@@ -53,6 +56,29 @@ struct obj_attune_data *attune_create(void)
    return hero_calloc(1, sizeof(struct obj_attune_data));
    }
 
+struct obj_armor_data *armor_create(void)
+   {
+   return hero_calloc(1, sizeof(struct obj_armor_data));
+   }
+
+static const char *armor_stat_words[ARMOR_NUM_STATS] =
+   { "hp", "mana", "str", "dex", "hitroll", "damroll", "spellsave", "breathsave", "armor" };
+
+const char *armor_stat_word(int stat)
+   {
+   return (stat >= 0 && stat < ARMOR_NUM_STATS) ? armor_stat_words[stat] : "?";
+   }
+
+int armor_stat_of(const char *word)
+   {
+   int i;
+
+   for (i = 0; word && i < ARMOR_NUM_STATS; i++)
+      if (!strcmp(word, armor_stat_words[i]))
+         return i;
+   return -1;
+   }
+
 void obj_hero_free(struct obj_data *obj)
    {
    if (!obj)
@@ -61,8 +87,11 @@ void obj_hero_free(struct obj_data *obj)
       free(obj->hero);
    if (obj->attune)
       free(obj->attune);
+   if (obj->armor)
+      free(obj->armor);
    obj->hero = NULL;
    obj->attune = NULL;
+   obj->armor = NULL;
    obj->bound_idnum = 0;
    obj->bound_name[0] = '\0';
    obj->checkpoint_of = 0;
@@ -83,6 +112,11 @@ void obj_hero_copy(struct obj_data *dst, const struct obj_data *src)
       dst->attune = hero_calloc(1, sizeof(struct obj_attune_data));
       *dst->attune = *src->attune;
       }
+   if (src->armor)
+      {
+      dst->armor = hero_calloc(1, sizeof(struct obj_armor_data));
+      *dst->armor = *src->armor;
+      }
    dst->bound_idnum = src->bound_idnum;
    strncpy(dst->bound_name, src->bound_name, MAX_NAME_LENGTH);
    dst->bound_name[MAX_NAME_LENGTH] = '\0';
@@ -93,6 +127,7 @@ int obj_hero_write(FILE *fp, const struct obj_data *obj)
    {
    const struct hero_data *h = obj->hero;
    const struct obj_attune_data *a = obj->attune;
+   const struct obj_armor_data *r = obj->armor;
    int i, err = 0;
 
    if (obj->bound_idnum > 0)
@@ -113,6 +148,16 @@ int obj_hero_write(FILE *fp, const struct obj_data *obj)
       else if (fprintf(fp, "HT %.4f %ld %ld %ld %ld\n", a->points, a->hits,
                        a->hour, a->hour_hits, a->hour_points) < 0)
          err = -1;
+      }
+   if (r)
+      {
+      for (i = 0; i < r->num && i < ARMOR_MAX_POINTS; i++)
+         if (fprintf(fp, "HA %s %d %d\n", armor_stat_word(r->pts[i].stat), r->pts[i].essences,
+                     r->pts[i].over ? 1 : 0) < 0)
+            err = -1;
+      if (r->essences > 0)
+         if (fprintf(fp, "HE %ld\n", r->essences) < 0)
+            err = -1;
       }
    if (!h)
       return err;
@@ -143,6 +188,9 @@ int obj_hero_write(FILE *fp, const struct obj_data *obj)
    for (i = 0; i < h->num_grants && i < HERO_MAX_GRANTS; i++)
       if (fprintf(fp, "HG %s\n", h->grants[i]) < 0)
          err = -1;
+   if (h->focus2 > HERO_FOCUS_NONE && h->focus2 < HERO_NUM_FOCUS)
+      if (fprintf(fp, "HS %d\n", h->focus2) < 0)
+         err = -1;
    return err;
    }
 
@@ -151,6 +199,13 @@ static struct hero_data *hero_of(struct obj_data *obj)
    if (!obj->hero)
       obj->hero = hero_create();
    return obj->hero;
+   }
+
+static struct obj_armor_data *armor_of(struct obj_data *obj)
+   {
+   if (!obj->armor)
+      obj->armor = armor_create();
+   return obj->armor;
    }
 
 int obj_hero_read_line(struct obj_data *obj, const char *line)
@@ -242,6 +297,29 @@ int obj_hero_read_line(struct obj_data *obj, const char *line)
             h->focus_points[HERO_FOCUS_TANK] = d3;
             h->focus_points[HERO_FOCUS_CAST] = d4;
             }
+         return TRUE;
+      case 'S':
+         if (sscanf(line, "HS %d", &i1) == 1 && i1 > HERO_FOCUS_NONE && i1 < HERO_NUM_FOCUS)
+            hero_of(obj)->focus2 = i1;
+         return TRUE;
+      case 'A':
+         if (sscanf(line, "HA %20s %d %d", word, &i1, &i2) == 3 && armor_stat_of(word) >= 0 &&
+             i1 >= 0)
+            {
+            struct obj_armor_data *r = armor_of(obj);
+
+            if (r->num < ARMOR_MAX_POINTS)
+               {
+               r->pts[r->num].stat = armor_stat_of(word);
+               r->pts[r->num].essences = i1;
+               r->pts[r->num].over = i2 ? 1 : 0;
+               r->num++;
+               }
+            }
+         return TRUE;
+      case 'E':
+         if (sscanf(line, "HE %ld", &l1) == 1 && l1 > 0)
+            armor_of(obj)->essences = l1;
          return TRUE;
       case 'G':
          if (sscanf(line, "HG %47s", word) == 1)

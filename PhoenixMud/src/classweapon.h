@@ -37,5 +37,9 @@ void cw_identify_lines(struct obj_data *obj, char *buf);
 /* a bound piece serves its one character (immortals aside): FALSE and
  * the message when ch may not use it */
 int  cw_bound_ok(struct char_data *ch, struct obj_data *obj, int message);
+/* class armor: an attuned piece's stats on its wearer (equip, unequip and
+ * affect_total), and the record beside the pfile at every save */
+void cw_armor_affect(struct char_data *ch, struct obj_data *obj, int add);
+void cw_armor_save(const char *name, long idnum);
 
 #endif

@@ -56,16 +56,21 @@ build/size_fit_test: PhoenixMud/tests/size_fit_test.c build/size_fit.o | build
 build/cw_math_test: PhoenixMud/tests/cw_math_test.c build/cw_math.o | build
 	$(CC) $(CFLAGS) $^ -o $@ -lm
 
+# The class armor's arithmetic and tables (armor_math.c)
+build/armor_math_test: PhoenixMud/tests/armor_math_test.c build/armor_math.o build/hero_state.o | build
+	$(CC) $(CFLAGS) $^ -o $@ -lm
+
 # A word naming a help entry exactly (help_match.c)
 build/help_match_test: PhoenixMud/tests/help_match_test.c build/help_match.o | build
 	$(CC) $(CFLAGS) $^ -o $@
 
-test: build/obj_instance_test build/hero_state_test build/repair_life_test build/size_fit_test build/help_match_test build/cw_math_test
+test: build/obj_instance_test build/hero_state_test build/repair_life_test build/size_fit_test build/help_match_test build/cw_math_test build/armor_math_test
 	./build/obj_instance_test
 	./build/hero_state_test
 	./build/repair_life_test
 	./build/size_fit_test
 	./build/help_match_test
 	./build/cw_math_test
+	./build/armor_math_test
 
 .PHONY: test clean
