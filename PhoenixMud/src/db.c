@@ -305,6 +305,7 @@ ACMD(do_reboot)
          }
       top_of_helpt = 0;
       index_boot(DB_BOOT_HLP);
+      cw_help_boot();   /* the class weapon's own entries, while its switch is on */
       }
    else
       {

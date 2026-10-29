@@ -304,6 +304,10 @@ struct help_index_element {
    int  file_order;    /* position in the help file; hedit saves in this order */
 };
 
+/* the file_order of a help entry the code adds (the class weapon's, while
+ * its switch is on): hedit never writes one to the help file */
+#define HELP_CODE_ORDER 1000000
+
 struct dg_quest
 {
   char *quest_name;
