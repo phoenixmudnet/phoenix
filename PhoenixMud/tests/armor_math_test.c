@@ -177,6 +177,11 @@ int main(void)
    CHECK(k.n == CLASS_KILLS_SIZE && class_kills_repeat(&k, 3060) == 1.0);   /* pushed off */
    }
 
+   /* the armor's class bonus by level: none at 50, half at 75, whole at 100 */
+   CHECK(armor_level_scale(1) == 0 && armor_level_scale(50) == 0);
+   CHECK(fabs(armor_level_scale(75) - 0.5) < 1e-12);
+   CHECK(armor_level_scale(100) == 1 && armor_level_scale(127) == 1);
+
    printf("armor_math_test: %d checks, %d failures\n", checks, failures);
    return failures ? 1 : 0;
    }

@@ -542,6 +542,9 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "\r\n"
      "  - Each piece carries part of your class bonus (help TEMPER): the body\r\n"
      "    the most, head and legs less, feet, hands and arms the least.\r\n"
+     "  - Below level one hundred a piece's class bonus is smaller: none at\r\n"
+     "    level fifty or below, more each level after, whole at one hundred.\r\n"
+     "    Its armor and stats are whole at every level.\r\n"
      "  - Pieces drop from the mobs you kill, earned as the class weapon's growth\r\n"
      "    is: hits, attack spells, and heals in a fight on you or your group.\r\n"
      "    No class weapon or remort is needed.\r\n"
@@ -572,15 +575,21 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "\r\n"
      "  - Armor essences drop on the same kills as the pieces, more often. They\r\n"
      "    are bound to you and held as one item. They are not weapon essences.\r\n"
-     "  - Each piece has a pool of stats, set by its slot. Any class may take\r\n"
-     "    any stat in the pool.\r\n"
-     "  - Each piece has a limit. Heavier pieces hold more. No stat takes more\r\n"
-     "    than half a piece. Strength costs double and goes on once a piece.\r\n"
-     "  - Every piece may also take hitroll and damroll, up to half a piece\r\n"
-     "    together.\r\n"
-     "  - Past the limit a piece takes a few more points. Each costs more than\r\n"
-     "    the last and has an increasing chance to break. A break loses that\r\n"
-     "    point and its essences.\r\n"
+     "  - Each piece has a pool of stats, set by its slot, and every piece may\r\n"
+     "    also take hitroll and damroll. Any class may take any stat in the pool.\r\n"
+     "  - Each piece holds a set number of points: the body six, the head and\r\n"
+     "    the legs four, the feet, the hands and the arms two.\r\n"
+     "  - Each stat has a cap on each piece: three on the body, two on the head\r\n"
+     "    or the legs, one on the feet, the hands or the arms. Hitroll and\r\n"
+     "    damroll share one cap.\r\n"
+     "  - A point is ten hit points or ten mana; one dexterity, hitroll or\r\n"
+     "    damroll; one off a save; or three off armor class. Strength costs two\r\n"
+     "    points and goes on once, on the body or the legs.\r\n"
+     "  - Once a piece is full, a few more points can go on: three on the body,\r\n"
+     "    two on the head or the legs, one on the feet, the hands or the arms.\r\n"
+     "    These may go to any stat in its pool, a capped one included, but not\r\n"
+     "    strength. Each costs more than the last and has an increasing chance\r\n"
+     "    to break. A break loses that point and its essences.\r\n"
      "\r\n"
      "Stats: hp, mana, strength, dexterity, hitroll, damroll, save spell,\r\n"
      "save breath, armor.\r\n"
@@ -1013,7 +1022,8 @@ static int cw_set_count(struct char_data *ch)
    return n + (cw_in_hand(ch) ? 1 : 0);
    }
 
-/* the armor's part of the class bonus of `kind`, on top of the weapon's */
+/* the armor's part of the class bonus of `kind`, on top of the weapon's,
+ * scaled by the wearer's level (armor_level_scale) */
 static double cw_armor_layer(struct char_data *ch, struct obj_data *weapon, int kind)
    {
    double fraction = 0;
@@ -1025,6 +1035,7 @@ static double cw_armor_layer(struct char_data *ch, struct obj_data *weapon, int 
    for (s = 0; s < ARMOR_NUM_SLOTS; s++)
       if (cw_armor_worn(ch, s))
          fraction += armor_slot_fraction(s);
+   fraction *= armor_level_scale(GET_LEVEL(ch));
    if (fraction <= 0)
       return 1.0;
    return armor_factor(kind == KIND_IN, cw_raise[cls].s,

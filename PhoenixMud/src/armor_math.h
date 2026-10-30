@@ -111,6 +111,11 @@ int    armor_essences_for(double work, double r);
 double armor_slot_fraction(int slot);
 double armor_factor(int in_kind, double s, double weapon_share, double fraction);
 double armor_set_focus_mult(int count);
+/* how much of the armor's class bonus a character of level gets: none at
+ * ARMOR_BONUS_FROM_LEVEL or below, whole at ARMOR_BONUS_FULL_LEVEL */
+#define ARMOR_BONUS_FROM_LEVEL 50
+#define ARMOR_BONUS_FULL_LEVEL 100
+double armor_level_scale(int level);
 
 /* attunement */
 const char *armor_stat_label(int stat);
