@@ -135,6 +135,17 @@ void class_kills_note(struct class_kills *k, long vnum)
    k->count[0] = count < 255 ? count + 1 : 255;
    }
 
+/* the armor's class bonus by the wearer's level: the gap was measured in a
+ * level-100 duel, so a first life or a remort climbing back gets none of it
+ * at 50 or below and more each level to the whole at 100; the pieces' armor,
+ * base hitroll and damroll and attuned stats are whole at every level */
+double armor_level_scale(int level)
+   {
+   double x = (double)(level - ARMOR_BONUS_FROM_LEVEL) / (ARMOR_BONUS_FULL_LEVEL - ARMOR_BONUS_FROM_LEVEL);
+
+   return x < 0 ? 0 : x > 1 ? 1 : x;
+   }
+
 /* the next piece among those not had: the lighter, the likelier (1/parts) */
 int armor_pick_next(int got, double r)
    {
@@ -322,7 +333,8 @@ int armor_over_limit(int slot)
    return ATTUNE_OVER_PER_PART * armor_slot_parts(slot);
    }
 
-/* the most units of a stat within the limit: half the piece, strength one */
+/* a stat's cap on a piece within the limit: half its points (body 3, head
+ * and legs 2, the rest 1), strength one */
 int armor_max_units(int stat, int slot)
    {
    int m = armor_limit(slot) / 2 / armor_stat_points(stat);
@@ -332,7 +344,7 @@ int armor_max_units(int stat, int slot)
    return m;
    }
 
-/* a piece's pool: its slot's stats that fit in half of it, then hitroll and
+/* a piece's pool: its slot's stats that fit under its cap, then hitroll and
  * damroll; returns how many */
 int armor_pool(int slot, int out[ARMOR_NUM_STATS])
    {
@@ -457,8 +469,8 @@ void armor_unattune_terms(const struct obj_armor_data *a, int stat, int *essence
    }
 
 /* as room opens under the limit, the oldest points past it come within,
- * each only if it could have gone on within the limit (no stat past half
- * the piece, hitroll and damroll half together): moved any other way, an
+ * each only if it could have gone on within the limit (no stat past its
+ * cap on the piece, hitroll and damroll one cap): moved any other way, an
  * unattune would launder points past the limit over the caps and start
  * their price and break chance again */
 void armor_settle_over(struct obj_armor_data *a, int slot)
