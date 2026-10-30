@@ -21,6 +21,8 @@
 
 extern struct descriptor_data *descriptor_list;
 extern struct char_data *character_list;
+extern struct player_index_element *player_table;
+long get_ptable_by_name(char *name);
 void save_char_ascii(struct char_file_u *ch);
 
 struct account_data *account_list = NULL;
@@ -882,6 +884,16 @@ void account_money_load(struct char_file_u *f)
  * first; coins it lost went to this character, so the holder's does. A
  * crash between the two writes then loses the transfer instead of minting
  * it. A live holder writes the balance at its own save. */
+/* The holder's player index entry carries the bank its record was just
+ * written with; the next write_player_index_file saves it. */
+static void acct_index_bank(char *holder, long bank)
+{
+   long i = get_ptable_by_name(holder);
+
+   if (i >= 0)
+      player_table[i].bank_gold[0] = bank;
+}
+
 static void acct_push(struct account_data *acct, char *holder,
                       struct char_file_u *st, long bank)
 {
@@ -903,9 +915,11 @@ static void acct_push(struct account_data *acct, char *holder,
       save_char_ascii(st);
       h.points.bank_gold[0] = bank;
       save_char_ascii(&h);
+      acct_index_bank(holder, bank);
    } else if (bank < h.points.bank_gold[0]) {
       h.points.bank_gold[0] = bank;
       save_char_ascii(&h);
+      acct_index_bank(holder, bank);
       save_char_ascii(st);
    } else
       save_char_ascii(st);

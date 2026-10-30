@@ -3958,9 +3958,12 @@ void save_char_no_logon(struct char_data* ch, room_rnum load_room) {
       for(k=0;k<5;k++)
          player_table[table_pos].gold[k]
          = ch->points.gold[k];
+      /* The bank the record was saved with: ch's own field is stale for
+       * a character spending its account's balance (GET_BANK_GOLD reads
+       * the account), and account_save_record leaves a member's record 0. */
       for(k=0;k<32;k++)
          player_table[table_pos].bank_gold[k]
-         = ch->points.bank_gold[k];
+         = st.points.bank_gold[k];
       }
    write_player_index_file();
 
@@ -4012,9 +4015,12 @@ void save_char(struct char_data * ch, room_rnum load_room)
       for(k=0;k<5;k++)
          player_table[table_pos].gold[k]
          = ch->points.gold[k];
+      /* The bank the record was saved with: ch's own field is stale for
+       * a character spending its account's balance (GET_BANK_GOLD reads
+       * the account), and account_save_record leaves a member's record 0. */
       for(k=0;k<32;k++)
          player_table[table_pos].bank_gold[k]
-         = ch->points.bank_gold[k];
+         = st.points.bank_gold[k];
       }
    write_player_index_file();
 
