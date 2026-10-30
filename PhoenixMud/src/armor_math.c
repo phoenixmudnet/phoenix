@@ -87,6 +87,54 @@ void armor_state_fresh(struct class_armor_state *st, int cls)
    st->next = -1;
    }
 
+/* the repeat part of what the next kill of vnum pays: in full for a type's
+ * first two kills, then KILL_UNDER_MF (fight.c), 3% less a kill, to a floor
+ * of one in ten thousand; a type pushed off by 64 others pays in full again */
+double class_kills_repeat(const struct class_kills *k, long vnum)
+   {
+   int i, n = 0, pct;
+
+   for (i = 0; i < k->n; i++)
+      if (k->vnum[i] == vnum)
+         {
+         n = k->count[i];
+         break;
+         }
+   if (n <= 1)
+      return 1.0;
+   if (n > 101)
+      n = 101;
+   pct = (int)((float)((float)(101 - (n * 3 > 101 ? 101 : n * 3)) / (float)100.0) * (float)10000);
+   return (pct < 1 ? 1 : pct) / 10000.0;
+   }
+
+/* a kill of vnum goes on the buffer: to the front, counted; a new type
+ * pushes the oldest off */
+void class_kills_note(struct class_kills *k, long vnum)
+   {
+   int i, at = -1, count = 0;
+
+   for (i = 0; i < k->n; i++)
+      if (k->vnum[i] == vnum)
+         {
+         at = i;
+         break;
+         }
+   if (at >= 0)
+      count = k->count[at];
+   else if (k->n < CLASS_KILLS_SIZE)
+      at = k->n++;
+   else
+      at = CLASS_KILLS_SIZE - 1;
+   for (i = at; i > 0; i--)
+      {
+      k->vnum[i] = k->vnum[i - 1];
+      k->count[i] = k->count[i - 1];
+      }
+   k->vnum[0] = vnum;
+   k->count[0] = count < 255 ? count + 1 : 255;
+   }
+
 /* the next piece among those not had: the lighter, the likelier (1/parts) */
 int armor_pick_next(int got, double r)
    {

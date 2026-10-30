@@ -145,6 +145,38 @@ int main(void)
    CHECK(armor_stat_parse("dam") == ARMOR_STAT_DAMROLL && armor_stat_parse("ac") == ARMOR_STAT_ARMOR);
    CHECK(armor_stat_parse("wisdom") == -1);
 
+   /* the class kill buffer: every mob goes on it at its first kill, and pays
+    * at the experience buffer's taper; nothing clears a type but 64 others */
+   {
+   struct class_kills k;
+   int i;
+
+   memset(&k, 0, sizeof(k));
+   CHECK(class_kills_repeat(&k, 3060) == 1.0);
+   class_kills_note(&k, 3060);
+   CHECK(class_kills_repeat(&k, 3060) == 1.0);          /* the second kill pays in full */
+   class_kills_note(&k, 3060);
+   CHECK(fabs(class_kills_repeat(&k, 3060) - 0.95) < 0.0002);
+   class_kills_note(&k, 3060);
+   CHECK(fabs(class_kills_repeat(&k, 3060) - 0.92) < 0.0002);
+   for (i = 0; i < 40; i++)
+      class_kills_note(&k, 3060);
+   CHECK(fabs(class_kills_repeat(&k, 3060) - 0.0001) < 1e-9);   /* KILL_UNDER_MF's floor of one */
+   CHECK(k.n == 1 && k.vnum[0] == 3060 && k.count[0] == 43);
+   for (i = 0; i < 300; i++)
+      class_kills_note(&k, 3060);
+   CHECK(k.count[0] == 255);
+   for (i = 0; i < CLASS_KILLS_SIZE - 1; i++)
+      class_kills_note(&k, 10000 + i);
+   CHECK(k.n == CLASS_KILLS_SIZE && k.vnum[CLASS_KILLS_SIZE - 1] == 3060);
+   CHECK(class_kills_repeat(&k, 3060) < 1.0);           /* 63 others: still on it */
+   class_kills_note(&k, 3060);
+   CHECK(k.vnum[0] == 3060 && k.vnum[1] == 10000 + CLASS_KILLS_SIZE - 2);   /* back to the front */
+   for (i = 0; i < CLASS_KILLS_SIZE; i++)
+      class_kills_note(&k, 20000 + i);
+   CHECK(k.n == CLASS_KILLS_SIZE && class_kills_repeat(&k, 3060) == 1.0);   /* pushed off */
+   }
+
    printf("armor_math_test: %d checks, %d failures\n", checks, failures);
    return failures ? 1 : 0;
    }
