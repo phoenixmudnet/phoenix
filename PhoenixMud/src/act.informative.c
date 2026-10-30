@@ -3982,6 +3982,24 @@ void perform_graffiti_where(struct char_data *ch)
 	release_buffer(buf2);
 }
 
+/* The first character in ch's zone that `match` finds by `arg`. */
+static struct char_data *mortal_where_find(struct char_data *ch, char *arg,
+		int (*match)(const char *, const char *))
+{
+	struct char_data *i;
+
+	for (i = character_list; i; i = i->next) {
+		if (i->in_room == NOWHERE || i == ch)
+			continue;
+		if (!CAN_SEE(ch, i)
+		    || world[i->in_room].zone != world[ch->in_room].zone)
+			continue;
+		if (match(arg, i->player.name))
+			return i;
+	}
+	return NULL;
+}
+
 void perform_mortal_where(struct char_data *ch, char *arg)
 {
 	register struct char_data *i;
@@ -4006,26 +4024,23 @@ void perform_mortal_where(struct char_data *ch, char *arg)
 				     world[IN_ROOM(i)].name);
 		}
 	} else {		/* print only FIRST char, not all. */
-		for (i = character_list; i; i = i->next) {
-			if (i->in_room == NOWHERE || i == ch)
-				continue;
-			if (!CAN_SEE(ch, i)
-			    || world[i->in_room].zone !=
-			    world[ch->in_room].zone)
-				continue;
-			if (!isname(arg, i->player.name))
-				continue;
+		char *first = get_buffer(MAX_INPUT_LENGTH);
 
+		/* Every word must match, as with locate object; when the
+		   phrase finds no one, its first word alone is searched. */
+		one_argument(arg, first);
+		if (!(i = mortal_where_find(ch, arg, isname_all))
+		    && strcmp(first, arg))
+			i = mortal_where_find(ch, first, isname);
+		if (i) {
 			send_to_char(ch, "%-25s - %s\r\n", GET_NAME(i),
 				     world[IN_ROOM(i)].name);
-			return;
-		}
-
-		if (starts_with("graffiti", arg)) {
+		} else if (starts_with("graffiti", first)) {
 			perform_graffiti_where(ch);
-			return;
+		} else {
+			send_to_char(ch, "No-one around by that name.\r\n");
 		}
-		send_to_char(ch, "No-one around by that name.\r\n");
+		release_buffer(first);
 	}
 }
 
@@ -4102,13 +4117,72 @@ void print_object_location(int num, struct obj_data *obj, struct char_data *ch,
 	}
 }
 
-void perform_immort_where(struct char_data *ch, char *arg)
+/* One search of perform_immort_where: the mobiles, then the objects,
+   that `match` finds by `arg`, written over buf. Whether any matched. */
+static int immort_where_pass(struct char_data *ch, char *arg, char *buf,
+		int (*match)(const char *, const char *))
 {
 	register struct char_data *i;
 	register struct obj_data *k;
-	struct descriptor_data *d;
 	int num = 0, found = 0;
+
+	strcpy(buf, "Mobiles\r\n-------\r\n");
+	for (i = character_list; i; i = i->next) {
+		if (CAN_SEE(ch, i) && IN_ROOM(i) != NOWHERE
+		    && match(arg, i->player.name)) {
+			found = 1;
+			sprintf(buf + strlen(buf),
+				"M%3d. %-25s - [%5ld] %s\r\n", ++num,
+				GET_NAME(i), GET_ROOM_VNUM(IN_ROOM(i)),
+				world[IN_ROOM(i)].name);
+		}
+		if (strlen(buf) > 32500) {
+			sprintf(buf + strlen(buf),
+				"Buffer limit exceeded, you need to refine your search\r\n");
+			break;
+		}
+	}
+	if (!found)
+		strcat(buf, " None\r\n");
+
+	if (strlen(buf) > 32500) {
+		sprintf(buf + strlen(buf),
+			"Buffer limit exceeded, you need to refine your search\r\n");
+	} else {
+		strcat(buf, "\r\nObjects\r\n-------\r\n");
+		for (num = 0, k = object_list; k; k = k->next)
+			if (CAN_SEE_OBJ(ch, k) && match(arg, k->name)
+			    && object_location_known(k)
+			    && (!k->carried_by
+				|| CAN_SEE(ch, k->carried_by))
+			    && !(item_owner(k) && !IS_NPC(item_owner(k))
+				 && (GET_INVIS_LEV(item_owner(k)) >
+				     GET_LEVEL(ch)))) {
+				found = 1;
+				print_object_location(++num, k, ch,
+						      TRUE, buf);
+				if (strlen(buf) > 32500) {
+					sprintf(buf + strlen(buf),
+						"Buffer limit exceeded, you need to refine your search\r\n");
+					break;
+				}
+			}
+		if (!found)
+			strcat(buf, " None\r\n");
+
+	}
+	return found;
+}
+
+void perform_immort_where(struct char_data *ch, char *arg)
+{
+	register struct char_data *i;
+	struct descriptor_data *d;
+	int found = 0;
 	char *buf = get_buffer(32750);
+	char *first = get_buffer(MAX_INPUT_LENGTH);
+
+	one_argument(arg, first);
 
 	if (!*arg) {
 		strcpy(buf, "Players\r\n-------\r\n");
@@ -4138,60 +4212,21 @@ void perform_immort_where(struct char_data *ch, char *arg)
 				}
 			}
 	} else {
-		strcpy(buf, "Mobiles\r\n-------\r\n");
-		for (i = character_list; i; i = i->next) {
-			if (CAN_SEE(ch, i) && IN_ROOM(i) != NOWHERE
-			    && isname(arg, i->player.name)) {
-				found = 1;
-				sprintf(buf + strlen(buf),
-					"M%3d. %-25s - [%5ld] %s\r\n", ++num,
-					GET_NAME(i), GET_ROOM_VNUM(IN_ROOM(i)),
-					world[IN_ROOM(i)].name);
-			}
-			if (strlen(buf) > 32500) {
-				sprintf(buf + strlen(buf),
-					"Buffer limit exceeded, you need to refine your search\r\n");
-				break;
-			}
-		}
-		if (!found)
-			strcat(buf, " None\r\n");
-
-		if (strlen(buf) > 32500) {
-			sprintf(buf + strlen(buf),
-				"Buffer limit exceeded, you need to refine your search\r\n");
-		} else {
-			strcat(buf, "\r\nObjects\r\n-------\r\n");
-			for (num = 0, k = object_list; k; k = k->next)
-				if (CAN_SEE_OBJ(ch, k) && isname(arg, k->name)
-				    && object_location_known(k)
-				    && (!k->carried_by
-					|| CAN_SEE(ch, k->carried_by))
-				    && !(item_owner(k) && !IS_NPC(item_owner(k))
-					 && (GET_INVIS_LEV(item_owner(k)) >
-					     GET_LEVEL(ch)))) {
-					found = 1;
-					print_object_location(++num, k, ch,
-							      TRUE, buf);
-					if (strlen(buf) > 32500) {
-						sprintf(buf + strlen(buf),
-							"Buffer limit exceeded, you need to refine your search\r\n");
-						break;
-					}
-				}
-			if (!found)
-				strcat(buf, " None\r\n");
-
-		}
+		/* Every word must match, as with locate object; when the
+		   phrase finds nothing, its first word alone is searched. */
+		found = immort_where_pass(ch, arg, buf, isname_all);
+		if (!found && strcmp(first, arg))
+			found = immort_where_pass(ch, first, buf, isname);
 	}
 
-	if (!found && arg && *arg && starts_with("graffiti", arg)) {
+	if (!found && arg && *arg && starts_with("graffiti", first)) {
 		perform_graffiti_where(ch);
 	} else {
 		if (ch->desc) {
 			page_string(ch->desc, buf, TRUE, "");
 		}
 	}
+	release_buffer(first);
 	release_buffer(buf);
 
 }
@@ -4201,7 +4236,22 @@ extern int port;
 ACMD(do_where)
 {
 	char *arg = get_buffer(MAX_INPUT_LENGTH);
-	one_argument(argument, arg);
+	char *word = get_buffer(MAX_INPUT_LENGTH);
+
+	/* Every word, fill words dropped as one_argument drops them, so a
+	   phrase like "warrior guildmaster" can single one out. */
+	*arg = '\0';
+	for (;;) {
+		argument = one_argument(argument, word);
+		if (!*word)
+			break;
+		if (strlen(arg) + strlen(word) + 2 > MAX_INPUT_LENGTH)
+			break;
+		if (*arg)
+			strcat(arg, " ");
+		strcat(arg, word);
+	}
+	release_buffer(word);
 
 	if (GET_LEVEL(ch) < LVL_IMMORT
 	    || (port == 9000 && GET_LEVEL(ch) < IMM_WHERE_LEVEL))
