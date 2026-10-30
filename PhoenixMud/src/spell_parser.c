@@ -2121,7 +2121,9 @@ ACMD(do_cast)
          to its first word below for the target ladder, but locate object
          matches every word of what was typed, so "white dragonscale vest"
          has to survive intact. Lowercased because one_argument used to do
-         it, and the Locate-Obj log line prints this verbatim. */
+         it, and the Locate-Obj log line prints this verbatim. The space
+         after the spell's closing quote is not part of it. */
+      skip_spaces(&t);
       strncpy(CAST_ARG(ch), t, 120);
       CAST_ARG(ch)[120]='\0';
       for (i = 0; CAST_ARG(ch)[i]; i++)
