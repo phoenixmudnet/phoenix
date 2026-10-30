@@ -160,7 +160,7 @@ static const char *cw_service_stems[] =
 static const long cw_crafters[] = { 27498, 27497, 27496, 27499, 0 };
 
 /* the class weapon commands, opened at boot when the switch is on */
-static const char *cw_commands[] = { "temper", "focus", "infuse", "shift", "refit", "claim", "attune", "unattune", NULL };
+static const char *cw_commands[] = { "temper", "focus", "infuse", "shift", "reshape", "refit", "claim", "attune", "unattune", NULL };
 /* the staff's, opened to immortals */
 static const char *cw_staff_commands[] = { "classweapon", "remortreward", NULL };
 
@@ -474,8 +474,9 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "not lent again. The class weapon is never no-rent.\r\n"
      "\r\n"
      "See also: SHIFT, REFIT, TEMPER, FOCUS\r\n" },
-   { "SHIFT",
+   { "SHIFT RESHAPE",
      "Usage: shift <form>   |   shift core   (class weapon carried)\r\n"
+     "       reshape <form> |   reshape core\r\n"
      "\r\n"
      "Your class weapon takes a form it has absorbed: that weapon's damage,\r\n"
      "damage type, weight, bonuses and spells, with your levels and class bonus\r\n"
@@ -483,6 +484,11 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "keeps its own name; identify shows the form it is in. `shift core` returns\r\n"
      "it to its own form, and a spent form returns it by itself. `shift` alone\r\n"
      "lists the forms it knows, their charge and the refits left.\r\n"
+     "\r\n"
+     "Reshape is the same command under another name. Some clients keep the\r\n"
+     "word shift for themselves: Mudlet's mapper answers \"(mapper): (error)\r\n"
+     "not mapping\" and the line never reaches the game. Type reshape, or\r\n"
+     "Shift with a capital S.\r\n"
      "\r\n"
      "See also: INFUSE, REFIT, TEMPER, FOCUS\r\n" },
    { "REFIT",

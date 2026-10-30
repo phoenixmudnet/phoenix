@@ -1264,6 +1264,7 @@ struct command_info cmd_info[] = {
 	{"unattune", POS_STANDING, do_unattune, LVL_IMPLII + 1, 0},
 	{"infuse", POS_STANDING, do_infuse, LVL_IMPLII + 1, 0},
 	{"shift", POS_RESTING, do_shift, LVL_IMPLII + 1, 0},
+	{"reshape", POS_RESTING, do_shift, LVL_IMPLII + 1, 0},
 	{"refit", POS_STANDING, do_refit, LVL_IMPLII + 1, 0},
 	{"claim", POS_RESTING, do_claim, LVL_IMPLII + 1, 0},
 	{"classweapon", POS_DEAD, do_classweapon, LVL_IMPLII + 1, 0},
