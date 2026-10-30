@@ -95,6 +95,9 @@ int class_weapons = FALSE;
 #define FOCUS_HOT_HP         12
 #define FOCUS_HOT_MANA       12
 #define FOCUS_HOT_TICKS      3
+/* a focus grows to this share of the constants above and no further: damage
+ * or healing at most x1.15 (x1.1875 with the set), the pools 7 a tick (9) */
+#define FOCUS_SHARE_CAP      0.6
 #define BLOWS_PER_WEAR       600
 #define INDESTRUCTIBLE_PTS   175
 #define INDESTRUCTIBLE_WEAR  2
@@ -518,6 +521,14 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "  tank   your hits heal you over time\r\n"
      "  cast   your hits give you mana over time\r\n"
      "\r\n"
+     "A focus grows as the weapon does, to a cap: at most fifteen percent more\r\n"
+     "damage or healing, or seven hit points or mana a tick; a little more with\r\n"
+     "three of your class set. The focus line shows how far it has grown.\r\n"
+     "\r\n"
+     "A focus does not work against another player: not on a blow, not on a\r\n"
+     "heal in a fight with one, and its hit points and mana wait until that\r\n"
+     "fight ends.\r\n"
+     "\r\n"
      "With five of your class set (help CLASS ARMOR), a second focus works beside\r\n"
      "the first and grows with it. It is chosen and changed as the first is.\r\n"
      "\r\n"
@@ -732,13 +743,28 @@ static long cw_points(struct obj_data *obj)
    return obj->attune ? (long)cw_floor(obj->attune->points) + obj->attune->hits : 0;
    }
 
-/* the share of the full focus the one in use has reached: its own points,
- * on the weapon's level curve; 0 with none chosen */
+/* the share of the full focus a focus has reached: its own points, on the
+ * weapon's level curve, to FOCUS_SHARE_CAP; 0 with none chosen */
+static double cw_focus_share_of(struct hero_data *h, int f)
+   {
+   double v;
+
+   if (f <= HERO_FOCUS_NONE || f >= HERO_NUM_FOCUS)
+      return 0;
+   v = cw_share(cw_level_for(h->focus_points[f]));
+   return v < FOCUS_SHARE_CAP ? v : FOCUS_SHARE_CAP;   /* not MIN(): it is int */
+   }
+
 static double cw_focus_share(struct hero_data *h)
    {
-   if (h->focus <= HERO_FOCUS_NONE || h->focus >= HERO_NUM_FOCUS)
-      return 0;
-   return cw_share(cw_level_for(h->focus_points[h->focus]));
+   return cw_focus_share_of(h, h->focus);
+   }
+
+/* a real player: the focus works in no fight with one (there are no arena
+ * reflections in C; an NPC is never one) */
+static int cw_pvp(struct char_data *ch)
+   {
+   return ch && !IS_NPC(ch);
    }
 
 /* how much a growth point counts at the owner's remort tier (1 at a single
@@ -1057,7 +1083,7 @@ static double cw_focus_output(struct char_data *ch, struct hero_data *h, int f)
    {
    if (!cw_focus_in_use(ch, h, f))
       return 0;
-   return cw_share(cw_level_for(h->focus_points[f])) * armor_set_focus_mult(cw_set_count(ch));
+   return cw_focus_share_of(h, f) * armor_set_focus_mult(cw_set_count(ch));
    }
 
 /* a hit, an attack spell or a counted heal: the armor's work, by the
@@ -2150,7 +2176,7 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam, struct
       return;
    /* a dps focus says what it added to the blow: the share it made of it, as
     * cw_damage_mod multiplied it in, while the weapon is in hand */
-   if (dam > 0 && cw_in_hand(ch) == obj && cw_focus_in_use(ch, obj->hero, HERO_FOCUS_DPS))
+   if (dam > 0 && cw_in_hand(ch) == obj && !cw_pvp(victim) && cw_focus_in_use(ch, obj->hero, HERO_FOCUS_DPS))
       {
       double f = FOCUS_DPS * cw_focus_output(ch, obj->hero, HERO_FOCUS_DPS);
       int added = (int)cw_floor(dam * f / (1.0 + f) + 0.5);
@@ -2160,7 +2186,8 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam, struct
       }
    /* a tank or cast focus: each blow refreshes the over-time pool (both,
     * with a second focus) */
-   if (cw_focus_in_use(ch, obj->hero, HERO_FOCUS_TANK) || cw_focus_in_use(ch, obj->hero, HERO_FOCUS_CAST))
+   if (!cw_pvp(victim) &&
+       (cw_focus_in_use(ch, obj->hero, HERO_FOCUS_TANK) || cw_focus_in_use(ch, obj->hero, HERO_FOCUS_CAST)))
       {
       struct cw_pool *p;
       int hp = cw_focus_in_use(ch, obj->hero, HERO_FOCUS_TANK)
@@ -2223,13 +2250,13 @@ void cw_focus_tick(void)
          {
          int before;
 
-         if (p->hp > 0 && GET_HIT(ch) < GET_MAX_HIT(ch))
+         if (p->hp > 0 && GET_HIT(ch) < GET_MAX_HIT(ch) && !cw_pvp(FIGHTING(ch)))
             {
             before = GET_HIT(ch);
             GET_HIT(ch) = MIN(GET_MAX_HIT(ch), GET_HIT(ch) + p->hp);
             send_to_char(ch, "&cYour focus mends you: +%d hit points.&n\r\n", GET_HIT(ch) - before);
             }
-         if (p->mana > 0 && GET_MANA(ch) < GET_MAX_MANA(ch))
+         if (p->mana > 0 && GET_MANA(ch) < GET_MAX_MANA(ch) && !cw_pvp(FIGHTING(ch)))
             {
             before = GET_MANA(ch);
             GET_MANA(ch) = MIN(GET_MAX_MANA(ch), GET_MANA(ch) + p->mana);
@@ -2350,7 +2377,8 @@ int cw_heal_mod(struct char_data *ch, struct char_data *victim, int amount)
    if (obj && cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_HEAL)
       a *= cw_mult(KIND_HEAL, s);
    a *= cw_armor_layer(ch, obj, KIND_HEAL);
-   if (obj && cw_focus_in_use(ch, obj->hero, HERO_FOCUS_HEAL))
+   if (obj && cw_focus_in_use(ch, obj->hero, HERO_FOCUS_HEAL) && !cw_pvp(FIGHTING(ch)) &&
+       !(victim && cw_pvp(FIGHTING(victim))))
       {
       int before = (int)cw_floor(a), added;
 
@@ -2376,7 +2404,8 @@ int cw_damage_mod(struct char_data *ch, struct char_data *victim, int dam,
       {
       if (cw_knob(obj->hero->cls, obj->hero->level, &kind, &s) && kind == KIND_OUT)
          mul *= cw_mult(KIND_OUT, s);
-      mul *= 1.0 + FOCUS_DPS * cw_focus_output(ch, obj->hero, HERO_FOCUS_DPS);
+      if (!cw_pvp(victim))
+         mul *= 1.0 + FOCUS_DPS * cw_focus_output(ch, obj->hero, HERO_FOCUS_DPS);
       }
    if (ch && !IS_NPC(ch))
       mul *= cw_armor_layer(ch, cw_in_hand(ch), KIND_OUT);
@@ -2911,18 +2940,18 @@ static void cw_focus_line(struct hero_data *h, char *out, double set_mult)
    for (f = HERO_FOCUS_DPS; f < HERO_NUM_FOCUS; f++)
       if (f != h->focus && f != h->focus2 && h->focus_points[f] > 0)
          sprintf(tail + strlen(tail), "%s%s %d%%", n++ ? ", " : " Kept: ", cw_focus_names[f],
-                 (int)cw_floor(cw_share(cw_level_for(h->focus_points[f])) * 100 + 0.5));
+                 (int)cw_floor(cw_focus_share_of(h, f) / FOCUS_SHARE_CAP * 100 + 0.5));
    if (n)
       strcat(tail, ".");
    if (h->focus > HERO_FOCUS_NONE && h->focus < HERO_NUM_FOCUS && h->focus2 > HERO_FOCUS_NONE &&
        h->focus2 < HERO_NUM_FOCUS)
       sprintf(out, "Its focus: it %s (%d%% of the full focus). Its second focus, while your class "
               "set counts %d: it %s (%d%%).%s", cw_focus_words[h->focus],
-              (int)cw_floor(cw_focus_share(h) * set_mult * 100 + 0.5), SET_SECOND_FOCUS_AT, cw_focus_words[h->focus2],
-              (int)cw_floor(cw_share(cw_level_for(h->focus_points[h->focus2])) * set_mult * 100 + 0.5), tail);
+              (int)cw_floor(cw_focus_share(h) / FOCUS_SHARE_CAP * set_mult * 100 + 0.5), SET_SECOND_FOCUS_AT, cw_focus_words[h->focus2],
+              (int)cw_floor(cw_focus_share_of(h, h->focus2) / FOCUS_SHARE_CAP * set_mult * 100 + 0.5), tail);
    else if (h->focus > HERO_FOCUS_NONE && h->focus < HERO_NUM_FOCUS)
       sprintf(out, "Its focus: it %s (%d%% of the full focus).%s", cw_focus_words[h->focus],
-              (int)cw_floor(cw_focus_share(h) * set_mult * 100 + 0.5), tail);
+              (int)cw_floor(cw_focus_share(h) / FOCUS_SHARE_CAP * set_mult * 100 + 0.5), tail);
    else
       sprintf(out, "No focus chosen yet: focus <dps|heal|tank|cast>.%s", tail);
    }
