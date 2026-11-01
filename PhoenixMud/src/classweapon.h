@@ -21,6 +21,7 @@ void cw_login(struct char_data *ch);
  * once a day old */
 void cw_end_sitting(struct char_data *ch, int at_login);
 void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam, struct char_data *victim);
+void cw_note_skill(struct char_data *ch, int attacktype, struct char_data *victim);
 void cw_mark_player_made(struct char_data *mob);
 void cw_mob_gone(struct char_data *mob);
 void cw_set_killer(struct char_data *killer);

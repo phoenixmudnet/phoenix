@@ -32,6 +32,7 @@
 #include "repair_life.h"
 #include "classweapon.h"
 #include "dg_scripts.h"
+#include "spells.h"
 
 extern struct obj_data *object_list;
 extern struct char_data *mob_proto;
@@ -423,8 +424,8 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "    you do not carry. junk asks first; junk <weapon> confirm then destroys\r\n"
      "    it for good.\r\n"
      "  - Passed the Hero test before it was handed out? Claim it (help CLAIM).\r\n"
-     "  - Gains levels as you fight with it in hand: hits, attack spells, and\r\n"
-     "    heals in a fight on you or your group. A spell counts once, however\r\n"
+     "  - Gains levels as you fight with it in hand: hits, skills, attack spells,\r\n"
+     "    and heals in a fight on you or your group. A spell counts once, however\r\n"
      "    many it reaches. What a fight earns is paid when its mob dies, by you\r\n"
      "    or your group. It counts less for a mob far below you, and each kill\r\n"
      "    of the same kind of mob counts less than the last, as its experience\r\n"
@@ -563,8 +564,8 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "    level fifty or below, more each level after, whole at one hundred.\r\n"
      "    Its armor and stats are whole at every level.\r\n"
      "  - Pieces drop from the mobs you kill, earned as the class weapon's growth\r\n"
-     "    is: hits, attack spells, and heals in a fight on you or your group.\r\n"
-     "    No class weapon or remort is needed.\r\n"
+     "    is: hits, skills, attack spells, and heals in a fight on you or your\r\n"
+     "    group. No class weapon or remort is needed.\r\n"
      "  - A mob far below you counts for less. Each kill of the same kind of mob\r\n"
      "    counts less than the last, as its experience does, until you have\r\n"
      "    killed sixty-four other kinds since. A mob summoned, lured out of its\r\n"
@@ -2234,6 +2235,41 @@ void cw_note_hit(struct char_data *ch, struct obj_data *wielded, int dam, struct
          }
       }
    if (earns)
+      cw_grow(ch, obj, POINTS_PER_HIT);
+   }
+
+/* the skills that go to damage() without passing through hit() */
+static int cw_skill_earns(int attacktype)
+   {
+   switch (attacktype)
+      {
+      case SKILL_BASH:
+      case SKILL_KICK:
+      case SKILL_TRIP:
+      case SKILL_SWEEP:
+      case SKILL_QUIVERING_PALM:
+      case SKILL_STOMP:
+      case SKILL_HEADBUTT:
+      case SKILL_STUN:
+      case SKILL_GORE:
+         return 1;
+      default:
+         return 0;
+      }
+   }
+
+/* A skill that lands earns as a blow does: it marks the fight and grows the
+ * weapon in hand and the armor. It works no focus and spends no form's charge,
+ * which stay with blows. */
+void cw_note_skill(struct char_data *ch, int attacktype, struct char_data *victim)
+   {
+   struct obj_data *obj;
+
+   if (!class_weapons || IS_NPC(ch) || !cw_skill_earns(attacktype) || !cw_work_counts(victim))
+      return;
+   cw_earned_on(ch, victim);
+   cw_armor_grow(ch, POINTS_PER_HIT);
+   if ((obj = cw_in_hand(ch)) != NULL)
       cw_grow(ch, obj, POINTS_PER_HIT);
    }
 
