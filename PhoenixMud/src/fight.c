@@ -2954,6 +2954,10 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
    /*    log("%-20.20s did %5d dam to %s",GET_NAME(ch),dam,GET_NAME(victim)); */
    GET_HIT(victim) -= dam;
 
+   /* a skill that lands earns before a killing one pays */
+   if (dam > 0)
+      cw_note_skill(ch, attacktype, victim);
+
    /* APPLIED amount, after the clamp above. Zero is a miss. */
    gmcp_combat_event(ch, victim, dam > 0 ? "dam" : "miss", dam,
                      attacktype == TYPE_HIT ? "melee" : "skill");
