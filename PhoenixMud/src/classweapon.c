@@ -4,8 +4,8 @@
 *                                                                      *
 *  A first Hero is handed the class's weapon, bound. It grows by what  *
 *  its owner does with it in hand: a melee hit, an attack spell, a     *
-*  heal on someone hurt, under a cap each MUD hour, scaled by the      *
-*  remort tier as the exp tables are. Level n needs 200 x n^1.5 growth *
+*  heal on someone hurt, under a cap each MUD hour. Level n needs      *
+*  200 x n^1.5 growth                                                  *
 *  points; each level buys share 1 - 0.92^n of the class bonus. A new  *
 *  level may be LOCKED (a roll, at most a few in a hundred levels): it *
 *  names a boss of the world, whose essence opens it. The owner kills  *
@@ -84,9 +84,9 @@ int class_weapons = FALSE;
  * 12.5 a MUD hour of 75 seconds); it was 100, eight times that */
 #define POINTS_PER_MUD_HOUR  25
 /* growth is banked and paid at a kill credited to the owner; a bank holds at
- * most two MUD hours' cap, so a fled fight carries over and hours of farming
- * beside something that never dies do not */
-#define BANK_MAX             (2 * POINTS_PER_MUD_HOUR)
+ * most eight MUD hours' cap, so a ten-minute fight is paid for its ten minutes
+ * and hours of farming beside something that never dies are not */
+#define BANK_MAX             (8 * POINTS_PER_MUD_HOUR)
 #define LEVEL_COST_A         200.0
 #define SHARE_R              0.08
 #define HERO_WEAPON_BONUS    0.33
@@ -429,9 +429,9 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "    many it reaches. What a fight earns is paid when its mob dies, by you\r\n"
      "    or your group. It counts less for a mob far below you, and each kill\r\n"
      "    of the same kind of mob counts less than the last, as its experience\r\n"
-     "    does, until you have killed sixty-four other kinds since. A fight you\r\n"
-     "    leave keeps its points for your next kill; identify shows what is\r\n"
-     "    waiting.\r\n"
+     "    does, until you have killed sixty-four other kinds since. A mob summoned\r\n"
+     "    or lured out of its own zone pays nothing. A fight you leave keeps its\r\n"
+     "    points for your next kill; identify shows what is waiting.\r\n"
      "  - Each level raises your CLASS BONUS while you wield it:\r\n"
      "      Clerics, Druids, Paladins and Monks heal more\r\n"
      "      Thieves, Magic-Users and Necromancers take less damage\r\n"
@@ -772,19 +772,6 @@ static double cw_focus_share(struct hero_data *h)
 static int cw_pvp(struct char_data *ch)
    {
    return ch && !IS_NPC(ch);
-   }
-
-/* how much a growth point counts at the owner's remort tier (1 at a single
- * remort): the exp tables' own ratio for levels 101 and 102 */
-static double cw_tier(struct char_data *ch)
-   {
-   double mine, single;
-
-   mine = (double)GET_EXP_FOR_LEVEL(GET_RACE(ch), GET_CLASS(ch), 101, REMORT_LEVEL(ch))
-        + (double)GET_EXP_FOR_LEVEL(GET_RACE(ch), GET_CLASS(ch), 102, REMORT_LEVEL(ch));
-   single = (double)GET_EXP_FOR_LEVEL(GET_RACE(ch), GET_CLASS(ch), 101, 1)
-          + (double)GET_EXP_FOR_LEVEL(GET_RACE(ch), GET_CLASS(ch), 102, 1);
-   return mine > 0 && single > 0 ? single / mine : 1.0;
    }
 
 /* ---------------------------------------------------------------- the copy */
@@ -1337,12 +1324,21 @@ static void cw_armor_drop(struct char_data *ch, struct char_data *victim, struct
    send_to_char(ch, "&Y*****************************************************************&n\r\n");
    }
 
-/* the drop: a kill's work, paid in the zone that loaded the mob, not on a
- * charmed one; essences straight to the finder, a piece loaded on the mob */
+/* the mob died in the zone that loaded it: one summoned or lured to a killing
+ * room is not hunting, and pays neither the weapon nor the armor */
+static int cw_died_at_home(struct char_data *victim)
+   {
+   room_rnum home = real_room(GET_MOB_VAL(victim, 0));
+
+   return IN_ROOM(victim) != NOWHERE && home != NOWHERE
+          && world[home].zone == world[IN_ROOM(victim)].zone;
+   }
+
+/* the drop: a kill's work; essences straight to the finder, a piece loaded on
+ * the mob */
 static void cw_armor_pay(struct char_data *ch, struct char_data *victim, double factor)
    {
    struct class_armor_state *st;
-   room_rnum home;
    double work;
    int n, slot;
 
@@ -1350,11 +1346,6 @@ static void cw_armor_pay(struct char_data *ch, struct char_data *victim, double 
       return;
    st = cw_armor_state(ch);
    if (st->bank <= 0)
-      return;
-   /* a mob that dies outside the zone that loaded it pays nothing, and the
-    * bank waits */
-   home = real_room(GET_MOB_VAL(victim, 0));
-   if (IN_ROOM(victim) == NOWHERE || home == NOWHERE || world[home].zone != world[IN_ROOM(victim)].zone)
       return;
    work = st->bank * factor;
    st->bank = 0;
@@ -1974,7 +1965,7 @@ static double cw_kill_factor(struct char_data *ch, struct char_data *victim)
    return level * class_kills_repeat(&cw_armor_rec_of(GET_IDNUM(ch), TRUE)->kills, GET_MOB_VNUM(victim));
    }
 
-/* banked growth paid in: points and the focus in use, scaled by tier */
+/* banked growth paid in: points and the focus in use */
 static void cw_pay(struct char_data *ch, struct obj_data *obj, double base)
    {
    struct obj_attune_data *a = obj->attune;
@@ -1982,11 +1973,11 @@ static void cw_pay(struct char_data *ch, struct obj_data *obj, double base)
    int r;
    char line[256];
 
-   a->points += base * cw_tier(ch);
+   a->points += base;
    if (h->focus != HERO_FOCUS_NONE)
-      h->focus_points[h->focus] += base * cw_tier(ch);
+      h->focus_points[h->focus] += base;
    if (h->focus2 != HERO_FOCUS_NONE && h->focus2 != h->focus && cw_focus_in_use(ch, h, h->focus2))
-      h->focus_points[h->focus2] += base * cw_tier(ch);
+      h->focus_points[h->focus2] += base;
    if (h->waiting != HERO_NOT_LOCKED)
       cw_ensure_boss(ch, h);
    r = cw_settle(ch, obj);
@@ -2136,7 +2127,7 @@ void cw_pay_kill(struct char_data *ch, struct char_data *victim)
     * it does not pay waits for the next kill that does */
    if (cw_killer_npc || !cw_work_counts(victim) || !cw_has_earned(ch, victim))
       return;
-   factor = cw_kill_factor(ch, victim);
+   factor = cw_died_at_home(victim) ? cw_kill_factor(ch, victim) : 0;
    class_kills_note(&cw_armor_rec_of(GET_IDNUM(ch), TRUE)->kills, GET_MOB_VNUM(victim));
    for (i = 0; i < NUM_WEARS; i++)
       if (GET_EQ(ch, i))
@@ -3534,8 +3525,8 @@ ACMD(do_classweapon)
    if (!*a1)
       {
       send_to_char(ch, "&cThe class weapons (a Hero's, bound; grows by hits (%d), attack spells "
-                   "(%d) and heals (%d) at %d mana or more, in hand, at most %d a MUD hour, scaled "
-                   "by remort tier; a lock %d%% a level, %d in a hundred; the essence comes from a "
+                   "(%d) and heals (%d) at %d mana or more, in hand, at most %d a MUD hour; "
+                   "a lock %d%% a level, %d in a hundred; the essence comes from a "
                    "locked weapon's boss, slain):&n\r\n", POINTS_PER_HIT, POINTS_PER_CAST,
                    POINTS_PER_HEAL, CAST_MANA_FULL, POINTS_PER_MUD_HOUR,
                    (int)cw_floor(cw_chance * 100 + 0.5), cw_max_per_100);
@@ -3732,9 +3723,7 @@ void cw_identify_lines(struct obj_data *obj, char *buf)
       }
    if (obj->attune && obj->attune->banked > 0)
       {
-      struct char_data *owner = obj->carried_by ? obj->carried_by : obj->worn_by;
-      double tier = (owner && !IS_NPC(owner) && GET_IDNUM(owner) == obj->bound_idnum) ? cw_tier(owner) : 1.0;
-      cw_commas(a, (long)(obj->attune->banked * tier + 0.5));
+      cw_commas(a, (long)(obj->attune->banked + 0.5));
       sprintf(buf + strlen(buf), "Waiting for your next kill: %s points.\r\n", a);
       }
    {
