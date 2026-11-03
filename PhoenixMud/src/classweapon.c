@@ -427,10 +427,10 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "  - Gains levels as you fight with it in hand: hits, skills, attack spells,\r\n"
      "    and heals in a fight on you or your group. A spell counts once, however\r\n"
      "    many it reaches. What a fight earns is paid when its mob dies, by you\r\n"
-     "    or your group. It counts less for a mob far below you, and each kill\r\n"
-     "    of the same kind of mob counts less than the last, as its experience\r\n"
-     "    does, until you have killed sixty-four other kinds since. A mob summoned\r\n"
-     "    or lured out of its own zone pays nothing. A fight you leave keeps its\r\n"
+     "    or your group. It counts less for a mob far below you. Each kill of the\r\n"
+     "    same kind of mob counts less than the last, by the count your experience\r\n"
+     "    keeps. A mob too far below you for that count pays nothing, as does a\r\n"
+     "    mob summoned or lured out of its own zone. A fight you leave keeps its\r\n"
      "    points for your next kill; identify shows what is waiting.\r\n"
      "  - Each level raises your CLASS BONUS while you wield it:\r\n"
      "      Clerics, Druids, Paladins and Monks heal more\r\n"
@@ -567,9 +567,9 @@ static const struct { const char *keywords; const char *entry; } cw_help[] =
      "    is: hits, skills, attack spells, and heals in a fight on you or your\r\n"
      "    group. No class weapon or remort is needed.\r\n"
      "  - A mob far below you counts for less. Each kill of the same kind of mob\r\n"
-     "    counts less than the last, as its experience does, until you have\r\n"
-     "    killed sixty-four other kinds since. A mob summoned, lured out of its\r\n"
-     "    own zone, charmed, or made by a player counts for nothing.\r\n"
+     "    counts less than the last, by the count your experience keeps. A mob\r\n"
+     "    too far below you for that count counts for nothing, as does a mob\r\n"
+     "    summoned, lured out of its own zone, charmed, or made by a player.\r\n"
      "  - A piece drops into the mob's corpse, bound to you. The lighter pieces\r\n"
      "    come sooner; the body is the rarest. A piece lost before you take it\r\n"
      "    (the corpse decayed, the floor took it) drops again at a later kill.\r\n"
@@ -888,7 +888,7 @@ static const char *cw_cap(const char *name)
    return b;
    }
 
-struct cw_armor_rec { long idnum; struct class_armor_state st; struct class_kills kills; struct cw_armor_rec *next; };
+struct cw_armor_rec { long idnum; struct class_armor_state st; struct cw_armor_rec *next; };
 static struct cw_armor_rec *cw_armor_recs = NULL;
 
 static double cw_rand01(void)
@@ -951,8 +951,6 @@ static void cw_armor_load(struct char_data *ch)
               &st.mark, &st.bank, &st.hour, &st.hour_points, &st.pending, &st.owed) >= 5)
       {
       struct cw_armor_rec *r = cw_armor_rec_of(GET_IDNUM(ch), TRUE);
-      long vnum;
-      int n = 0, count, i;
 
       st.got &= (1 << ARMOR_NUM_SLOTS) - 1;
       st.pending &= (1 << ARMOR_NUM_SLOTS) - 1;
@@ -960,17 +958,6 @@ static void cw_armor_load(struct char_data *ch)
       if (st.next < -1 || st.next >= ARMOR_NUM_SLOTS)
          st.next = -1;
       r->st = st;
-      /* the kill buffer, most recent first */
-      if (fscanf(fp, " K %d", &n) == 1)
-         for (i = 0; i < n && r->kills.n < CLASS_KILLS_SIZE; i++)
-            {
-            if (fscanf(fp, " %ld %d", &vnum, &count) != 2)
-               break;
-            if (count <= 0)
-               continue;
-            r->kills.vnum[r->kills.n] = vnum;
-            r->kills.count[r->kills.n++] = MIN(count, 255);
-            }
       }
    fclose(fp);
    }
@@ -991,15 +978,6 @@ void cw_armor_save(const char *name, long idnum)
    fprintf(fp, "%d %d %.4f %d %ld %.4f %ld %ld %d %d\n", r->st.cls, r->st.got, r->st.work,
            r->st.next, r->st.mark, r->st.bank, r->st.hour, r->st.hour_points,
            r->st.pending, r->st.owed);
-   if (r->kills.n > 0)
-      {
-      int i;
-
-      fprintf(fp, "K %d", r->kills.n);
-      for (i = 0; i < r->kills.n; i++)
-         fprintf(fp, " %ld %d", r->kills.vnum[i], r->kills.count[i]);
-      fprintf(fp, "\n");
-      }
    fclose(fp);
    }
 
@@ -1950,19 +1928,31 @@ static void cw_grow(struct char_data *ch, struct obj_data *obj, int base)
 
 /*
  * What a kill pays of a bank: 1 for a mob no more than 10 levels below the
- * owner, falling to 0 at 30 below; times the class kill buffer's repeat
- * factor for that mob (class_kills_repeat, read only). The buffer is the
- * experience buffer's rules without its pass for a mob a quarter of the
- * owner's level below: every mob goes on it at its first kill.
+ * owner, falling to 0 at 30 below; nothing for a mob the experience buffer
+ * passes by for its level (kills_limit_xpgain, fight.c); times the repeat
+ * factor for the count that buffer read for this kill. kills_limit_xpgain
+ * has already counted the kill (perform_group_gain), so the count read here
+ * is one more.
  */
 static double cw_kill_factor(struct char_data *ch, struct char_data *victim)
    {
    int gap = GET_LEVEL(ch) - GET_LEVEL(victim);
    double level = gap <= 10 ? 1.0 : MAX(0.0, 1.0 - (gap - 10) / 20.0);
+   long vnum = GET_MOB_VNUM(victim);
+   int i, n = 0;
 
    if (level <= 0)
       return 0;
-   return level * class_kills_repeat(&cw_armor_rec_of(GET_IDNUM(ch), TRUE)->kills, GET_MOB_VNUM(victim));
+   if (GET_LEVEL(victim) < GET_LEVEL(ch) && GET_LEVEL(ch) > LVL_NEWBIE
+       && GET_LEVEL(victim) + GET_LEVEL(ch) * 1 / 4 < GET_LEVEL(ch))
+      return 0;
+   for (i = 0; i < 64; i++)
+      if (GET_KILLS_VNUM(ch, i) == vnum)
+         {
+         n = GET_KILLS_AMMOUNT(ch, i) - 1;
+         break;
+         }
+   return level * kill_repeat_factor(n);
    }
 
 /* banked growth paid in: points and the focus in use */
@@ -2128,7 +2118,6 @@ void cw_pay_kill(struct char_data *ch, struct char_data *victim)
    if (cw_killer_npc || !cw_work_counts(victim) || !cw_has_earned(ch, victim))
       return;
    factor = cw_died_at_home(victim) ? cw_kill_factor(ch, victim) : 0;
-   class_kills_note(&cw_armor_rec_of(GET_IDNUM(ch), TRUE)->kills, GET_MOB_VNUM(victim));
    for (i = 0; i < NUM_WEARS; i++)
       if (GET_EQ(ch, i))
          {

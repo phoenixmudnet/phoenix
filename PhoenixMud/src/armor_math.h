@@ -79,17 +79,9 @@ struct class_armor_state
    int owed;                /* a bit a slot: lost before it was taken, to drop again */
    };
 
-/* the class layers' kill buffer: the experience buffer's rules
- * (kills_limit_xpgain, fight.c) with no mob passed by for its level */
-#define CLASS_KILLS_SIZE 64
-struct class_kills
-   {
-   long vnum[CLASS_KILLS_SIZE];
-   int count[CLASS_KILLS_SIZE];
-   int n;
-   };
-double class_kills_repeat(const struct class_kills *k, long vnum);
-void   class_kills_note(struct class_kills *k, long vnum);
+/* the repeat part of what a kill pays: n is the experience buffer's count
+ * for the mob before this kill (kills_limit_xpgain, fight.c) */
+double kill_repeat_factor(int n);
 
 const char *armor_slot_name(int slot);
 int    armor_slot_parts(int slot);
