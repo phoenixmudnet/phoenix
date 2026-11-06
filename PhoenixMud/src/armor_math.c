@@ -103,7 +103,7 @@ double kill_repeat_factor(int n)
    }
 
 /* the armor's class bonus by the wearer's level: the gap was measured in a
- * level-100 duel, so a first life or a remort climbing back gets none of it
+ * level-100 duel, so a non-remort or a remort climbing back gets none of it
  * at 50 or below and more each level to the whole at 100; the pieces' armor,
  * base hitroll and damroll and attuned stats are whole at every level */
 double armor_level_scale(int level)
