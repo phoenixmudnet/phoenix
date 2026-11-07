@@ -665,6 +665,7 @@ ACMD(do_get)
             }
          }
       }
+   cw_join_essences(ch);
    release_buffer(arg3);
    release_buffer(arg2);
    release_buffer(arg1);

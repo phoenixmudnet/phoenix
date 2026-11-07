@@ -1150,7 +1150,10 @@ static void cw_name_essence(struct obj_data *o)
       }
    }
 
-/* n essences to ch, joined to the copy they carry (one made if none) */
+static int cw_take_essences(struct char_data *ch, long n);
+
+/* n essences to ch, joined to the copy they carry (one made if none); any
+ * other copy they carry is joined into it too */
 static struct obj_data *cw_give_essences(struct char_data *ch, int n)
    {
    struct obj_data *o = NULL;
@@ -1164,6 +1167,8 @@ static struct obj_data *cw_give_essences(struct char_data *ch, int n)
          o->armor = armor_create();
       o->armor->essences = MAX(1, o->armor->essences) + n;
       cw_name_essence(o);
+      cw_take_essences(ch, 0);
+      cw_essences_held(ch, &o);
       return o;
       }
    if (real_object(ARMOR_ESSENCE_VNUM) < 0 || !(o = read_object(ARMOR_ESSENCE_VNUM, VIRTUAL)))
@@ -1226,6 +1231,16 @@ static int cw_take_essences(struct char_data *ch, long n)
       cw_name_essence(copies[0]);
       }
    return TRUE;
+   }
+
+/* every essence copy ch carries joined into one. A copy left in a corpse
+ * while a kill made a new one comes back as a second copy when the corpse
+ * is looted; spending none joins them. */
+void cw_join_essences(struct char_data *ch)
+   {
+   if (!class_weapons || IS_NPC(ch))
+      return;
+   cw_take_essences(ch, 0);
    }
 
 /* the piece of vnum bound to idnum in this list, or inside anything in it */
@@ -2751,6 +2766,7 @@ void cw_login(struct char_data *ch)
    if (r && r->st.cls == GET_CLASS(ch))
       cw_armor_settle(ch, &r->st);
    }
+   cw_take_essences(ch, 0);
    {
    struct obj_data *ess[64];
    int k = 0, i;
