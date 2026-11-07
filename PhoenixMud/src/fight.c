@@ -3288,7 +3288,7 @@ int damage(struct char_data * ch, struct char_data * victim, int dam,
           */
          if (PRF_FLAGGED(ch, PRF_AUTOSAC))
             {
-            do_sac(ch, "npccorpse",0,0);
+            do_sac(ch, "npccorpse",0,1);   /* 1: the gift is paid here */
             if (victbat == FALSE)
                {
                gain_exp(ch, victlvl * 2);

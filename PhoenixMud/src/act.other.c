@@ -1969,6 +1969,20 @@ ACMD(do_sac)
                }
             act("$n sacrifices $p.", FALSE, ch, obj, 0, TO_ROOM);
             act("You sacrifice $p to your god.", FALSE, ch, obj, 0, TO_CHAR);
+            /* a mob's corpse, sacrificed by hand, pays what autosacrifice
+             * pays for it: the mob's level twice over (fight.c). Only a
+             * mob's corpse carries the npccorpse keyword (make_corpse);
+             * value 7 is its level. Autosacrifice (subcmd 1) pays its own. */
+            if (!subcmd && !IS_NPC(ch) && GET_OBJ_TYPE(obj) == ITEM_CONTAINER &&
+                GET_OBJ_VAL(obj, 3) == 1 && GET_OBJ_RNUM(obj) == NOTHING &&
+                isname("npccorpse", obj->name))
+               {
+               int gift = GET_OBJ_VAL(obj, 7) * 2;
+
+               gain_exp(ch, gift);
+               send_to_char(ch, "You receive %d experience points as a "
+                                "gift from the gods.\r\n", gift);
+               }
             extract_obj(obj);
             }
          }
