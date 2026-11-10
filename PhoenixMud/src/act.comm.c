@@ -313,7 +313,8 @@ bool is_tell_ok(struct char_data *ch, struct char_data *vict)
          }
       }
    else if ((!IS_NPC(vict)&&PRF_FLAGGED(vict, PRF_NOTELL)) ||
-            ROOM_FLAGGED(IN_ROOM(vict), ROOM_SOUNDPROOF))
+            (ROOM_FLAGGED(IN_ROOM(vict), ROOM_SOUNDPROOF)&&
+             (IS_NPC(vict)||GET_LEVEL(vict)<LVL_IMMORT)))
       {
       if(GET_LEVEL(ch)<LVL_IMMORT)
          act("$E can't hear you.", FALSE, ch, 0, vict, TO_CHAR | TO_SLEEP);
@@ -858,7 +859,8 @@ ACMD(do_gen_comm)
                 (subcmd>=SCMD_OOC))) &&
               !PLR_FLAGGED(tch, PLR_WRITING) &&
               (!ROOM_FLAGGED(IN_ROOM(i->character), ROOM_SOUNDPROOF)||
-               GET_LEVEL(ch)>=LVL_IMMORT))
+               GET_LEVEL(ch)>=LVL_IMMORT||
+               GET_LEVEL(tch)>=LVL_IMMORT))
          {
          if (subcmd == SCMD_SHOUT &&
                  ((world[IN_ROOM(ch)].zone != world[IN_ROOM(i->character)].zone) ||
@@ -2069,7 +2071,8 @@ ACMD(do_newbie)
 
       if (STATE(i) == CON_PLAYING && tch && i->character && !PLR_FLAGGED(tch, PLR_WRITING) &&
 	           (!ROOM_FLAGGED(IN_ROOM(i->character), ROOM_SOUNDPROOF) || 
-			    GET_LEVEL(ch)>=LVL_IMMORT)) 
+			    GET_LEVEL(ch)>=LVL_IMMORT ||
+			    GET_LEVEL(tch)>=LVL_IMMORT)) 
 	     {
          if (!IS_NPC(tch) && ignoring(tch, ch) && GET_LEVEL(tch) < LVL_IMMORT)
 	        continue;
