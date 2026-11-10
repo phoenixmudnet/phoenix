@@ -1059,7 +1059,8 @@ ACMD (do_csay)
       send_to_char(ch,"You can only snoop the channel.\r\n");
       return;
       }
-   if (ROOM_FLAGGED(IN_ROOM(ch), ROOM_SOUNDPROOF))
+   if (ROOM_FLAGGED(IN_ROOM(ch), ROOM_SOUNDPROOF)&&
+       GET_LEVEL(ch)<LVL_IMMORT)
       {
       send_to_char(ch,"The walls absorb your words.\r\n");
       return;
@@ -1103,7 +1104,8 @@ ACMD (do_csay)
               !IS_SET(MUTE_CHANNELS(vict), 1<<GET_CLAN(ch)))
          {
          if(IN_ROOM(vict)&&
-                 !ROOM_FLAGGED(IN_ROOM(vict),ROOM_SOUNDPROOF))
+                 (!ROOM_FLAGGED(IN_ROOM(vict),ROOM_SOUNDPROOF)||
+                  GET_LEVEL(vict)>=LVL_IMMORT))
             {
             act(buf1, FALSE, ch, 0, vict, TO_VICT | TO_SLEEP);
             gmcp_comm(vict, "clan", GET_NAME(ch), ctext);
