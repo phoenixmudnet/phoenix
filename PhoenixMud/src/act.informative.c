@@ -2227,23 +2227,23 @@ ACMD(do_attribute)
 	int real_stat;
 
 	real_stat = MIN(9, GET_STR(ch) / 3);
-	send_to_char(ch, "Strength: %s (%d)\r\n", str_strings[real_stat],
-		     GET_STR(ch));
+	send_to_char(ch, "Strength: %s (%d, base %d)\r\n", str_strings[real_stat],
+		     GET_STR(ch), ch->real_abils.str);
 	real_stat = MIN(9, GET_CON(ch) / 3);
-	send_to_char(ch, "Constitution: %s (%d)\r\n", con_strings[real_stat],
-		     GET_CON(ch));
+	send_to_char(ch, "Constitution: %s (%d, base %d)\r\n", con_strings[real_stat],
+		     GET_CON(ch), ch->real_abils.con);
 	real_stat = MIN(9, GET_DEX(ch) / 3);
-	send_to_char(ch, "Dexterity: %s (%d)\r\n", dex_strings[real_stat],
-		     GET_DEX(ch));
+	send_to_char(ch, "Dexterity: %s (%d, base %d)\r\n", dex_strings[real_stat],
+		     GET_DEX(ch), ch->real_abils.dex);
 	real_stat = MIN(9, GET_INT(ch) / 3);
-	send_to_char(ch, "Intelligence: %s (%d)\r\n", int_strings[real_stat],
-		     GET_INT(ch));
+	send_to_char(ch, "Intelligence: %s (%d, base %d)\r\n", int_strings[real_stat],
+		     GET_INT(ch), ch->real_abils.intel);
 	real_stat = MIN(9, GET_WIS(ch) / 3);
-	send_to_char(ch, "Wisdom: %s (%d)\r\n", wis_strings[real_stat],
-		     GET_WIS(ch));
+	send_to_char(ch, "Wisdom: %s (%d, base %d)\r\n", wis_strings[real_stat],
+		     GET_WIS(ch), ch->real_abils.wis);
 	real_stat = MIN(9, GET_CHA(ch) / 3);
-	send_to_char(ch, "Charisma: %s (%d)\r\n", cha_strings[real_stat],
-		     GET_CHA(ch));
+	send_to_char(ch, "Charisma: %s (%d, base %d)\r\n", cha_strings[real_stat],
+		     GET_CHA(ch), ch->real_abils.cha);
 }
 
 ACMD(do_inventory)
