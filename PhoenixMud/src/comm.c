@@ -1617,6 +1617,15 @@ void write_to_q_d(char *txt, struct descriptor_data *d, int aliased)
     */
    if (d && d->character && STATE(d)==CON_PLAYING) {
      struct char_data *ch = d->character;
+     /* flush runs at once at any lag: it drops the commands the lag is
+      * holding, so a lagged walk stops in the room it has reached.  The
+      * lag itself stays, so walking on still waits. */
+     if (starts_with(txt, "flush")) {
+       if (d->speed_buffer < 1)
+         d->speed_buffer += 2;
+       command_interpreter(ch, txt);
+       return;
+     }
      if (
 	 d->speed_buffer < 1
 	 && (
@@ -1624,7 +1633,6 @@ void write_to_q_d(char *txt, struct descriptor_data *d, int aliased)
 	     || starts_with(txt, "gre") 
 	     || starts_with(txt, "gt")
 	     || starts_with(txt, "oo")
-	     || starts_with(txt, "flush")
 	     )
 	 ) {
        d->speed_buffer += 2;
