@@ -2469,6 +2469,12 @@ ACMD(do_history)
             text++;
          skip_spaces(&text);
          }
+      /* the log keeps the line's own CR; trim it, or it prints before ours */
+      {
+      size_t tl = strlen(text);
+      while (tl > 0 && (text[tl - 1] == '\r' || text[tl - 1] == '\n'))
+         text[--tl] = '\0';
+      }
       if (!*text || (word && !str_str(text, word)))
          continue;
       if (ring[head])
