@@ -210,6 +210,37 @@ int is_guild_open(struct char_data *keeper, int guild_nr, int msg)
   return (FALSE);
   }
 
+/* guildmaster: the guilds that take this character's class at this level, and
+ * where their keepers load -- the same test and the same scan as the referral
+ * above, in the same order (guild table, then zone table). Fills up to max
+ * (keeper, room) pairs; returns how many. */
+int guild_finder(struct char_data *ch, mob_rnum *mobs, room_rnum *rooms, int max)
+  {
+  int ii, cmd_no, n = 0, lvl = GET_LEVEL(ch);
+  zone_rnum zone;
+  int gm_match[] = {1<<6, 1<<4, 1<<5, 1<<3, 1<<7, 1<<8, 1<<9, 1<<10, 1<<11, 1<<12,
+                    1<<13, 1<<14, 1<<15, 1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21};
+
+  if (GET_CLASS(ch) < 0 || GET_CLASS(ch) >= (int)(sizeof(gm_match) / sizeof(gm_match[0])))
+    return 0;
+  for (ii = 0; ii < top_guild; ii++)
+    {
+    if (gm_match[(int)GET_CLASS(ch)] & GM_WITH_WHO(ii))
+      continue;
+    if (lvl > GM_MAXLVL(ii) || lvl < GM_MINLVL(ii))
+      continue;
+    for (zone = 0; zone <= top_of_zone_table; zone++)
+      for (cmd_no = 0; ZCOM.command != 'S'; cmd_no++)
+        if (ZCOM.command == 'M' && ZCOM.arg1 == GM_TRAINER(ii) && n < max)
+          {
+          mobs[n] = GM_TRAINER(ii);
+          rooms[n] = ZCOM.arg3;
+          n++;
+          }
+    }
+  return n;
+  }
+
 int is_gm_ok_char(struct char_data * keeper, struct char_data * ch, int guild_nr)
   {
     /*if (!(CAN_SEE(keeper, ch)))

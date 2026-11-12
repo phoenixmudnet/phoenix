@@ -35,6 +35,7 @@
 extern struct zone_data *zone_table;
 extern zone_rnum top_of_zone_table;
 extern struct room_data *world;
+extern struct char_data *mob_proto;
 extern struct descriptor_data *descriptor_list;
 extern struct char_data *character_list;
 extern struct obj_data *object_list;
@@ -3692,6 +3693,136 @@ static int areas_refuses(struct char_data *ch, room_rnum from, room_rnum to, int
     if (IS_SET(GET_TRIG_TYPE(t), WTRIG_ENTER))
       return GET_TRIG_NARG(t) >= 100 && areas_gate_verdict(ch, t, from, to, dir) == 1;
   return 0;
+}
+
+int guild_finder(struct char_data *ch, mob_rnum *mobs, room_rnum *rooms, int max);
+
+/* guildmaster: where this character's guildmaster is, for anyone below level
+ * 75, from anywhere -- the guilds the gain/practice referral would name, each
+ * with the room it stands in and the way to walk there from here (the same
+ * sweep areas <level> walks), nearest first. */
+#define GUILDMASTER_MAXLVL 75
+#define GUILDMASTER_SHOWN  3
+#define GUILDMASTER_FOUND  32
+
+ACMD(do_guildmaster)
+{
+  mob_rnum mobs[GUILDMASTER_FOUND];
+  room_rnum rooms[GUILDMASTER_FOUND];
+  int found, i, d, qh = 0, qt = 0, shown = 0, used[GUILDMASTER_FOUND];
+  int top = top_of_world + 1;
+  room_rnum *queue, *prev, cur, to;
+  char *stepdir, buf[MAX_STRING_LENGTH], row[640], route[256];
+  static const char *dabbr[] = { "n", "e", "s", "w", "u", "d" };
+
+  if (IS_NPC(ch) || IN_ROOM(ch) == NOWHERE)
+    return;
+  if (GET_LEVEL(ch) >= GUILDMASTER_MAXLVL) {
+    send_to_char(ch, "Past level %d you find your own way to your guildmaster.\r\n", GUILDMASTER_MAXLVL - 1);
+    return;
+  }
+  found = guild_finder(ch, mobs, rooms, GUILDMASTER_FOUND);
+  if (found == 0) {
+    send_to_char(ch, "No guildmaster teaches your class at your level.\r\n");
+    return;
+  }
+
+  CREATE(queue, room_rnum, top);
+  CREATE(prev, room_rnum, top);
+  CREATE(stepdir, char, top);
+  for (i = 0; i < top; i++)
+    prev[i] = NOWHERE;
+  areas_load_unreachable();
+  queue[qt++] = IN_ROOM(ch);
+  prev[IN_ROOM(ch)] = IN_ROOM(ch);
+  while (qh < qt) {
+    cur = queue[qh++];
+    for (d = 0; d < NUM_OF_DIRS; d++) {
+      if (world[cur].dir_option[d] == NULL)
+        continue;
+      to = world[cur].dir_option[d]->to_room;
+      if (to == NOWHERE || to < 0 || to > top_of_world || prev[to] != NOWHERE)
+        continue;
+      if (unreach_flags && unreach_flags[to])
+        continue;
+      if (areas_refuses(ch, cur, to, d))
+        continue;
+      prev[to] = cur;
+      stepdir[to] = d;
+      queue[qt++] = to;
+    }
+  }
+
+  sprintf(buf, "Your guildmaster at level %d, nearest first:\r\n\r\n", GET_LEVEL(ch));
+  for (i = 0; i < found; i++)
+    used[i] = 0;
+  while (shown < GUILDMASTER_SHOWN) {
+    int best = -1, best_hops = 0, hops;
+
+    /* nearest reachable first; ties keep the referral's order */
+    for (i = 0; i < found; i++) {
+      if (used[i] || rooms[i] == NOWHERE || prev[rooms[i]] == NOWHERE)
+        continue;
+      hops = 0;
+      for (cur = rooms[i]; cur != IN_ROOM(ch); cur = prev[cur])
+        hops++;
+      if (best == -1 || hops < best_hops) {
+        best = i;
+        best_hops = hops;
+      }
+    }
+    if (best == -1)
+      break;
+    used[best] = 1;
+
+    {
+      int nsteps = 0, run, j;
+      char steps[512];
+      room_rnum path[512];
+
+      for (cur = rooms[best]; cur != IN_ROOM(ch) && nsteps < 512; cur = prev[cur])
+        path[nsteps++] = cur;
+      route[0] = '\0';
+      for (j = nsteps - 1; j >= 0; ) {
+        int dir = stepdir[path[j]];
+        run = 0;
+        while (j >= 0 && stepdir[path[j]] == dir) { run++; j--; }
+        if (run > 1)
+          sprintf(steps, "%d%s ", run, dabbr[dir]);
+        else
+          sprintf(steps, "%s ", dabbr[dir]);
+        if (strlen(route) + strlen(steps) < sizeof(route) - 1)
+          strcat(route, steps);
+      }
+      {
+        int rl = strlen(route);
+        if (rl > 0 && route[rl - 1] == ' ')
+          route[rl - 1] = '\0';
+      }
+      sprintf(row, "  %s, %s, %s\r\n      Path: %s\r\n",
+              mob_proto[mobs[best]].player.short_descr, world[rooms[best]].name,
+              zone_table[world[rooms[best]].zone].name, *route ? route : "(here)");
+      if (strlen(buf) + strlen(row) < MAX_STRING_LENGTH - 256)
+        strcat(buf, row);
+      shown++;
+    }
+  }
+
+  /* none reachable on foot: still say who and where */
+  for (i = 0; shown == 0 && i < found && i < GUILDMASTER_SHOWN; i++) {
+    if (rooms[i] == NOWHERE)
+      continue;
+    sprintf(row, "  %s, %s, %s\r\n      Path: no way to walk there from here\r\n",
+            mob_proto[mobs[i]].player.short_descr, world[rooms[i]].name,
+            zone_table[world[rooms[i]].zone].name);
+    if (strlen(buf) + strlen(row) < MAX_STRING_LENGTH - 256)
+      strcat(buf, row);
+  }
+
+  page_string(ch->desc, buf, TRUE, "");
+  free(queue);
+  free(prev);
+  free(stepdir);
 }
 
 void areas_for_level(struct char_data *ch, int level, const char *name)
