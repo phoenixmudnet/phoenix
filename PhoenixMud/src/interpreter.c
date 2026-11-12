@@ -165,6 +165,7 @@ ACMD(do_commands);
 ACMD(do_commune);
 ACMD(do_commsearch);
 ACMD(do_history);
+ACMD(do_guildmaster);
 ACMD(do_replay);
 ACMD(do_consider);
 ACMD(do_control_battle);
@@ -656,6 +657,7 @@ struct command_info cmd_info[] = {
 	{"gsay", POS_SLEEPING, do_gsay, 0, 0},
 	{"gtell", POS_SLEEPING, do_gsay, 0, 0},
 	{"guard", POS_FIGHTING, do_guard, 0, 0},
+	{"guildmaster", POS_DEAD, do_guildmaster, 0, 0},
 	{"gwho", POS_SLEEPING, do_gwho, 0, 0},
 
 	{"help", POS_DEAD, do_help, 0, 0},
