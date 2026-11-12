@@ -165,6 +165,7 @@ ACMD(do_commands);
 ACMD(do_commune);
 ACMD(do_commsearch);
 ACMD(do_history);
+ACMD(do_replay);
 ACMD(do_consider);
 ACMD(do_control_battle);
 ACMD(do_credits);
@@ -868,6 +869,7 @@ struct command_info cmd_info[] = {
 	{"rent", POS_STANDING, do_not_here, 1, 0},
 	{"repair", POS_STANDING, do_repair, 0, 0},
 	{"report", POS_CHANT, do_report, 0, 0},
+	{"replay", POS_DEAD, do_replay, 1, 0},
 	/*{ "retool"   , POS_DEAD    , do_retool  , 0, 0 }, */
 	{"rescue", POS_FIGHTING, do_rescue, 1, 0},
 	{"resize", POS_DEAD, do_infobar, 0, SCMDB_RESIZE},

@@ -44,6 +44,7 @@ extern int top_of_p_table;
 
 void read_line_ascii(FILE *fp, char *string, int len);
 void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int type);
+int history_shorthand(struct char_data *ch, char *argument, const char *match);
 
 /* for chars */
 extern struct spell_info_type *spells;
@@ -878,6 +879,13 @@ ACMD (do_csay)
       {
       send_to_char(ch, "You're not the member of any clan!!");
       return;
+      }
+   if (GET_CLAN(ch) != 0)
+      {
+      char hmatch[MAX_INPUT_LENGTH];
+      snprintf(hmatch, sizeof(hmatch), "[%s]", GET_CLAN_NAME(ch));
+      if (history_shorthand(ch, argument, hmatch))
+         return;
       }
    if(!IS_NPC(ch)&&PLR_FLAGGED(ch, PLR_NOSHOUT)&&(GET_LEVEL(ch)<LVL_IMMORT))
       {

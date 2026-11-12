@@ -56,6 +56,7 @@ void do_auction_update(void);
 void id_obj_to_char(struct char_data *ch, struct obj_data *obj);
 /* internal functions */
 void write_comms(struct char_data *ch, struct char_data *vict, char *msg, int type);
+int history_shorthand(struct char_data *ch, char *argument, const char *match);
 int ignoring(struct char_data *ch, struct char_data *vict);
 /* external functions */
 void proc_color(char *inbuf, int color);
@@ -159,6 +160,8 @@ void do_april_fools_drunk(struct char_data* ch, char* argument)
 
 ACMD(do_say)
    {
+   if (history_shorthand(ch, argument, "says, '|You say, '"))
+      return;
    if(GET_LEVEL(ch)<LVL_IMMORT)
       strip_color(argument);
    skip_spaces(&argument);
@@ -208,6 +211,9 @@ ACMD(do_gsay)
    {
    struct char_data *k;
    struct follow_type *f;
+
+   if (history_shorthand(ch, argument, "tells the group"))
+      return;
 
    if(GET_LEVEL(ch)<LVL_IMMORT)
       strip_color(argument);
@@ -347,6 +353,13 @@ ACMD(do_tell)
    struct char_data *vict=NULL;
    char *buf = get_buffer(MAX_STRING_LENGTH);
    char *buf2 = get_buffer(MAX_STRING_LENGTH);
+
+   if (history_shorthand(ch, argument, "tells you|You tell"))
+      {
+      release_buffer(buf);
+      release_buffer(buf2);
+      return;
+      }
 
    if(GET_LEVEL(ch)<LVL_IMMORT&&!IS_NPC(ch))
       strip_color(argument);
@@ -750,6 +763,14 @@ ACMD(do_gen_comm)
    /* to keep pets, etc from being ordered to shout */
    if ((!ch->desc)&&(ch->master))
       return;
+
+   /* gossip -h 13: this channel's lines from your history */
+   {
+   char hmatch[64];
+   snprintf(hmatch, sizeof(hmatch), "%s, '|%ss, '", com_msgs[subcmd][1], com_msgs[subcmd][1]);
+   if (history_shorthand(ch, argument, hmatch))
+      return;
+   }
 
    if(!IS_NPC(ch)&&PLR_FLAGGED(ch, PLR_NOSHOUT))
       {
@@ -1701,6 +1722,8 @@ ACMD(do_qcomm)
       send_to_char(ch, "You aren't even part of the quest!\r\n");
       return;
       }
+   if (subcmd == SCMD_QSAY && history_shorthand(ch, argument, "quest-say"))
+      return;
    if(GET_LEVEL(ch)<LVL_IMMORT)
       strip_color(argument);
    skip_spaces(&argument);
@@ -1776,6 +1799,8 @@ ACMD(do_remortnet)
       send_to_char(ch, "Huh?!?\r\n");
       return;
       }
+   if (history_shorthand(ch, argument, "[Remort]"))
+      return;
       /* Nomikos 8-24-2002, Made it so morts can't remortnet if muted. */
    if(!IS_NPC(ch)&&PLR_FLAGGED(ch, PLR_NOSHOUT)&&(GET_LEVEL(ch)<LVL_IMMORT))
       {
@@ -2419,32 +2444,42 @@ ACMD(do_commsearch)
 /* history [word] [count]: the newest lines of your own comms log, oldest
  * first, each as it was said -- without the line number and date viewcomms
  * puts in front of every line, so a screen reader hears only the words.
- * With a word, only the lines that contain it (history tell, history bob). */
+ * With a word, only the lines that contain it (history tell, history bob);
+ * a word may hold alternatives split by | (history ooc|gossip). */
 #define HISTORY_DEFAULT 20
 #define HISTORY_MAX     100
 
-ACMD(do_history)
+/* Does the line hold any of the |-separated alternatives in match? */
+static int history_match(char *text, const char *match)
    {
-   char arg1[MAX_INPUT_LENGTH], arg2[MAX_INPUT_LENGTH];
+   char alt[MAX_INPUT_LENGTH];
+   const char *p = match;
+
+   while (*p)
+      {
+      size_t n = 0;
+      while (*p && *p != '|' && n < sizeof(alt) - 1)
+         alt[n++] = *p++;
+      alt[n] = '\0';
+      if (*p == '|')
+         p++;
+      if (*alt && str_str(text, alt))
+         return TRUE;
+      }
+   return FALSE;
+   }
+
+static void show_history(struct char_data *ch, const char *match, int want)
+   {
    char *ring[HISTORY_MAX];
-   char *word = NULL, *fileName, *line, *text, *out;
-   int want = HISTORY_DEFAULT, n = 0, head = 0, first, i;
+   char *fileName, *line, *text, *out;
+   int n = 0, head = 0, first, i;
    size_t len = 0;
    FILE *fl;
 
-   if (IS_NPC(ch) || !ch->desc)
-      return;
-
-   two_arguments(argument, arg1, arg2);
-   if (*arg1 && is_number(arg1))
-      want = atoi(arg1);
-   else if (*arg1)
-      {
-      word = arg1;
-      if (*arg2 && is_number(arg2))
-         want = atoi(arg2);
-      }
    want = MAX(1, MIN(HISTORY_MAX, want));
+   if (match && !*match)
+      match = NULL;
 
    fileName = get_buffer(SMALL_BUFSIZE);
    get_filename(GET_NAME(ch), fileName, COMMS_FILE);
@@ -2475,7 +2510,7 @@ ACMD(do_history)
       while (tl > 0 && (text[tl - 1] == '\r' || text[tl - 1] == '\n'))
          text[--tl] = '\0';
       }
-      if (!*text || (word && !str_str(text, word)))
+      if (!*text || (match && !history_match(text, match)))
          continue;
       if (ring[head])
          free(ring[head]);
@@ -2489,8 +2524,8 @@ ACMD(do_history)
 
    if (!n)
       {
-      send_to_char(ch, "%s\r\n", word ? "Nothing in your history has that in it."
-                                      : "You have no history yet.");
+      send_to_char(ch, "%s\r\n", match ? "Nothing in your history has that in it."
+                                       : "You have no history yet.");
       return;
       }
 
@@ -2512,4 +2547,63 @@ ACMD(do_history)
       }
    page_string(ch->desc, out, TRUE, "");
    release_buffer(out);
+   }
+
+/* <channel> -h [count] or <channel> -history [count]: that channel's history,
+ * as history <match> [count]. Only when that is the whole message, so a line
+ * that merely starts with -h still goes out. TRUE when it was a history ask. */
+int history_shorthand(struct char_data *ch, char *argument, const char *match)
+   {
+   char a1[MAX_INPUT_LENGTH], a2[MAX_INPUT_LENGTH];
+   char *rest;
+   int want = HISTORY_DEFAULT;
+
+   if (IS_NPC(ch) || !ch->desc || !argument)
+      return FALSE;
+   rest = one_argument(argument, a1);
+   if (str_cmp(a1, "-h") && str_cmp(a1, "-history"))
+      return FALSE;
+   rest = one_argument(rest, a2);
+   skip_spaces(&rest);
+   if (*rest || (*a2 && !is_number(a2)))
+      return FALSE;
+   if (*a2)
+      want = atoi(a2);
+   show_history(ch, match, want);
+   return TRUE;
+   }
+
+ACMD(do_history)
+   {
+   char arg1[MAX_INPUT_LENGTH], arg2[MAX_INPUT_LENGTH];
+   char *word = NULL;
+   int want = HISTORY_DEFAULT;
+
+   if (IS_NPC(ch) || !ch->desc)
+      return;
+
+   two_arguments(argument, arg1, arg2);
+   if (*arg1 && is_number(arg1))
+      want = atoi(arg1);
+   else if (*arg1)
+      {
+      word = arg1;
+      if (*arg2 && is_number(arg2))
+         want = atoi(arg2);
+      }
+   show_history(ch, word, want);
+   }
+
+/* replay [count]: your tells, given and received, newest last. */
+ACMD(do_replay)
+   {
+   char arg1[MAX_INPUT_LENGTH];
+   int want = HISTORY_DEFAULT;
+
+   if (IS_NPC(ch) || !ch->desc)
+      return;
+   one_argument(argument, arg1);
+   if (*arg1 && is_number(arg1))
+      want = atoi(arg1);
+   show_history(ch, "tells you|You tell", want);
    }
