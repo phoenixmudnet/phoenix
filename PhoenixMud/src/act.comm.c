@@ -2414,3 +2414,96 @@ ACMD(do_commsearch)
    release_buffer(buf2);
    release_buffer(buf);
    }
+
+
+/* history [word] [count]: the newest lines of your own comms log, oldest
+ * first, each as it was said -- without the line number and date viewcomms
+ * puts in front of every line, so a screen reader hears only the words.
+ * With a word, only the lines that contain it (history tell, history bob). */
+#define HISTORY_DEFAULT 20
+#define HISTORY_MAX     100
+
+ACMD(do_history)
+   {
+   char arg1[MAX_INPUT_LENGTH], arg2[MAX_INPUT_LENGTH];
+   char *ring[HISTORY_MAX];
+   char *word = NULL, *fileName, *line, *text, *out;
+   int want = HISTORY_DEFAULT, n = 0, head = 0, first, i;
+   size_t len = 0;
+   FILE *fl;
+
+   if (IS_NPC(ch) || !ch->desc)
+      return;
+
+   two_arguments(argument, arg1, arg2);
+   if (*arg1 && is_number(arg1))
+      want = atoi(arg1);
+   else if (*arg1)
+      {
+      word = arg1;
+      if (*arg2 && is_number(arg2))
+         want = atoi(arg2);
+      }
+   want = MAX(1, MIN(HISTORY_MAX, want));
+
+   fileName = get_buffer(SMALL_BUFSIZE);
+   get_filename(GET_NAME(ch), fileName, COMMS_FILE);
+   fl = fopen(fileName, "r");
+   release_buffer(fileName);
+   if (!fl)
+      {
+      send_to_char(ch, "You have no history yet.\r\n");
+      return;
+      }
+
+   for (i = 0; i < HISTORY_MAX; i++)
+      ring[i] = NULL;
+   line = get_buffer(MAX_STRING_LENGTH);
+   while (get_line(fl, line))
+      {
+      text = line;
+      /* drop the saved time in front of the line */
+      if (isdigit((int)*text))
+         {
+         while (*text && !isspace((int)*text))
+            text++;
+         skip_spaces(&text);
+         }
+      if (!*text || (word && !str_str(text, word)))
+         continue;
+      if (ring[head])
+         free(ring[head]);
+      ring[head] = str_dup(text);
+      head = (head + 1) % want;
+      if (n < want)
+         n++;
+      }
+   fclose(fl);
+   release_buffer(line);
+
+   if (!n)
+      {
+      send_to_char(ch, "%s\r\n", word ? "Nothing in your history has that in it."
+                                      : "You have no history yet.");
+      return;
+      }
+
+   out = get_buffer(65500);
+   *out = '\0';
+   first = (n < want) ? 0 : head;
+   for (i = 0; i < n; i++)
+      {
+      int at = (first + i) % want;
+      size_t add = strlen(ring[at]);
+      if (len + add + 3 < 65500)
+         {
+         strcpy(out + len, ring[at]);
+         strcpy(out + len + add, "\r\n");
+         len += add + 2;
+         }
+      free(ring[at]);
+      ring[at] = NULL;
+      }
+   page_string(ch->desc, out, TRUE, "");
+   release_buffer(out);
+   }
