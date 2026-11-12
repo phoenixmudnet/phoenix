@@ -164,6 +164,7 @@ ACMD(do_color);
 ACMD(do_commands);
 ACMD(do_commune);
 ACMD(do_commsearch);
+ACMD(do_history);
 ACMD(do_consider);
 ACMD(do_control_battle);
 ACMD(do_credits);
@@ -669,6 +670,7 @@ struct command_info cmd_info[] = {
 	{"hidehero", POS_DEAD, do_gen_tog, 0, SCMD_HIDEHERO},
 	{"hideangel", POS_DEAD, do_gen_tog, 0, SCMD_HIDEANGEL},
 	{"hit", POS_FIGHTING, do_hit, 0, SCMD_HIT},
+	{"history", POS_DEAD, do_history, 1, 0},
 	{"hold", POS_CHANT, do_grab, 1, 0},
 	{"holler", POS_CHANT, do_gen_comm, 1, SCMD_HOLLER},
 	{"holylight", POS_DEAD, do_gen_tog, LVL_IMMORT, SCMD_HOLYLIGHT},
