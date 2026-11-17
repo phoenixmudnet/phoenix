@@ -522,8 +522,12 @@ void script_trigger_check(void)
    int nr;
    struct script_data *sc;
 
-   for (ch = character_list; ch; ch = ch->next)
+   /* A random trigger can purge its own mob or object, or another one: walk
+    * with the extract-safe next pointers (db.c), never ch->next / obj->next
+    * read after the trigger ran. */
+   for (ch = character_list; ch; ch = char_walk_next)
       {
+      char_walk_next = ch->next;
       if (SCRIPT(ch))
          {
          sc = SCRIPT(ch);
@@ -535,8 +539,11 @@ void script_trigger_check(void)
          }
       }
 
-   for (obj = object_list; obj; obj = obj->next)
+   char_walk_next = NULL;
+
+   for (obj = object_list; obj; obj = obj_walk_next)
       {
+      obj_walk_next = obj->next;
       if (SCRIPT(obj))
          {
          sc = SCRIPT(obj);
@@ -545,6 +552,7 @@ void script_trigger_check(void)
             random_otrigger(obj);
          }
       }
+   obj_walk_next = NULL;
 
    for (nr = 0; nr <= top_of_world; nr++)
       {

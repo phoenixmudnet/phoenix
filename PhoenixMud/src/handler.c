@@ -1594,6 +1594,8 @@ void extract_obj(struct obj_data * obj)
    while (obj->contains)
       extract_obj(obj->contains);
 
+   if (obj == obj_walk_next)   /* a list walk was about to visit it */
+      obj_walk_next = obj->next;
    REMOVE_FROM_LIST(obj, object_list, next);
 
    if (GET_OBJ_RNUM(obj) >= 0)
@@ -1920,6 +1922,8 @@ void extract_char(struct char_data * ch)
 
 
    /* pull the char from the list */
+   if (ch == char_walk_next)   /* a list walk was about to visit it */
+      char_walk_next = ch->next;
    REMOVE_FROM_LIST(ch, character_list, next);
 
    if (!IS_NPC(ch))

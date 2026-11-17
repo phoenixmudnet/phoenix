@@ -69,6 +69,8 @@ void	obj_from_obj(struct obj_data *obj);
 void	object_list_new_owner(struct obj_data *list, struct char_data *ch);
 
 void	extract_obj(struct obj_data *obj);
+extern struct obj_data *obj_walk_next;     /* db.c: a list walk's next object */
+extern struct char_data *char_walk_next;   /* db.c: a list walk's next char */
 void    scrap_item(struct obj_data *obj, struct char_data *ch);
 
 int     can_take_obj(struct char_data * ch, struct obj_data * obj);
