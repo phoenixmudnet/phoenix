@@ -61,6 +61,16 @@ struct char_data *mob_proto; /* prototypes for mobs   */
 mob_rnum top_of_mobt = 0; /* top of mobile index table  */
 
 struct obj_data *object_list = NULL; /* global linked list of objs  */
+/* A walk of object_list or character_list that runs code able to extract
+ * (a random trigger's opurge or mpurge, a zone purge taking a container and
+ * everything in it) keeps its next element here rather than in a local, and
+ * extract_obj / extract_char step it past the element they free. A local or
+ * obj->next read after the call can be freed memory: script_trigger_check
+ * read obj->next after the object's random trigger purged it, and
+ * purge_zone's next_obj could be inside the container it had just extracted.
+ * The walks that use these do not nest. */
+struct obj_data *obj_walk_next = NULL;
+struct char_data *char_walk_next = NULL;
 struct index_data *obj_index; /* index table for object file  */
 struct obj_data *obj_proto; /* prototypes for objs   */
 obj_rnum top_of_objt = 0; /* top of object index table  */
@@ -3113,19 +3123,24 @@ struct obj_data *read_object(obj_vnum nr, int type)
 
 int purge_zone(int zone)
    {
-   struct char_data *ch, *next_ch;
-   struct obj_data *obj, *next_obj;
+   struct char_data *ch;
+   struct obj_data *obj;
 
-   for (ch = character_list; ch; ch = next_ch)
+   /* Extract-safe walks (db.c obj_walk_next): extracting a container takes
+    * its contents, which are on object_list too, so a saved next_obj could be
+    * freed by the time the loop reached it. */
+   for (ch = character_list; ch; ch = char_walk_next)
       {
-      next_ch = ch->next;
+      char_walk_next = ch->next;
       if (IS_NPC(ch) && (world[IN_ROOM(ch)].zone == zone) && !FIGHTING(ch))
          extract_char(ch);
       }
 
-   for (obj = object_list; obj; obj = next_obj)
+   char_walk_next = NULL;
+
+   for (obj = object_list; obj; obj = obj_walk_next)
       {
-      next_obj = obj->next;
+      obj_walk_next = obj->next;
       if((IN_ROOM(obj)>top_of_world)|| (IN_ROOM(obj)<-1))
          log("name:%s room:%ld rnum:%ld",GET_OBJ_NAME(obj),IN_ROOM(obj),
              GET_OBJ_RNUM(obj));
@@ -3141,6 +3156,7 @@ int purge_zone(int zone)
          continue;
       extract_obj(obj);
       }
+   obj_walk_next = NULL;
    return 0;
    }
 
