@@ -1448,8 +1448,13 @@ void mag_affects(int level, struct char_data * ch, struct char_data * victim,
      } 
    }
  
+   /*
+    * Zeal carries no location and no bitvector: gain_exp reads it off its
+    * presence (limits.c), so its one entry is placed regardless.
+    */
    for (i = 0; i < MAX_SPELL_AFFECTS; i++) 
-      if (af[i].bitvector || (af[i].location != APPLY_NONE)) 
+      if (af[i].bitvector || (af[i].location != APPLY_NONE) ||
+          (i == 0 && spellnum == SPELL_ZEAL)) 
 	 affect_join(victim, af+i, accum_duration, FALSE, accum_affect, FALSE); 
  
    if (to_vict != NULL) 
