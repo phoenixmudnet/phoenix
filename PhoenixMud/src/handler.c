@@ -111,7 +111,8 @@ int isname(const char *str, const char *namelist)
    unaffected.
 
    Deliberately does not use strtok: isname() uses it internally, and nesting
-   the two would clobber the outer scan's state. */
+   the two would clobber the outer scan's state. The name lookups (room,
+   world, object list, world objects, equipment) match this way. */
 int isname_all(const char *str, const char *namelist)
 {
   char word[MAX_INPUT_LENGTH];
@@ -2039,7 +2040,7 @@ struct char_data *get_char_room_vis(struct char_data * ch, char *name)
       }
 
    for (i = world[IN_ROOM(ch)].people; i && j <= vnumber; i = i->next_in_room)
-      if (isname(tmp, i->player.name))
+      if (isname_all(tmp, i->player.name))
          if (CAN_SEE(ch, i))
             if (++j == vnumber)
                {
@@ -2162,7 +2163,7 @@ struct char_data *get_char_vis(struct char_data * ch, char *name,int location)
          }
 
       for (i = character_list; i && (j <= vnumber); i = i->next)
-         if (isname(tmp, i->player.name) && CAN_SEE(ch, i))
+         if (isname_all(tmp, i->player.name) && CAN_SEE(ch, i))
             if (++j == vnumber)
                {
                release_buffer(tmp);
@@ -2192,7 +2193,7 @@ struct obj_data *get_obj_in_list_vis(struct char_data * ch, char *name,
 
    for (i = list; i && (j <= vnumber); i = i->next_content)
       {
-      if (isname(tmp, i->name))
+      if (isname_all(tmp, i->name))
          {
          if (CAN_SEE_OBJ(ch, i))
             if (++j == vnumber)
@@ -2240,7 +2241,7 @@ struct obj_data *get_obj_vis(struct char_data * ch, char *name)
 
    /* ok.. no luck yet. scan the entire obj list   */
    for (i = object_list; i && (j <= vnumber); i = i->next)
-      if (isname(tmp, i->name))
+      if (isname_all(tmp, i->name))
          if (CAN_SEE_OBJ(ch, i)&&
                  (!i->carried_by || CAN_SEE(ch,i->carried_by)))
             if (++j == vnumber)
@@ -2262,7 +2263,7 @@ struct obj_data *get_object_in_equip_vis(struct char_data * ch,
    for ((*j) = 0; (*j) < NUM_WEARS; (*j)++)
       if (equipment[(*j)])
          if (CAN_SEE_OBJ(ch, equipment[(*j)]))
-            if (isname(arg, equipment[(*j)]->name))
+            if (isname_all(arg, equipment[(*j)]->name))
                return (equipment[(*j)]);
 
    return NULL;
