@@ -175,11 +175,91 @@ int find_first_step(room_rnum src, room_rnum target, long iFlag)
 *  Functions and Commands which use the above fns          * 
 ************************************************************************/ 
  
+/*
+ * bfs_first_steps: the first step from src toward EVERY room it can reach,
+ * under the same edges as find_first_step: steps[room] is that direction,
+ * BFS_ALREADY_THERE for src, or BFS_NO_PATH. One search serves every
+ * candidate do_track weighs.
+ */
+static void bfs_first_steps(room_rnum src, long iFlag, int *steps)
+{
+   int curr_dir;
+   room_rnum curr_room;
+
+   for (curr_room = 0; curr_room <= top_of_world; curr_room++)
+      {
+      UNMARK(curr_room);
+      steps[curr_room] = BFS_NO_PATH;
+      }
+   MARK(src);
+   steps[src] = BFS_ALREADY_THERE;
+   for (curr_dir = 0; curr_dir < NUM_OF_DIRS; curr_dir++)
+      if (VALID_EDGE(src, curr_dir, iFlag))
+         {
+         MARK(TOROOM(src, curr_dir));
+         steps[TOROOM(src, curr_dir)] = curr_dir;
+         bfs_enqueue(TOROOM(src, curr_dir), curr_dir);
+         }
+   while (queue_head)
+      {
+      for (curr_dir = 0; curr_dir < NUM_OF_DIRS; curr_dir++)
+         if (VALID_EDGE(queue_head->room, curr_dir, iFlag))
+            {
+            MARK(TOROOM(queue_head->room, curr_dir));
+            steps[TOROOM(queue_head->room, curr_dir)] = queue_head->dir;
+            bfs_enqueue(TOROOM(queue_head->room, curr_dir), queue_head->dir);
+            }
+      bfs_dequeue();
+      }
+}
+
+/*
+ * The character `track <name>` follows. The whole argument is the name and
+ * every word must match (isname_all). Matches are weighed in the tracker's
+ * room, then the rest of its zone, then the world, each in character_list
+ * order, and the first one with a trail wins; one with no trail (no path,
+ * or AFF_NOTRACK) is passed over. *first gets the first match seen, so the
+ * refusal names it. "N.name" keeps get_char_vis's numbered match.
+ */
+static struct char_data *track_target(struct char_data *ch, char *name, struct char_data **first)
+{
+   struct char_data *i, *found = NULL;
+   int *steps, pass, zone = world[IN_ROOM(ch)].zone;
+
+   *first = NULL;
+   if (isdigit((unsigned char) *name) && strchr(name, '.'))
+      {
+      *first = get_char_vis(ch, name, FIND_CHAR_WORLD);
+      return ((*first && !AFF_FLAGGED(*first, AFF_NOTRACK)) ? *first : NULL);
+      }
+   CREATE(steps, int, top_of_world + 1);
+   bfs_first_steps(IN_ROOM(ch), 0, steps);
+   for (pass = 0; pass < 3 && !found; pass++)
+      for (i = pass ? character_list : world[IN_ROOM(ch)].people; i && !found;
+           i = pass ? i->next : i->next_in_room)
+         {
+         if (i == ch || IN_ROOM(i) == NOWHERE)
+            continue;
+         if (pass == 1 && (IN_ROOM(i) == IN_ROOM(ch) || world[IN_ROOM(i)].zone != zone))
+            continue;
+         if (pass == 2 && (IN_ROOM(i) == IN_ROOM(ch) || world[IN_ROOM(i)].zone == zone))
+            continue;
+         if (!isname_all(name, i->player.name) || !CAN_SEE(ch, i))
+            continue;
+         if (!*first)
+            *first = i;
+         if (!AFF_FLAGGED(i, AFF_NOTRACK) && steps[IN_ROOM(i)] != BFS_NO_PATH)
+            found = i;
+         }
+   free(steps);
+   return (found);
+}
+
 ACMD(do_track) 
 { 
-   struct char_data *vict; 
+   struct char_data *vict, *first; 
    int dir,pass=0; 
-   char *arg=get_buffer(MAX_INPUT_LENGTH);
+   char *arg=get_buffer(MAX_INPUT_LENGTH), *name;
  
    if (IS_NPC(ch) || !GET_SKILL(ch, SKILL_TRACK)) 
       { 
@@ -187,25 +267,43 @@ ACMD(do_track)
       release_buffer(arg);
       return; 
       } 
-   one_argument(argument, arg); 
+   /* The whole argument, fill words dropped: "track the deep dragon". */
+   skip_spaces(&argument);
+   *arg = '\0';
+   while (*argument)
+      {
+      char *word = get_buffer(MAX_INPUT_LENGTH);
+      argument = any_one_arg(argument, word);
+      if (*word && !fill_word(word) && strlen(arg) + strlen(word) + 2 < MAX_INPUT_LENGTH)
+         {
+         if (*arg)
+            strcat(arg, " ");
+         strcat(arg, word);
+         }
+      release_buffer(word);
+      }
    if (!*arg) 
       { 
       send_to_char(ch,"Whom are you trying to track?\r\n"); 
       release_buffer(arg);
       return; 
       } 
-   if (!(vict = get_char_vis(ch, arg,FIND_CHAR_WORLD))) 
+   name = arg;
+   vict = track_target(ch, name, &first);
+   if (!first) 
       { 
       send_to_char(ch,"No-one around by that name.\r\n"); 
       release_buffer(arg);
       return; 
       } 
-   if (AFF_FLAGGED(vict, AFF_NOTRACK)) 
+   if (!vict && AFF_FLAGGED(first, AFF_NOTRACK)) 
       { 
       send_to_char(ch,"You sense no trail.\r\n"); 
       release_buffer(arg);
       return; 
       } 
+   if (!vict)
+      vict = first;
    
    if (GET_SKILL(ch, SKILL_TRACK) < number(0,101)) 
       {
