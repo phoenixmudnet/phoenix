@@ -290,6 +290,17 @@ ACMD(do_track)
       } 
    name = arg;
    vict = track_target(ch, name, &first);
+   if (!first)
+      {
+      /* Nothing matched the whole name: try its first word. */
+      char *word = get_buffer(MAX_INPUT_LENGTH);
+      if (first_word_retry(name, word))
+         {
+         strcpy(arg, word);
+         vict = track_target(ch, name, &first);
+         }
+      release_buffer(word);
+      }
    if (!first) 
       { 
       send_to_char(ch,"No-one around by that name.\r\n"); 

@@ -292,7 +292,7 @@ room_rnum find_target_room(struct char_data * ch, char *rawroomstr)
    char *roomstr=get_buffer(MAX_INPUT_LENGTH);
 
 
-   one_argument(rawroomstr, roomstr);
+   phrase_argument(rawroomstr, roomstr);
 
 #ifdef PLAYERS_PORT
    /*
@@ -331,24 +331,46 @@ room_rnum find_target_room(struct char_data * ch, char *rawroomstr)
          return (NOWHERE);
          }
       }
-   else if ((target_mob = get_char_vis(ch, roomstr,FIND_CHAR_WORLD)))
-      location = IN_ROOM(target_mob);
-   else if ((target_obj = get_obj_vis(ch, roomstr))!=NULL)
+   else
       {
-      if (IN_ROOM(target_obj) != NOWHERE)
-         location = IN_ROOM(target_obj);
+      /* The whole name, a creature then an object; only when it matches
+         neither is its first word tried. */
+      char *first = get_buffer(MAX_INPUT_LENGTH), *name = roomstr;
+      int pass;
+
+      target_mob = NULL;
+      target_obj = NULL;
+      for (pass = 0; pass < 2 && !target_mob && !target_obj; pass++)
+         {
+         if (pass == 1)
+            {
+            if (!first_word_retry(roomstr, first))
+               break;
+            name = first;
+            }
+         if (!(target_mob = get_char_vis_exact(ch, name, FIND_CHAR_WORLD)))
+            target_obj = get_obj_vis_exact(ch, name);
+         }
+      release_buffer(first);
+      if (target_mob)
+         location = IN_ROOM(target_mob);
+      else if (target_obj)
+         {
+         if (IN_ROOM(target_obj) != NOWHERE)
+            location = IN_ROOM(target_obj);
+         else
+            {
+            send_to_char(ch,"That object is not available.\r\n");
+            release_buffer(roomstr);
+            return (NOWHERE);
+            }
+         }
       else
          {
-         send_to_char(ch,"That object is not available.\r\n");
+         send_to_char(ch,"No such creature or object around.\r\n");
          release_buffer(roomstr);
          return (NOWHERE);
          }
-      }
-   else
-      {
-      send_to_char(ch,"No such creature or object around.\r\n");
-      release_buffer(roomstr);
-      return (NOWHERE);
       }
 
    release_buffer(roomstr);
@@ -1017,7 +1039,7 @@ ACMD(do_trans)
      return;
    }
 
-   one_argument(argument, buf);
+   phrase_argument(argument, buf);
    if (!*buf)
       send_to_char(ch,"Whom do you wish to transfer?\r\n");
    else if (str_cmp("all", buf))
@@ -2723,7 +2745,7 @@ ACMD(do_switch)
    struct char_data *victim;
    char *arg=get_buffer(MAX_INPUT_LENGTH);
 
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
 
 
    if (ch->desc->original)
@@ -2982,14 +3004,33 @@ ACMD(do_purge)
    struct obj_data *obj, *next_o;
    char *buf=get_buffer(MAX_INPUT_LENGTH);
 
-   one_argument(argument, buf);
+   phrase_argument(argument, buf);
 
 
    if (*buf)
       {
       /* argument supplied. destroy single object
        * or char */
-      if ((vict = get_char_vis(ch, buf,FIND_CHAR_ROOM)))
+      /* The whole name, a creature then an object; only when it matches
+         neither is its first word tried. */
+      char *first = get_buffer(MAX_INPUT_LENGTH), *name = buf;
+      int pass;
+
+      vict = NULL;
+      obj = NULL;
+      for (pass = 0; pass < 2 && !vict && !obj; pass++)
+         {
+         if (pass == 1)
+            {
+            if (!first_word_retry(buf, first))
+               break;
+            name = first;
+            }
+         if (!(vict = get_char_vis_exact(ch, name, FIND_CHAR_ROOM)))
+            obj = get_obj_in_list_vis_exact(ch, name, world[IN_ROOM(ch)].contents);
+         }
+      release_buffer(first);
+      if (vict)
          {
          if (!IS_NPC(vict) && (GET_LEVEL(ch) <= GET_LEVEL(vict)))
             {
@@ -3014,8 +3055,7 @@ ACMD(do_purge)
             }
          extract_char(vict);
          }
-      else if ((obj = get_obj_in_list_vis(ch, buf,
-                                          world[IN_ROOM(ch)].contents))!=NULL)
+      else if (obj)
          {
          act("$n destroys $p.", FALSE, ch, obj, 0, TO_ROOM);
          extract_obj(obj);
@@ -3201,7 +3241,7 @@ ACMD(do_restore) {
     char *buf = get_buffer(MAX_INPUT_LENGTH);
 
 
-    one_argument(argument, buf);
+    phrase_argument(argument, buf);
     if (!*buf)
         send_to_char(ch,"Whom do you wish to restore?\r\n");
     else if (!(vict = get_char_vis(ch, buf,FIND_CHAR_WORLD)))

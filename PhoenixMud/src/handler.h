@@ -120,6 +120,12 @@ int	find_all_dots(char *arg);
 
 int	generic_find(char *arg, bitvector_t bitvector, struct char_data *ch,
 		     struct char_data **tar_ch, struct obj_data **tar_obj);
+int	first_word_retry(const char *name, char *buf);
+struct char_data *get_char_vis_exact(struct char_data *ch, char *name, int location);
+struct obj_data *get_obj_in_list_vis_exact(struct char_data *ch, char *name, struct obj_data *list);
+struct obj_data *get_obj_vis_exact(struct char_data *ch, char *name);
+int	generic_find_exact(char *name, bitvector_t bitvector, struct char_data *ch,
+		     struct char_data **tar_ch, struct obj_data **tar_obj);
 
 #define FIND_CHAR_ROOM     (1 << 0)
 #define FIND_CHAR_WORLD    (1 << 1)

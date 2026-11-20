@@ -1857,6 +1857,38 @@ char *any_one_arg(char *argument, char *first_arg)
 }
 
 /*
+ * The whole argument as one name: every word but the fill words, lowercased
+ * as one_argument does, joined by single spaces. A one-target command reads
+ * its target this way; the name lookups match every word of it and fall
+ * back to its first word. buf holds MAX_INPUT_LENGTH.
+ */
+char *phrase_argument(char *argument, char *buf)
+{
+	char *word = get_buffer(MAX_INPUT_LENGTH);
+	size_t len = 0, wl;
+
+	*buf = '\0';
+	if (!argument) {
+		release_buffer(word);
+		return NULL;
+	}
+	for (;;) {
+		argument = one_argument(argument, word);
+		if (!*word)
+			break;
+		wl = strlen(word);
+		if (len + wl + 2 > MAX_INPUT_LENGTH)
+			break;
+		if (len)
+			buf[len++] = ' ';
+		strcpy(buf + len, word);
+		len += wl;
+	}
+	release_buffer(word);
+	return argument;
+}
+
+/*
  * Same as one_argument except that it takes two args and returns the rest;
  * ignores fill words
  */

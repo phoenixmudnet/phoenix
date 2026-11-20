@@ -71,7 +71,7 @@ ACMD(do_ambush)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!(vict = get_char_vis(ch, arg,FIND_CHAR_ROOM)))
       {
@@ -160,7 +160,7 @@ ACMD(do_backstab)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict = get_char_vis(ch, arg,FIND_CHAR_ROOM);
    release_buffer(arg);
@@ -267,7 +267,7 @@ ACMD(do_bandage)
       }
 
    arg=get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
    /* if the argument is blank - apply bandage to self */
    if (!*arg)
       band_self = TRUE;
@@ -368,7 +368,7 @@ ACMD(do_bash)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -680,7 +680,7 @@ ACMD(do_circle)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -945,7 +945,7 @@ ACMD(do_disarm)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument,arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -1097,7 +1097,7 @@ ACMD(do_gore)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -1170,7 +1170,7 @@ ACMD(do_headbutt)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -1242,7 +1242,7 @@ ACMD(do_kick)
       return;
       }
    arg=get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -1318,7 +1318,7 @@ ACMD(do_lay_hands)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
    if (!(vict = get_char_vis(ch, arg,FIND_CHAR_ROOM)))
       {
       send_to_char(ch,"Who do you wish to heal???\r\n");
@@ -1534,7 +1534,7 @@ ACMD(do_palm)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!*arg)
       send_to_char(ch,"Palm what?\r\n");
@@ -1601,7 +1601,7 @@ ACMD(do_peck)
       return;
       }
    arg=get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
    
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -1690,7 +1690,7 @@ ACMD(do_quivering_palm)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -1853,7 +1853,7 @@ ACMD(do_redirect)
       return;
       }
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
    if (!(vict = get_char_vis(ch, arg,FIND_CHAR_ROOM)))
       {
       send_to_char(ch,"Who do you wish to start hitting?\r\n");
@@ -1929,7 +1929,7 @@ ACMD(do_rescue)
       return;
       }
    arg=get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!(vict = get_char_vis(ch, arg,FIND_CHAR_ROOM)))
       {
@@ -2072,7 +2072,7 @@ ACMD(do_shock)
       }
 
    arg=get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -2211,7 +2211,7 @@ ACMD(do_skin)
       return;
    /* find the corpse! */
 
-   any_one_arg(argument, buf);
+   phrase_argument(argument, buf);
 
    if (*buf)
       {
@@ -2514,7 +2514,7 @@ ACMD(do_stomp)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -2589,7 +2589,7 @@ ACMD(do_stun)
       }
 
    arg=get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -2689,7 +2689,7 @@ ACMD(do_sweep)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -2767,7 +2767,7 @@ ACMD(do_tame)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
    if (!(vict = get_char_vis(ch, arg,FIND_CHAR_ROOM)))
       {
       send_to_char(ch,"Who do you wish to tame???\r\n");
@@ -2877,7 +2877,7 @@ ACMD(do_trip)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   any_one_arg(argument, arg);
+   phrase_argument(argument, arg);
 
    vict=NULL;
    if ((!*arg)&&FIGHTING(ch))
@@ -3160,7 +3160,7 @@ ACMD(do_guard)
   skip_spaces(&argument);
 
   char *arg = get_buffer(MAX_INPUT_LENGTH);
-  any_one_arg(argument, arg);
+  phrase_argument(argument, arg);
 
   if (!arg || !*arg) {
     send_to_char(ch, "Guard who?\r\n");

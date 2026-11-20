@@ -1380,7 +1380,7 @@ ACMD(do_wake)
    int self = 0;
    char *arg=get_buffer(SMALL_BUFSIZE);
 
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
    if (*arg)
       {
       if (GET_POS(ch) == POS_SLEEPING)
@@ -1428,7 +1428,7 @@ ACMD(do_follow)
    struct char_data *leader;
    char *buf=get_buffer(SMALL_BUFSIZE);
 
-   one_argument(argument, buf);
+   phrase_argument(argument, buf);
 
    if (*buf)
       {
@@ -1492,7 +1492,7 @@ ACMD(do_mount)
    char *arg=get_buffer(MAX_INPUT_LENGTH);
    struct char_data *vict;
 
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!arg || !*arg)
       {

@@ -1555,7 +1555,7 @@ ACMD(do_drink)
       }
 
    arg = get_buffer(MAX_INPUT_LENGTH);
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!*arg)
       {
@@ -1563,16 +1563,32 @@ ACMD(do_drink)
       release_buffer(arg);
       return;
       }
-   if (!(temp = get_obj_in_list_vis(ch, arg, ch->carrying)))
+   /* The whole name, carried then on the ground; only when it matches
+      neither is its first word tried. */
+   {
+   char *first = get_buffer(MAX_INPUT_LENGTH), *name = arg;
+   int pass;
+
+   temp = NULL;
+   for (pass = 0; pass < 2 && !temp; pass++)
       {
-      if (!(temp = get_obj_in_list_vis(ch, arg, world[IN_ROOM(ch)].contents)))
+      if (pass == 1)
          {
-         send_to_char(ch, "You can't find it!\r\n");
-         release_buffer(arg);
-         return;
+         if (!first_word_retry(arg, first))
+            break;
+         name = first;
          }
-      else
-         on_ground = 1;
+      if (!(temp = get_obj_in_list_vis_exact(ch, name, ch->carrying)))
+         if ((temp = get_obj_in_list_vis_exact(ch, name, world[IN_ROOM(ch)].contents)))
+            on_ground = 1;
+      }
+   release_buffer(first);
+   }
+   if (!temp)
+      {
+      send_to_char(ch, "You can't find it!\r\n");
+      release_buffer(arg);
+      return;
       }
    release_buffer(arg);
 
@@ -1694,7 +1710,7 @@ ACMD(do_eat)
    if(IS_NPC(ch))  /* cannot use GET_COND on mobs */
       return;
    arg = get_buffer(MAX_INPUT_LENGTH);
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!*arg)
       {
@@ -2674,7 +2690,7 @@ ACMD(do_wield)
    struct obj_data *obj;
    char *arg=get_buffer(MAX_INPUT_LENGTH);
 
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
    if(IS_MONK(ch)&&GET_LEVEL(ch)<LVL_IMMORT)
       {
       send_to_char(ch,"Monks do not need weapons, only their bare hands!\r\n");
@@ -2734,7 +2750,7 @@ ACMD(do_grab)
    struct obj_data *obj;
    char *arg=get_buffer(MAX_INPUT_LENGTH);
 
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!*arg)
       send_to_char(ch, "Hold what?\r\n");
@@ -2827,7 +2843,13 @@ ACMD(do_remove)
   }
   else
   {
-    if (!get_object_in_equip_vis(ch, arg, ch->equipment, &i))
+    char *name = get_buffer(MAX_INPUT_LENGTH);
+    struct obj_data *worn;
+
+    phrase_argument(argument, name);
+    worn = get_object_in_equip_vis(ch, name, ch->equipment, &i);
+    release_buffer(name);
+    if (!worn)
     {
       /* Check for graffiti. */
       if (starts_with("graffiti", arg)) {
@@ -3017,7 +3039,7 @@ ACMD(do_repair)
    }
 
    arg=get_buffer(256);
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!*arg)
       {
@@ -3119,7 +3141,7 @@ ACMD(do_recharge)
       }
       */
    arg=get_buffer(256);
-   one_argument(argument, arg);
+   phrase_argument(argument, arg);
 
    if (!*arg)
       {

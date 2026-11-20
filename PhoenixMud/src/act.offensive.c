@@ -62,7 +62,7 @@ ACMD(do_assist)
         }
 
     arg=get_buffer(MAX_INPUT_LENGTH);
-    one_argument(argument, arg);
+    phrase_argument(argument, arg);
 
     if (!*arg)
         {
@@ -137,7 +137,7 @@ ACMD(do_hit)
     struct char_data *vict;
     char *arg=get_buffer(MAX_INPUT_LENGTH);
 
-    one_argument(argument, arg);
+    phrase_argument(argument, arg);
 
     if (!*arg)
         send_to_char(ch, "Hit who?\r\n");
@@ -230,7 +230,7 @@ ACMD(do_plink)
     struct descriptor_data *i;
     char *arg=get_buffer(MAX_INPUT_LENGTH);
 
-    one_argument(argument,arg);
+    phrase_argument(argument, arg);
 
     if (!*arg)
         {
@@ -295,7 +295,7 @@ ACMD(do_smite)
     struct descriptor_data *i;
     char *arg=get_buffer(MAX_INPUT_LENGTH);
 
-    one_argument(argument,arg);
+    phrase_argument(argument, arg);
 
     if (!*arg)
         {
@@ -352,7 +352,7 @@ ACMD(do_slay)
     char *arg=get_buffer(MAX_INPUT_LENGTH);
 
 
-    one_argument(argument, arg);
+    phrase_argument(argument, arg);
 
     if (!*arg)
         {
