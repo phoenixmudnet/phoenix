@@ -109,7 +109,7 @@ ACMD(do_action)
 
    buf=get_buffer(MAX_INPUT_LENGTH);
    if (action->char_found && argument) 
-      one_argument(argument, buf); 
+      phrase_argument(argument, buf); 
    else 
       *buf = '\0'; 
  
@@ -257,7 +257,7 @@ ACMD(do_insult)
    struct char_data *victim; 
  
    char *arg = get_buffer(MAX_INPUT_LENGTH);
-   one_argument(argument, arg); 
+   phrase_argument(argument, arg); 
  
    if (*arg) 
       { 

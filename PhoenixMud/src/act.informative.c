@@ -1537,7 +1537,7 @@ char *find_exdesc(char *word, struct extra_descr_data *list)
 	struct extra_descr_data *i;
 
 	for (i = list; i; i = i->next)
-		if (isname(word, i->keyword))
+		if (isname_all(word, i->keyword))
 			return (i->description);
 
 	return (NULL);
@@ -1548,23 +1548,14 @@ char *find_exdesc(char *word, struct extra_descr_data *list)
  * matches the target.  First, see if there is another char in the room
  * with the name.  Then check local objs for exdescs.
  */
-void look_at_target(struct char_data *ch, char *arg)
+static int look_at_target_1(struct char_data *ch, char *arg, char *name, int whole)
 {
 	int bits, found = FALSE, j, i = 0, fnum;
 	struct char_data *found_char = NULL;
 	struct obj_data *obj, *found_obj = NULL;
 	char *desc, *tar_obj, *tmp_char;
 
-	if (!ch->desc)
-		return;
-
-	if (!*arg) {
-		send_to_char(ch, "Look at what?\r\n");
-		return;
-	}
-
-	skip_spaces(&arg);
-	bits = generic_find(arg, FIND_OBJ_INV | FIND_OBJ_ROOM | FIND_OBJ_EQUIP |
+	bits = generic_find_exact(name, FIND_OBJ_INV | FIND_OBJ_ROOM | FIND_OBJ_EQUIP |
 			    FIND_CHAR_ROOM, ch, &found_char, &found_obj);
 
 	/* Is the target a character? */
@@ -1573,7 +1564,9 @@ void look_at_target(struct char_data *ch, char *arg)
 		tmp_char = get_buffer(256);
 		half_chop(arg, tmp_char, tar_obj);
 
-		if (*tar_obj) {
+		/* "look guard sword": the rest names something the guard wears,
+		   unless the whole phrase named the guard. */
+		if (*tar_obj && !whole) {
 			for (j = 0; (j < NUM_WEARS) && !found; j++) {
 				if (GET_EQ(found_char, j)
 				    && CAN_SEE_OBJ(ch, GET_EQ(found_char, j))) {
@@ -1607,7 +1600,7 @@ void look_at_target(struct char_data *ch, char *arg)
 			if (found == TRUE) {
 				release_buffer(tar_obj);
 				release_buffer(tmp_char);
-				return;
+				return 1;
 			}
 		}
 		look_at_char(found_char, ch);
@@ -1620,27 +1613,25 @@ void look_at_target(struct char_data *ch, char *arg)
 		}
 		release_buffer(tar_obj);
 		release_buffer(tmp_char);
-		return;
+		return 1;
 	}
 
-	if (!(fnum = get_number(&arg))) {
-		send_to_char(ch, "You do not see that here.\r\n");
-		return;
-	}
+	if (!(fnum = get_number(&name)))
+		return 0;
 
 	/* Does the argument match an extra desc in the room? */
-	if ((desc = find_exdesc(arg, world[IN_ROOM(ch)].ex_description)) != NULL
+	if ((desc = find_exdesc(name, world[IN_ROOM(ch)].ex_description)) != NULL
 	    && ++i == fnum) {
 		if (ch->desc)
 			page_string(ch->desc, desc, FALSE, "");
-		return;
+		return 1;
 	}
 
 	/* Does the argument match an extra desc in the char's equipment? */
 	for (j = 0; (j < NUM_WEARS) && !found; j++) {
 		if (GET_EQ(ch, j) && CAN_SEE_OBJ(ch, GET_EQ(ch, j))) {
 			if ((desc =
-			     find_exdesc(arg,
+			     find_exdesc(name,
 					 GET_EQ(ch, j)->ex_description)) != NULL
 			    && ++i == fnum) {
 				send_to_char(ch, "%s", desc);
@@ -1652,7 +1643,7 @@ void look_at_target(struct char_data *ch, char *arg)
 	for (obj = ch->carrying; obj && !found; obj = obj->next_content) {
 		if (CAN_SEE_OBJ(ch, obj)) {
 			if ((desc =
-			     find_exdesc(arg, obj->ex_description)) != NULL
+			     find_exdesc(name, obj->ex_description)) != NULL
 			    && ++i == fnum) {
 				send_to_char(ch, "%s", desc);
 				found = TRUE;
@@ -1665,7 +1656,7 @@ void look_at_target(struct char_data *ch, char *arg)
 	     obj = obj->next_content) {
 		if (CAN_SEE_OBJ(ch, obj)) {
 			if ((desc =
-			     find_exdesc(arg, obj->ex_description)) != NULL
+			     find_exdesc(name, obj->ex_description)) != NULL
 			    && ++i == fnum) {
 				send_to_char(ch, "%s", desc);
 				found = TRUE;
@@ -1678,12 +1669,40 @@ void look_at_target(struct char_data *ch, char *arg)
 			show_obj_to_char(found_obj, ch, 5);	/* Show no-description */
 		else
 			show_obj_to_char(found_obj, ch, 7);	/* Find hum, glow etc */
+		return 1;
+	}
+
+	return (found);
+}
+
+/*
+ * The whole argument is the name (fill words dropped). It is looked for
+ * everywhere first; only when it matches nothing is its first word tried,
+ * with the rest naming something a person wears, as before.
+ */
+void look_at_target(struct char_data *ch, char *arg)
+{
+	char *name, *first;
+	int shown;
+
+	if (!ch->desc)
+		return;
+
+	if (!*arg) {
+		send_to_char(ch, "Look at what?\r\n");
 		return;
 	}
 
-	if (!found) {
+	name = get_buffer(MAX_INPUT_LENGTH);
+	first = get_buffer(MAX_INPUT_LENGTH);
+	phrase_argument(arg, name);
+	shown = *name && look_at_target_1(ch, name, name, TRUE);
+	if (!shown && first_word_retry(name, first))
+		shown = look_at_target_1(ch, name, first, FALSE);
+	if (!shown)
 		send_to_char(ch, "You do not see that here.\r\n");
-	}
+	release_buffer(first);
+	release_buffer(name);
 }
 
 ACMD(do_look)
@@ -1749,7 +1768,7 @@ ACMD(do_examine)
 	char *buf;
 	int condition;
 
-	one_argument(argument, arg);
+	phrase_argument(argument, arg);
 
 	if (!*arg) {
 		send_to_char(ch, "Examine what?\r\n");
@@ -4529,7 +4548,7 @@ ACMD(do_consider)
 	signed int diff;
 	char *buf = get_buffer(MAX_INPUT_LENGTH);
 
-	one_argument(argument, buf);
+	phrase_argument(argument, buf);
 
 	if (!(victim = get_char_vis(ch, buf, FIND_CHAR_ROOM))) {
 		send_to_char(ch, "Consider killing who?\r\n");
@@ -4657,7 +4676,7 @@ ACMD(do_diagnose)
 	struct char_data *vict;
 	char *buf = get_buffer(MAX_INPUT_LENGTH);
 
-	one_argument(argument, buf);
+	phrase_argument(argument, buf);
 
 	if (*buf) {
 		if (!(vict = get_char_vis(ch, buf, FIND_CHAR_ROOM))) {

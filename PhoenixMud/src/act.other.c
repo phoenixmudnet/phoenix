@@ -987,7 +987,7 @@ ACMD(do_group)
    int found;
    char *buf=get_buffer(MAX_INPUT_LENGTH);
 
-   one_argument(argument, buf);
+   phrase_argument(argument, buf);
 
    if (!*buf)
       {
@@ -1049,7 +1049,7 @@ ACMD(do_ungroup)
    struct char_data *tch;
    char *buf=get_buffer(MAX_INPUT_LENGTH);
 
-   one_argument(argument, buf);
+   phrase_argument(argument, buf);
 
    if (!*buf)
    {
@@ -1940,7 +1940,7 @@ ACMD(do_sac)
    struct obj_data *tmp_obj;
    char *buf=get_buffer(MAX_INPUT_LENGTH);
 
-   one_argument(argument, buf);
+   phrase_argument(argument, buf);
 
    if (*buf)
       {

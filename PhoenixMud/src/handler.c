@@ -1980,6 +1980,27 @@ void extract_char(struct char_data * ch)
 *********************************************************************** */
 
 
+/*
+ * A name lookup matches the whole phrase first (isname_all); when the phrase
+ * has more than one word and nothing matches it, the lookup is run again on
+ * its first word, as the name was read before. Puts that first word in buf
+ * and returns 1 when there is a retry to make.
+ */
+int first_word_retry(const char *name, char *buf)
+{
+   const char *p = name;
+   int n = 0;
+
+   while (*p && isspace((unsigned char) *p))
+      p++;
+   while (*p && !isspace((unsigned char) *p) && n < MAX_INPUT_LENGTH - 1)
+      buf[n++] = *p++;
+   buf[n] = '\0';
+   while (*p && isspace((unsigned char) *p))
+      p++;
+   return (n > 0 && *p);
+}
+
 struct char_data *get_player_vis(struct char_data * ch, char *name, int inroom)
    {
    struct char_data *i;
@@ -2001,7 +2022,7 @@ struct char_data *get_player_vis(struct char_data * ch, char *name, int inroom)
    }
 
 
-struct char_data *get_char_room_vis(struct char_data * ch, char *name)
+static struct char_data *char_room_vis_1(struct char_data * ch, char *name)
    {
    struct char_data *i;
    int j = 0, vnumber;
@@ -2050,6 +2071,22 @@ struct char_data *get_char_room_vis(struct char_data * ch, char *name)
 
    release_buffer(tmp);
    return NULL;
+   }
+
+struct char_data *get_char_room_vis(struct char_data * ch, char *name)
+   {
+   struct char_data *i;
+   char *first;
+
+   if (!name)
+      return NULL;
+   if ((i = char_room_vis_1(ch, name)) != NULL)
+      return i;
+   first = get_buffer(MAX_INPUT_LENGTH);
+   if (first_word_retry(name, first))
+      i = char_room_vis_1(ch, first);
+   release_buffer(first);
+   return i;
    }
 
 struct room_direction_data *get_other_room_dir(struct room_data *rd,char *name,
@@ -2137,7 +2174,10 @@ struct room_direction_data *get_room_dir(struct room_data *rd,char *name,
 
 
 
-struct char_data *get_char_vis(struct char_data * ch, char *name,int location)
+/* The lookup matching name exactly as given (every word, no first-word
+   retry), for a caller that tries a whole phrase across several places
+   before retrying. */
+struct char_data *get_char_vis_exact(struct char_data * ch, char *name,int location)
    {
    struct char_data *i;
    int j = 0, vnumber;
@@ -2147,10 +2187,10 @@ struct char_data *get_char_vis(struct char_data * ch, char *name,int location)
       return NULL;
    /* check the room first */
    if (location == FIND_CHAR_ROOM)
-      return get_char_room_vis(ch, name);
+      return char_room_vis_1(ch, name);
    else if (location == FIND_CHAR_WORLD)
       {
-      if ((i = get_char_room_vis(ch, name)) != NULL)
+      if ((i = char_room_vis_1(ch, name)) != NULL)
          return i;
 
       tmp=get_buffer(MAX_INPUT_LENGTH);
@@ -2174,9 +2214,23 @@ struct char_data *get_char_vis(struct char_data * ch, char *name,int location)
    return NULL;
    }
 
+struct char_data *get_char_vis(struct char_data * ch, char *name,int location)
+   {
+   struct char_data *i;
+   char *first;
+
+   if ((i = get_char_vis_exact(ch, name, location)) != NULL || !*name)
+      return i;
+   first = get_buffer(MAX_INPUT_LENGTH);
+   if (first_word_retry(name, first))
+      i = get_char_vis_exact(ch, first, location);
+   release_buffer(first);
+   return i;
+   }
 
 
-struct obj_data *get_obj_in_list_vis(struct char_data * ch, char *name,
+
+struct obj_data *get_obj_in_list_vis_exact(struct char_data * ch, char *name,
                                               struct obj_data * list)
    {
    struct obj_data *i;
@@ -2208,25 +2262,40 @@ struct obj_data *get_obj_in_list_vis(struct char_data * ch, char *name,
    return NULL;
    }
 
+struct obj_data *get_obj_in_list_vis(struct char_data * ch, char *name,
+                                              struct obj_data * list)
+   {
+   struct obj_data *i;
+   char *first;
+
+   if ((i = get_obj_in_list_vis_exact(ch, name, list)) != NULL)
+      return i;
+   first = get_buffer(MAX_INPUT_LENGTH);
+   if (first_word_retry(name, first))
+      i = get_obj_in_list_vis_exact(ch, first, list);
+   release_buffer(first);
+   return i;
+   }
+
 
 
 
 /* search the entire world for an object, and return a pointer  */
-struct obj_data *get_obj_vis(struct char_data * ch, char *name)
+struct obj_data *get_obj_vis_exact(struct char_data * ch, char *name)
    {
    struct obj_data *i;
    int j = 0, vnumber;
    char *tmp =get_buffer(MAX_INPUT_LENGTH);
 
    /* scan items carried */
-   if ((i = get_obj_in_list_vis(ch, name, ch->carrying))!=NULL)
+   if ((i = get_obj_in_list_vis_exact(ch, name, ch->carrying))!=NULL)
       {
       release_buffer(tmp);
       return i;
       }
 
    /* scan room */
-   if ((i = get_obj_in_list_vis(ch, name, world[IN_ROOM(ch)].contents))!=NULL)
+   if ((i = get_obj_in_list_vis_exact(ch, name, world[IN_ROOM(ch)].contents))!=NULL)
       {
       release_buffer(tmp);
       return i;
@@ -2254,9 +2323,23 @@ struct obj_data *get_obj_vis(struct char_data * ch, char *name)
    return NULL;
    }
 
+struct obj_data *get_obj_vis(struct char_data * ch, char *name)
+   {
+   struct obj_data *i;
+   char *first;
+
+   if ((i = get_obj_vis_exact(ch, name)) != NULL)
+      return i;
+   first = get_buffer(MAX_INPUT_LENGTH);
+   if (first_word_retry(name, first))
+      i = get_obj_vis_exact(ch, first);
+   release_buffer(first);
+   return i;
+   }
 
 
-struct obj_data *get_object_in_equip_vis(struct char_data * ch,
+
+static struct obj_data *equip_vis_1(struct char_data * ch,
                char *arg,struct obj_data *equipment[],
                int *j)
    {
@@ -2267,6 +2350,22 @@ struct obj_data *get_object_in_equip_vis(struct char_data * ch,
                return (equipment[(*j)]);
 
    return NULL;
+   }
+
+struct obj_data *get_object_in_equip_vis(struct char_data * ch,
+               char *arg,struct obj_data *equipment[],
+               int *j)
+   {
+   struct obj_data *i;
+   char *first;
+
+   if ((i = equip_vis_1(ch, arg, equipment, j)) != NULL)
+      return i;
+   first = get_buffer(MAX_INPUT_LENGTH);
+   if (first_word_retry(arg, first))
+      i = equip_vis_1(ch, first, equipment, j);
+   release_buffer(first);
+   return i;
    }
 
 
@@ -2404,79 +2503,94 @@ struct obj_data *create_money(int amount)
  * describes what it filled in.
  */
 
-int generic_find(char *arg, bitvector_t bitvector, struct char_data * ch,
+/*
+ * generic_find matching name exactly as given (every word, no first-word
+ * retry); look tries the whole phrase across every place before retrying.
+ */
+int generic_find_exact(char *name, bitvector_t bitvector, struct char_data * ch,
                  struct char_data ** tar_ch, struct obj_data ** tar_obj)
    {
    int i, found;
-   char *name=get_buffer(256);
-   one_argument(arg, name);
 
    *tar_ch = NULL;
    *tar_obj = NULL;
    if (!*name||!bitvector)
-      {
-      release_buffer(name);
       return (0);
-      }
 
 
    if (IS_SET(bitvector, FIND_CHAR_ROOM))
       {
       /* Find person in room */
-      if ((*tar_ch = get_char_vis(ch, name,FIND_CHAR_ROOM))!=NULL)
+      if ((*tar_ch = get_char_vis_exact(ch, name,FIND_CHAR_ROOM))!=NULL)
          {
-         release_buffer(name);
          return (FIND_CHAR_ROOM);
          }
       }
    if (IS_SET(bitvector, FIND_OBJ_EQUIP))
       {
       for (found = FALSE, i = 0; i < NUM_WEARS && !found; i++)
-         if (GET_EQ(ch, i) && isname(name, GET_EQ(ch, i)->name))
+         if (GET_EQ(ch, i) && isname_all(name, GET_EQ(ch, i)->name))
             {
             *tar_obj = GET_EQ(ch, i);
             found = TRUE;
             }
       if (found)
          {
-         release_buffer(name);
          return (FIND_OBJ_EQUIP);
          }
       }
    if (IS_SET(bitvector, FIND_OBJ_INV))
       {
-      if ((*tar_obj = get_obj_in_list_vis(ch,name,ch->carrying))!=NULL)
+      if ((*tar_obj = get_obj_in_list_vis_exact(ch,name,ch->carrying))!=NULL)
          {
-         release_buffer(name);
          return (FIND_OBJ_INV);
          }
       }
    if (IS_SET(bitvector, FIND_OBJ_ROOM))
       {
-      if ((*tar_obj = get_obj_in_list_vis(ch, name, world[IN_ROOM(ch)].contents))!=NULL)
+      if ((*tar_obj = get_obj_in_list_vis_exact(ch, name, world[IN_ROOM(ch)].contents))!=NULL)
          {
-         release_buffer(name);
          return (FIND_OBJ_ROOM);
          }
       }
    if (IS_SET(bitvector, FIND_OBJ_WORLD))
       {
-      if ((*tar_obj = get_obj_vis(ch, name))!=NULL)
+      if ((*tar_obj = get_obj_vis_exact(ch, name))!=NULL)
          {
-         release_buffer(name);
          return (FIND_OBJ_WORLD);
          }
       }
    if (IS_SET(bitvector, FIND_CHAR_WORLD))
       {
-      if ((*tar_ch = get_char_vis(ch, name,FIND_CHAR_WORLD))!=NULL)
+      if ((*tar_ch = get_char_vis_exact(ch, name,FIND_CHAR_WORLD))!=NULL)
          {
-         release_buffer(name);
          return (FIND_CHAR_WORLD);
          }
       }
-   release_buffer(name);
    return (0);
+   }
+
+/*
+ * The whole argument is the name (fill words dropped): every word must
+ * match, and when the phrase matches nothing anywhere asked for, its first
+ * word is tried, as the name was read before.
+ */
+int generic_find(char *arg, bitvector_t bitvector, struct char_data * ch,
+                 struct char_data ** tar_ch, struct obj_data ** tar_obj)
+   {
+   int bits;
+   char *name = get_buffer(MAX_INPUT_LENGTH), *first;
+
+   phrase_argument(arg, name);
+   if (!(bits = generic_find_exact(name, bitvector, ch, tar_ch, tar_obj)))
+      {
+      first = get_buffer(MAX_INPUT_LENGTH);
+      if (first_word_retry(name, first))
+         bits = generic_find_exact(first, bitvector, ch, tar_ch, tar_obj);
+      release_buffer(first);
+      }
+   release_buffer(name);
+   return (bits);
    }
 
 

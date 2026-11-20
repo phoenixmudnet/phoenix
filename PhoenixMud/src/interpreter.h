@@ -37,6 +37,7 @@ char	lower( char c );
 char	*one_argument(char *argument, char *first_arg);
 char	*one_word(char *argument, char *first_arg);
 char	*any_one_arg(char *argument, char *first_arg);
+char	*phrase_argument(char *argument, char *buf);
 char	*two_arguments(char *argument, char *first_arg, char *second_arg);
 char *five_arguments(char *argument, char *first_arg, char *second_arg, char *third_arg, char *fourth_arg, char *fifth_arg);
 

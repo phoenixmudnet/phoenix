@@ -2128,7 +2128,7 @@ ACMD(do_cast)
       CAST_ARG(ch)[120]='\0';
       for (i = 0; CAST_ARG(ch)[i]; i++)
          CAST_ARG(ch)[i] = LOWER(CAST_ARG(ch)[i]);
-      one_argument(strcpy(arg, t), t);
+      phrase_argument(strcpy(arg, t), t);
       skip_spaces(&t);
       release_buffer(arg);
       }
@@ -2138,49 +2138,63 @@ ACMD(do_cast)
       }
    else if (t != NULL && *t)
       {
-      /* CAST_ARG was set above, from the full argument. */
+      /* CAST_ARG was set above, from the full argument. The target is
+         the whole phrase, looked for in every place first; only when it
+         matches nothing is its first word tried. */
+      char *first = get_buffer(MAX_INPUT_LENGTH), *name = t;
+      int pass;
 
-      if (!target && (IS_SET(SINFO.targets, TAR_CHAR_ROOM)))
+      for (pass = 0; pass < 2 && !target; pass++)
          {
-         if ((tch = get_char_vis(ch, t,FIND_CHAR_ROOM)) != NULL)
-            target = TRUE;
-         }
-
-      if(!target && IS_SET(SINFO.targets,TAR_DOOR))
-         {
-         if((tdr = get_room_dir(world,t,ch))!=NULL)
+         if (pass == 1)
             {
-            tdr2=get_other_room_dir(world,t,ch);
-            target=TRUE;
+            if (!first_word_retry(t, first))
+               break;
+            name = first;
             }
-         }
-
-      if (!target && IS_SET(SINFO.targets, TAR_OBJ_INV))
-         if ((tobj = get_obj_in_list_vis(ch, t, ch->carrying)))
-            target = TRUE;
-
-      if (!target && IS_SET(SINFO.targets, TAR_OBJ_EQUIP))
-         {
-         for (i = 0; !target && i < NUM_WEARS; i++)
-            if (GET_EQ(ch, i) && isname(t, GET_EQ(ch, i)->name))
-               {
-               tobj = GET_EQ(ch, i);
+         if (!target && (IS_SET(SINFO.targets, TAR_CHAR_ROOM)))
+            {
+            if ((tch = get_char_vis_exact(ch, name, FIND_CHAR_ROOM)) != NULL)
                target = TRUE;
+            }
+
+         if(!target && IS_SET(SINFO.targets,TAR_DOOR))
+            {
+            if((tdr = get_room_dir(world,name,ch))!=NULL)
+               {
+               tdr2=get_other_room_dir(world,name,ch);
+               target=TRUE;
                }
+            }
+
+         if (!target && IS_SET(SINFO.targets, TAR_OBJ_INV))
+            if ((tobj = get_obj_in_list_vis_exact(ch, name, ch->carrying)))
+               target = TRUE;
+
+         if (!target && IS_SET(SINFO.targets, TAR_OBJ_EQUIP))
+            {
+            for (i = 0; !target && i < NUM_WEARS; i++)
+               if (GET_EQ(ch, i) && isname_all(name, GET_EQ(ch, i)->name))
+                  {
+                  tobj = GET_EQ(ch, i);
+                  target = TRUE;
+                  }
+            }
+         if (!target && IS_SET(SINFO.targets, TAR_OBJ_ROOM))
+            if ((tobj = get_obj_in_list_vis_exact(ch, name, world[IN_ROOM(ch)].contents)))
+               target = TRUE;
+
+         if (!target && IS_SET(SINFO.targets, TAR_OBJ_WORLD))
+            if ((tobj = get_obj_vis_exact(ch, name)))
+               target = TRUE;
+
+         if (!target && (IS_SET(SINFO.targets, TAR_CHAR_WORLD)||
+                         (IS_SET(SINFO.targets, TAR_CHAR_ROOM)&&
+                          (GET_LEVEL(ch)>=LVL_IMMORT))))
+            if ((tch = get_char_vis_exact(ch, name, FIND_CHAR_WORLD)))
+               target = TRUE;
          }
-      if (!target && IS_SET(SINFO.targets, TAR_OBJ_ROOM))
-         if ((tobj = get_obj_in_list_vis(ch, t, world[IN_ROOM(ch)].contents)))
-            target = TRUE;
-
-      if (!target && IS_SET(SINFO.targets, TAR_OBJ_WORLD))
-         if ((tobj = get_obj_vis(ch, t)))
-            target = TRUE;
-
-      if (!target && (IS_SET(SINFO.targets, TAR_CHAR_WORLD)||
-                      (IS_SET(SINFO.targets, TAR_CHAR_ROOM)&&
-                       (GET_LEVEL(ch)>=LVL_IMMORT))))
-         if ((tch = get_char_vis(ch, t,FIND_CHAR_WORLD)))
-            target = TRUE;
+      release_buffer(first);
       }
    else
       {
