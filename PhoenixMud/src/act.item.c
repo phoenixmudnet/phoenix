@@ -2374,6 +2374,59 @@ void perform_wear(struct char_data * ch, struct obj_data * obj, int where_pos, i
 
    }
 
+/* The place perform_wear fills for pos: the second of a pair (finger,
+   neck, wrist, ear) when the first is taken. */
+static int wear_landing(struct char_data * ch, int pos)
+   {
+   if ((pos == WEAR_FINGER_R || pos == WEAR_NECK_1 ||
+        pos == WEAR_WRIST_R || pos == WEAR_EAR_L) && GET_EQ(ch, pos))
+      return (pos + 1);
+   return (pos);
+   }
+
+/* An item that fits more than one place goes to an empty one when the
+   place find_eq_pos chose already holds the same item: a second brillia's
+   light goes on the legs instead of over the first on the arms. Places are
+   tried in find_eq_pos order, last first. No empty place keeps the swap.
+   Hands and shield are not tried. */
+static int empty_place_for_twin(struct char_data * ch, struct obj_data * obj, int pos)
+   {
+   static const int places[][2] =
+      {
+         { ITEM_WEAR_HEART,  WEAR_HEART },
+         { ITEM_WEAR_BACK,   WEAR_BACK },
+         { ITEM_WEAR_FACE,   WEAR_FACE },
+         { ITEM_WEAR_EAR,    WEAR_EAR_L },
+         { ITEM_WEAR_WRIST,  WEAR_WRIST_R },
+         { ITEM_WEAR_WAIST,  WEAR_WAIST },
+         { ITEM_WEAR_ABOUT,  WEAR_ABOUT },
+         { ITEM_WEAR_ARMS,   WEAR_ARMS },
+         { ITEM_WEAR_HANDS,  WEAR_HANDS },
+         { ITEM_WEAR_FEET,   WEAR_FEET },
+         { ITEM_WEAR_LEGS,   WEAR_LEGS },
+         { ITEM_WEAR_HEAD,   WEAR_HEAD },
+         { ITEM_WEAR_BODY,   WEAR_BODY },
+         { ITEM_WEAR_NECK,   WEAR_NECK_1 },
+         { ITEM_WEAR_FINGER, WEAR_FINGER_R }
+      };
+   struct obj_data *worn;
+   int i;
+
+   if (pos < 0 || GET_OBJ_RNUM(obj) < 0)
+      return (pos);
+   worn = GET_EQ(ch, wear_landing(ch, pos));
+   if (!worn || GET_OBJ_RNUM(worn) != GET_OBJ_RNUM(obj))
+      return (pos);
+   for (i = 0; i < (int) (sizeof(places) / sizeof(places[0])); i++)
+      {
+      if (places[i][1] == pos || !CAN_WEAR(obj, places[i][0]))
+         continue;
+      if (!GET_EQ(ch, wear_landing(ch, places[i][1])))
+         return (places[i][1]);
+      }
+   return (pos);
+   }
+
 int find_eq_pos(struct char_data * ch, struct obj_data * obj, char *arg)
    {
    int where_pos = -1;
@@ -2444,6 +2497,7 @@ int find_eq_pos(struct char_data * ch, struct obj_data * obj, char *arg)
          where_pos = WEAR_BACK;
       if (CAN_WEAR(obj, ITEM_WEAR_HEART))
          where_pos = WEAR_HEART;
+      where_pos = empty_place_for_twin(ch, obj, where_pos);
       }
    else
       {
