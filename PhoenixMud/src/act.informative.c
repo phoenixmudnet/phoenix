@@ -2244,26 +2244,30 @@ ACMD(do_explored)
 
 ACMD(do_attribute)
 {
-	int real_stat;
+	/* One row per score. The descriptions are padded to the longest one
+	   shown, so the numbers line up. */
+	static const char *label[6] = { "Strength:", "Constitution:", "Dexterity:",
+		"Intelligence:", "Wisdom:", "Charisma:" };
+	const char *desc[6];
+	int cur[6], base[6], i, w = 0;
 
-	real_stat = MIN(9, GET_STR(ch) / 3);
-	send_to_char(ch, "Strength: %s (%d, base %d)\r\n", str_strings[real_stat],
-		     GET_STR(ch), ch->real_abils.str);
-	real_stat = MIN(9, GET_CON(ch) / 3);
-	send_to_char(ch, "Constitution: %s (%d, base %d)\r\n", con_strings[real_stat],
-		     GET_CON(ch), ch->real_abils.con);
-	real_stat = MIN(9, GET_DEX(ch) / 3);
-	send_to_char(ch, "Dexterity: %s (%d, base %d)\r\n", dex_strings[real_stat],
-		     GET_DEX(ch), ch->real_abils.dex);
-	real_stat = MIN(9, GET_INT(ch) / 3);
-	send_to_char(ch, "Intelligence: %s (%d, base %d)\r\n", int_strings[real_stat],
-		     GET_INT(ch), ch->real_abils.intel);
-	real_stat = MIN(9, GET_WIS(ch) / 3);
-	send_to_char(ch, "Wisdom: %s (%d, base %d)\r\n", wis_strings[real_stat],
-		     GET_WIS(ch), ch->real_abils.wis);
-	real_stat = MIN(9, GET_CHA(ch) / 3);
-	send_to_char(ch, "Charisma: %s (%d, base %d)\r\n", cha_strings[real_stat],
-		     GET_CHA(ch), ch->real_abils.cha);
+	cur[0] = GET_STR(ch); base[0] = ch->real_abils.str;
+	cur[1] = GET_CON(ch); base[1] = ch->real_abils.con;
+	cur[2] = GET_DEX(ch); base[2] = ch->real_abils.dex;
+	cur[3] = GET_INT(ch); base[3] = ch->real_abils.intel;
+	cur[4] = GET_WIS(ch); base[4] = ch->real_abils.wis;
+	cur[5] = GET_CHA(ch); base[5] = ch->real_abils.cha;
+	desc[0] = str_strings[MIN(9, cur[0] / 3)];
+	desc[1] = con_strings[MIN(9, cur[1] / 3)];
+	desc[2] = dex_strings[MIN(9, cur[2] / 3)];
+	desc[3] = int_strings[MIN(9, cur[3] / 3)];
+	desc[4] = wis_strings[MIN(9, cur[4] / 3)];
+	desc[5] = cha_strings[MIN(9, cur[5] / 3)];
+	for (i = 0; i < 6; i++)
+		w = MAX(w, (int) strlen(desc[i]));
+	for (i = 0; i < 6; i++)
+		send_to_char(ch, "%-13s %-*s  (%2d, base %2d)\r\n", label[i], w,
+			     desc[i], cur[i], base[i]);
 }
 
 ACMD(do_inventory)

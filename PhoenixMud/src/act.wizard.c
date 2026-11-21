@@ -3642,7 +3642,11 @@ ACMD(do_event)
          release_buffer(arg1); release_buffer(arg2);
          return;
       }
-      send_to_char(ch, "name             kind  value  window                             state\r\n");
+      /* The name column is as wide as the longest name. */
+      int w = 4;
+      for (i = 0; i < n_events; i++)
+         w = MAX(w, (int) strlen(event_list[i].name));
+      send_to_char(ch, "%-*s  kind  value  %-27s  state\r\n", w, "name", "window");
       for (i = 0; i < n_events; i++) {
          struct event_window *e = &event_list[i];
          char s1[64], s2[64];
@@ -3650,8 +3654,8 @@ ACMD(do_event)
                            : (now < e->start) ? "upcoming" : "expired";
          strftime(s1, sizeof(s1), "%b %e %H:%M", localtime(&e->start));
          strftime(s2, sizeof(s2), "%b %e %H:%M", localtime(&e->end));
-         sprintf(buf, "%-16s %-5s %5d  %s - %-18s %s\r\n",
-                 e->name, event_kind_name(e->kind), e->value, s1, s2, state);
+         sprintf(buf, "%-*s  %-5s %5d  %s - %s  %s\r\n",
+                 w, e->name, event_kind_name(e->kind), e->value, s1, s2, state);
          send_to_char(ch, "%s", buf);
       }
       release_buffer(arg1); release_buffer(arg2);
