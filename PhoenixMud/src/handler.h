@@ -54,6 +54,7 @@ void	obj_from_char(struct obj_data *object);
 void	equip_char(struct char_data *ch, struct obj_data *obj, int pos);
 struct obj_data *unequip_char(struct char_data *ch, int pos);
 struct obj_data *unequip_char_inner(struct char_data *ch, int pos);
+extern int equip_weight_check_off;
 int    invalid_align(struct char_data *ch, struct obj_data *obj);
 
 struct obj_data *get_obj_in_list(char *name, struct obj_data *list);

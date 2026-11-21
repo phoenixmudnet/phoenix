@@ -1027,6 +1027,13 @@ int invalid_align(struct char_data *ch, struct obj_data *obj)
    return FALSE;
    }
 
+/* Set while char_to_store puts a saved kit back on (db.c): the weapon is
+   checked once, with every piece back, by save_char's own last call, not
+   after each piece. Checked after each, a weapon held up by STR from gear in
+   a later slot (held, face, back, heart) was knocked loose, or dropped, on
+   every save. */
+int equip_weight_check_off = 0;
+
 void equip_char(struct char_data * ch, struct obj_data * obj, int pos)
    {
    int j;
@@ -1141,7 +1148,8 @@ void equip_char(struct char_data * ch, struct obj_data * obj, int pos)
          }
       }
    affect_total(ch);
-   check_weapon_weight(ch);
+   if (!equip_weight_check_off)
+      check_weapon_weight(ch);
    }
 
 

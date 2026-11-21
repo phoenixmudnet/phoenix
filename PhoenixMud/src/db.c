@@ -4676,6 +4676,9 @@ void char_to_store(struct char_data * ch, struct char_file_u * st,
          affect_to_char(ch, &st->affected[i]);
       }
 
+   /* The weapon is checked once, with the whole kit back: save_char's last
+      call. Not by each equip_char here (equip_weight_check_off, handler.c). */
+   equip_weight_check_off = 1;
    for (i = 0; i < NUM_WEARS; i++)
       {
       if (char_eq[i])
@@ -4687,6 +4690,7 @@ void char_to_store(struct char_data * ch, struct char_file_u * st,
          }
 
       }
+   equip_weight_check_off = 0;
    /*   affect_total(ch); unnecessary, I think !?! */
    if(!AFF_FLAGGED(ch,AFF_FLY)&&AFF2_FLAGGED(ch,AFF2_FLYING))
       {
