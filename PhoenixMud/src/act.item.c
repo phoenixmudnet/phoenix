@@ -603,7 +603,10 @@ ACMD(do_get)
       cont_dotmode = find_all_dots(arg2);
       if (cont_dotmode == FIND_INDIV)
          {
-         mode = generic_find(arg2, FIND_OBJ_INV | FIND_OBJ_ROOM|FIND_OBJ_EQUIP,
+         /* The kill-time loot (SCMD_LOOT, fight.c) takes from the corpse on
+          * the floor: a corpse the killer carries or wears is not the kill's. */
+         mode = generic_find(arg2, subcmd == SCMD_LOOT ? FIND_OBJ_ROOM
+                             : FIND_OBJ_INV | FIND_OBJ_ROOM|FIND_OBJ_EQUIP,
                              ch, &tmp_char, &cont);
          if (!cont)
             {
