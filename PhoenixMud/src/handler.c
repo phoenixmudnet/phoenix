@@ -1794,7 +1794,9 @@ void extract_char(struct char_data * ch)
    if (ch) {
      for (i = 0; i < ch->num_casters; i++) {
        struct char_data *caster = find_char(ch->casting_on_me[i]);
-       if (caster) {
+       /* the list keeps a caster whose chant ended another way (lost
+        * concentration): stop only a chant still aimed here */
+       if (caster && IS_CASTING(caster) && CAST_TCH(caster) == ch) {
 	 /*log("Halted %s from casting.", GET_NAME(caster));*/
 	 reset_casting_data(caster);
 	 send_to_char(caster, "You stop chanting.\r\n");
