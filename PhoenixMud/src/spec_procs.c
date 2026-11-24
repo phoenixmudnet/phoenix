@@ -3037,6 +3037,9 @@ SPECIAL(healer)
                      return TRUE;
                      }
                   cast_spell(heal,ch,tobj,NULL, NULL,SPELL_REMOVE_CURSE,castLevel);
+                  GET_GOLD(ch) = GET_GOLD(ch)-cost;
+                  if(GET_GOLD(ch)<0)
+                     GET_GOLD(ch)=0;
                   }
                else
                   send_to_char(ch, "\r\nThe Healer says, 'I don't see the %s on you anywhere.'\r\n", arg3);
