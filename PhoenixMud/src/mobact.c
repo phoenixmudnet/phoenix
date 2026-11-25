@@ -95,6 +95,19 @@ void mob_citizen_help(struct char_data *ch)
       }
    }
 
+/* a rager with no fight left calms down, and the rage wears off */
+void rage_calm(struct char_data *ch)
+   {
+   if (!ch || FIGHTING(ch))
+      return;
+   if(AFF_FLAGGED(ch,AFF_RAGE))
+      {
+      send_to_char(ch, "You slowly calm down.\r\n");
+      act("$n slowly calms down.",TRUE,ch,0,0,TO_ROOM);
+      }
+   affect_from_char(ch,SKILL_RAGE);
+   }
+
 void rage_check(struct char_data *ch)
    {
    struct char_data *tmp_victim;
@@ -120,15 +133,7 @@ void rage_check(struct char_data *ch)
                break;
                }
          }
-   if(!FIGHTING(ch))/*no more victims*/
-      {
-      if(AFF_FLAGGED(ch,AFF_RAGE))
-         {
-         send_to_char(ch, "You slowly calm down.\r\n");
-         act("$n slowly calms down.",TRUE,ch,0,0,TO_ROOM);
-         }
-      affect_from_char(ch,SKILL_RAGE);
-      }
+   rage_calm(ch);
 
    }
 

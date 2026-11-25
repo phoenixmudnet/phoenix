@@ -66,6 +66,7 @@ void mprog_hitprcnt_trigger(struct char_data * mob, struct char_data * ch);
 void mprog_death_trigger(struct char_data * mob, struct char_data * killer);
 void mprog_fight_trigger(struct char_data * mob, struct char_data * ch);
 void rage_check(struct char_data *ch);
+void rage_calm(struct char_data *ch);
 int compute_armor_class(struct char_data *ch);
 int compute_thaco(struct char_data *ch);
 void dismount_char(struct char_data *ch);
@@ -2043,6 +2044,7 @@ void raw_kill(struct char_data * ch, struct char_data *killer)
 void die(struct char_data *ch, struct char_data *killer)
    {
    int same=FALSE;
+   room_rnum killer_room;
 
    if(ch==killer)
       same=TRUE;
@@ -2079,9 +2081,18 @@ void die(struct char_data *ch, struct char_data *killer)
          GET_WAIT_STATE(killer)=15;
 
       }
+   /* raw_kill runs the death trigger, and one can move the killer (the
+    * gremort mobs' mteleport): the move ended the killer's fight, so it calms
+    * down where it lands and never picks a fight there */
+   killer_room = IN_ROOM(killer);
    raw_kill(ch,killer);
    if(same==FALSE)
-      rage_check(killer);
+      {
+      if (IN_ROOM(killer) == killer_room)
+         rage_check(killer);
+      else
+         rage_calm(killer);
+      }
 
    }
 
