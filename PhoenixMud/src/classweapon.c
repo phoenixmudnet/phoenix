@@ -1367,12 +1367,14 @@ static void cw_armor_pay(struct char_data *ch, struct char_data *victim, double 
       cw_armor_drop(ch, victim, st, slot);
    }
 
+/* where each armor stat applies, in armor_math.h's stat order */
+static const int cw_armor_loc[ARMOR_NUM_STATS] =
+   { APPLY_HIT, APPLY_MANA, APPLY_STR, APPLY_DEX, APPLY_HITROLL, APPLY_DAMROLL,
+     APPLY_SAVING_SPELL, APPLY_SAVING_BREATH, APPLY_AC };
+
 /* an attuned piece's stats on its wearer: equip, unequip and affect_total */
 void cw_armor_affect(struct char_data *ch, struct obj_data *obj, int add)
    {
-   static const int loc[ARMOR_NUM_STATS] =
-      { APPLY_HIT, APPLY_MANA, APPLY_STR, APPLY_DEX, APPLY_HITROLL, APPLY_DAMROLL,
-        APPLY_SAVING_SPELL, APPLY_SAVING_BREATH, APPLY_AC };
    int totals[ARMOR_NUM_STATS], i;
 
    if (!class_weapons || !ch || !obj || !obj->armor || obj->armor->num <= 0)
@@ -1380,7 +1382,25 @@ void cw_armor_affect(struct char_data *ch, struct obj_data *obj, int add)
    armor_totals(obj->armor, totals);
    for (i = 0; i < ARMOR_NUM_STATS; i++)
       if (totals[i])
-         affect_modify(ch, loc[i], totals[i], 0, add);
+         affect_modify(ch, cw_armor_loc[i], totals[i], 0, add);
+   }
+
+/* an attuned piece's hit points, mana and moves, for the (+N) score prints
+ * beside each maximum: they are the piece's, as its own applies are */
+void cw_armor_score_adds(struct obj_data *obj, int *hp, int *mana, int *move)
+   {
+   int totals[ARMOR_NUM_STATS], i;
+
+   if (!class_weapons || !obj || !obj->armor || obj->armor->num <= 0)
+      return;
+   armor_totals(obj->armor, totals);
+   for (i = 0; i < ARMOR_NUM_STATS; i++)
+      if (cw_armor_loc[i] == APPLY_HIT)
+         *hp += totals[i];
+      else if (cw_armor_loc[i] == APPLY_MANA)
+         *mana += totals[i];
+      else if (cw_armor_loc[i] == APPLY_MOVE)
+         *move += totals[i];
    }
 
 /* "hit points +20, dexterity +1" */
