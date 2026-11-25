@@ -28,6 +28,7 @@
 #include "constants.h"
 #include "dg_scripts.h"
 #include "help_match.h"
+#include "classweapon.h"
 
 #define ZCMD zone_table[zone].cmd[cmd_no]
 
@@ -1949,6 +1950,8 @@ ACMD(do_score)
                   continue;
                }
             }
+         /* a class armor piece's attuned stats count as the piece's own */
+         cw_armor_score_adds(GET_EQ(ch, i), &hpadd, &manadd, &movadd);
          }
       }
 

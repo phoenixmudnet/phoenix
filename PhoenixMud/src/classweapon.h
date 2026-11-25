@@ -54,6 +54,7 @@ void cw_set_down_corpses(struct char_data *ch);
 /* class armor: an attuned piece's stats on its wearer (equip, unequip and
  * affect_total), and the record beside the pfile at every save */
 void cw_armor_affect(struct char_data *ch, struct obj_data *obj, int add);
+void cw_armor_score_adds(struct obj_data *obj, int *hp, int *mana, int *move);
 void cw_armor_save(const char *name, long idnum);
 
 #endif
