@@ -1946,7 +1946,7 @@ int cast_spell(struct char_data * ch, struct char_data * tch,
           * Everything else keeps the undercast shaving, so a damage spell
           * or debuff cast below your practice level still buys a tick.
           */
-         if(is_combat_buff(spellnum))
+         if(is_fast_cast(spellnum))
             CAST_TIME(ch) = MAX(min_time,
                                 spells[spellnum].cast_time-(GET_SKILL(ch,spellnum)-1));
          else
