@@ -208,6 +208,43 @@ int is_combat_buff(int spellnum)
 }
 
 /*
+ * is_fast_cast (4.2): the spells whose cast time follows the practice level
+ * alone (spell_parser.c), one tick a level off the base: practised, they go
+ * on without standing still. The combat buffs, and the buffs that are not
+ * combat buffs: the detects, the movement and sight spells, invisibility,
+ * and the group armor, sanctuary, infravision and levitate. Those still
+ * DECAY out of combat (they are not in is_combat_buff); only the cast is
+ * quicker. Heals, cures, travel and every attack keep the undercast rule.
+ */
+int is_fast_cast(int spellnum)
+{
+   if (is_combat_buff(spellnum))
+      return TRUE;
+   switch (spellnum)
+      {
+      case SPELL_DETECT_ALIGN:          /* 18  */
+      case SPELL_DETECT_INVIS:          /* 19  */
+      case SPELL_DETECT_MAGIC:          /* 20  */
+      case SPELL_INVISIBLE:             /* 29  */
+      case SPELL_SENSE_LIFE:            /* 44  */
+      case SPELL_GROUP_ARMOR:           /* 47  */
+      case SPELL_INFRAVISION:           /* 50  */
+      case SPELL_WATERWALK:             /* 51  */
+      case SPELL_GROUP_INFRAVISION:     /* 61  */
+      case SPELL_LEVITATE:              /* 65  */
+      case SPELL_INSPIRE:               /* 69  */
+      case SPELL_DREAM_SIGHT:           /* 70  */
+      case SPELL_WATER_BREATHE:         /* 85  */
+      case SPELL_GROUP_SANC:            /* 100 */
+      case SPELL_GROUP_LEVITATE:        /* 101 */
+      case SPELL_FLY:                   /* 129 */
+         return TRUE;
+      default:
+         return FALSE;
+      }
+}
+
+/*
  * 4.2: how long a gifted fern may be held, in days, whatever the holder does
  * with it. Owner ruling 2026-08-22. The in-combat duration (24*level ticks) is
  * the VALUE cap; this is the SHELF LIFE.

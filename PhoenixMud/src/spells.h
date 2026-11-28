@@ -447,8 +447,9 @@ int mag_check(int level, struct char_data *ch, struct char_data *victim,
 /* 4.2: may the carrier drop this affect at will? Defined in magic.c beside
  * is_combat_buff so the two lists stay adjacent. */
 int is_removable_buff(int type);
-/* Shared with spell_parser.c: buff cast time follows the practice level. */
 int is_combat_buff(int spellnum);
+/* Shared with spell_parser.c: a buff's cast time follows the practice level. */
+int is_fast_cast(int spellnum);
 
 void mag_affects(int level, struct char_data *ch, struct char_data *victim,
 		 int spellnum, int savetype);
